@@ -1,7 +1,7 @@
-From 0975276898d0520316db807780e611be363afe3c Mon Sep 17 00:00:00 2001
+From 12f404fac6937f4c6103e64ef3f99856f78b1145 Mon Sep 17 00:00:00 2001
 From: Dolu1990 <charles.papon.90@gmail.com>
 Date: Fri, 7 Jan 2022 10:11:42 +0800
-Subject: [PATCH 3/3] driver: add debug serial riscv driver
+Subject: [PATCH 3/4] driver: add debug serial riscv driver
 
 Signed-off-by: Dolu1990 <charles.papon.90@gmail.com>
 Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
