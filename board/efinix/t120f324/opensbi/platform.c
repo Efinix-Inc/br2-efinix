@@ -36,30 +36,12 @@
 
 /* clang-format on */
 
+static struct clint_data clint = {VEX_CLINT_ADDR, 0, VEX_HART_COUNT, true};
+
 static int vex_final_init(bool cold_boot)
 {
 	return 0;
 }
-
-static u32 vex_pmp_region_count(u32 hartid)
-{
-	return 0;
-}
-
-static int vex_pmp_region_info(u32 hartid, u32 index, ulong *prot, ulong *addr,
-				ulong *log2size)
-{
-	int ret = 0;
-
-	switch (index) {
-	default:
-		ret = -1;
-		break;
-	};
-
-	return ret;
-}
-
 
 void vex_putc(char ch){
 	while(((readl(VEX_UART_ADDR + UART_STATUS) >> 16) & 0xFF) == 0);
@@ -85,7 +67,7 @@ static int vex_ipi_init(bool cold_boot)
 	int rc;
 
 	if (cold_boot) {
-		rc = clint_cold_ipi_init(VEX_CLINT_ADDR, VEX_HART_COUNT);
+		rc = clint_cold_ipi_init(&clint);
 		if (rc)
 			return rc;
 	}
@@ -98,8 +80,7 @@ static int vex_timer_init(bool cold_boot)
 	int rc;
 
 	if (cold_boot) {
-		rc = clint_cold_timer_init(VEX_CLINT_ADDR,
-					   VEX_HART_COUNT, TRUE);
+		rc = clint_cold_timer_init(&clint, NULL);
 		if (rc)
 			return rc;
 	}
@@ -107,18 +88,19 @@ static int vex_timer_init(bool cold_boot)
 	return clint_warm_timer_init();
 }
 
-static int vex_system_down(u32 type)
+static int vex_system_reset_check(u32 type, u32 reason)
+{
+	return 0;
+}
+
+static void vex_system_reset(u32 type, u32 reason)
 {
 	/* Tell the "finisher" that the simulation
 	 * was successful so that QEMU exits
 	 */
-
-	return 0;
 }
 
 const struct sbi_platform_operations platform_ops = {
-	.pmp_region_count	= vex_pmp_region_count,
-	.pmp_region_info	= vex_pmp_region_info,
 	.final_init		    = vex_final_init,
 	.console_putc		= vex_putc,
 	.console_getc		= vex_getc,
@@ -130,9 +112,9 @@ const struct sbi_platform_operations platform_ops = {
 	.timer_value		= clint_timer_value,
 	.timer_event_stop	= clint_timer_event_stop,
 	.timer_event_start	= clint_timer_event_start,
-	.timer_init			= vex_timer_init,
-	.system_reboot		= vex_system_down,
-	.system_shutdown	= vex_system_down
+	.timer_init		= vex_timer_init,
+	.system_reset_check	= vex_system_reset_check,
+	.system_reset 		= vex_system_reset
 };
 
 const struct sbi_platform platform = {
