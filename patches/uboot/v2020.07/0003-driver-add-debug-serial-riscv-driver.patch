@@ -1,0 +1,239 @@
+From 1f3ec19745d45f05de9b91486d51f307cb5a8765 Mon Sep 17 00:00:00 2001
+From: Dolu1990 <charles.papon.90@gmail.com>
+Date: Fri, 7 Jan 2022 10:11:42 +0800
+Subject: [PATCH 3/5] driver: add debug serial riscv driver
+
+Signed-off-by: Dolu1990 <charles.papon.90@gmail.com>
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/serial/Kconfig            |  14 +++
+ drivers/serial/Makefile           |   1 +
+ drivers/serial/serial_riscv_sbi.c | 172 ++++++++++++++++++++++++++++++
+ 3 files changed, 187 insertions(+)
+ create mode 100644 drivers/serial/serial_riscv_sbi.c
+
+diff --git a/drivers/serial/Kconfig b/drivers/serial/Kconfig
+index 17d0e73623..04be6cffe3 100644
+--- a/drivers/serial/Kconfig
++++ b/drivers/serial/Kconfig
+@@ -365,6 +365,14 @@ config DEBUG_UART_SIFIVE
+ 	  will need to provide parameters to make this work. The driver will
+ 	  be available until the real driver-model serial is running.
+ 
++config DEBUG_UART_RISCV_SBI
++       bool "RISC-V SBI UART"
++       depends on RISCV_SBI_SERIAL
++       help
++         Select this to enable a debug UART using the serial_riscv_sbi driver. You
++         will need to provide parameters to make this work. The driver will
++         be available until the real driver-model serial is running.
++
+ config DEBUG_UART_STM32
+ 	bool "STMicroelectronics STM32"
+ 	depends on STM32_SERIAL
+@@ -783,6 +791,12 @@ config SIFIVE_SERIAL
+ 	help
+ 	  This driver supports the SiFive UART. If unsure say N.
+ 
++config RISCV_SBI_SERIAL
++       bool "RISC-V SBI UART support"
++       depends on DM_SERIAL
++       help
++         This driver supports the RISC-V SVI UART. If unsure say N.
++
+ config STI_ASC_SERIAL
+ 	bool "STMicroelectronics on-chip UART"
+ 	depends on DM_SERIAL && ARCH_STI
+diff --git a/drivers/serial/Makefile b/drivers/serial/Makefile
+index e4a92bbbb7..0a9446a67e 100644
+--- a/drivers/serial/Makefile
++++ b/drivers/serial/Makefile
+@@ -70,6 +70,7 @@ obj-$(CONFIG_OWL_SERIAL) += serial_owl.o
+ obj-$(CONFIG_OMAP_SERIAL) += serial_omap.o
+ obj-$(CONFIG_MTK_SERIAL) += serial_mtk.o
+ obj-$(CONFIG_SIFIVE_SERIAL) += serial_sifive.o
++obj-$(CONFIG_RISCV_SBI_SERIAL) += serial_riscv_sbi.o
+ 
+ ifndef CONFIG_SPL_BUILD
+ obj-$(CONFIG_USB_TTY) += usbtty.o
+diff --git a/drivers/serial/serial_riscv_sbi.c b/drivers/serial/serial_riscv_sbi.c
+new file mode 100644
+index 0000000000..acfd88ca0c
+--- /dev/null
++++ b/drivers/serial/serial_riscv_sbi.c
+@@ -0,0 +1,172 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2019 dolu1990 <charles.papon.90@gmail.com>
++ */
++
++#include <common.h>
++#include <clk.h>
++#include <debug_uart.h>
++#include <dm.h>
++#include <errno.h>
++#include <fdtdec.h>
++#include <serial.h>
++#include <asm/sbi.h>
++
++#define UNUSED(x) (void)(x)
++
++#ifdef CONFIG_DEBUG_UART_RISCV_SBI
++static inline void _debug_uart_init(void)
++{
++
++}
++
++static inline void _debug_uart_putc(int ch)
++{
++  UNUSED(ch);
++
++  sbi_console_putchar(ch);
++}
++
++DEBUG_UART_FUNCS
++
++#endif /* CONFIG_DEBUG_UART_riscv_sbi */
++
++struct riscv_sbi_uart_platdata {
++	int getc_buffer;
++};
++
++static int riscv_sbi_setbrg(struct udevice *dev, int baudrate)
++{
++	UNUSED(dev);
++	UNUSED(baudrate);
++	return 0;
++}
++
++static int riscv_sbi_getc(struct udevice *dev)
++{
++	struct riscv_sbi_uart_platdata *platdata;
++
++  platdata = dev_get_platdata(dev);
++  if (platdata->getc_buffer == -1) platdata->getc_buffer = sbi_console_getchar();
++  if (platdata->getc_buffer == -1)
++    return -EAGAIN;
++  int ch = platdata->getc_buffer;
++  platdata->getc_buffer = -1;
++  return ch;
++}
++
++static int riscv_sbi_putc(struct udevice *dev, const char ch)
++{
++  UNUSED(dev);
++  sbi_console_putchar(ch);
++  return 0;
++}
++
++static int riscv_sbi_pending(struct udevice *dev, bool input)
++{
++  struct riscv_sbi_uart_platdata *platdata;
++  platdata = dev_get_platdata(dev);
++
++  if(platdata->getc_buffer == -1) platdata->getc_buffer = sbi_console_getchar();
++  return platdata->getc_buffer != -1 ? 1 : 0;
++}
++
++static int riscv_sbi_clear(struct udevice *dev)
++{
++  UNUSED(dev);
++  return -EINVAL;
++}
++
++static int riscv_sbi_getconfig(struct udevice *dev, uint *serial_config)
++{
++  *serial_config = SERIAL_DEFAULT_CONFIG;
++  return 0;
++}
++
++static int riscv_sbi_setconfig(struct udevice *dev, uint config)
++{
++  UNUSED(dev);
++  UNUSED(config);
++  return 0;
++}
++
++static int riscv_sbi_getinfo(struct udevice *dev, struct serial_device_info *info)
++{
++  UNUSED(dev);
++  info->type = SERIAL_CHIP_UNKNOWN;
++  info->addr_space = SERIAL_ADDRESS_SPACE_IO;
++  info->baudrate = 0;
++  info->addr = 0;
++  info->reg_offset = 0;
++  info->reg_shift = 0;
++  return 0;
++}
++
++#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
++static int riscv_sbi_ofdata_to_platdata(struct udevice *dev)
++{
++  UNUSED(dev);
++  return 0;
++}
++#endif /* OF_CONTROL && !OF_PLATDATA */
++
++static int riscv_sbi_probe(struct udevice *dev)
++{
++  struct riscv_sbi_uart_platdata *platdata;
++
++  platdata = dev_get_platdata(dev);
++  platdata->getc_buffer = -1;
++
++  debug("!!!%s:%d\n",__func__,__LINE__);
++  return 0;
++}
++
++static int riscv_sbi_bind(struct udevice *dev)
++{
++  UNUSED(dev);
++	debug("!!!%s:%d\n",__func__,__LINE__);
++	return 0;
++}
++static const struct dm_serial_ops riscv_sbi_ops = {
++	.setbrg = riscv_sbi_setbrg,
++	.getc = riscv_sbi_getc,
++	.putc = riscv_sbi_putc,
++	.pending = riscv_sbi_pending,
++  .clear = riscv_sbi_clear,
++  .getconfig = riscv_sbi_getconfig,
++  .setconfig = riscv_sbi_setconfig,
++  .getinfo = riscv_sbi_getinfo,
++};
++
++#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
++static const struct udevice_id riscv_sbi_of_match[] = {
++	{ .compatible = "riscv_sbi,uart" },
++	{ }
++};
++#endif /* OF_CONTROL && !OF_PLATDATA */
++
++U_BOOT_DRIVER(riscv_sbi_serial) = {
++	.name	= "riscv_sbi_serial",
++	.id	= UCLASS_SERIAL,
++#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
++	.of_match = riscv_sbi_of_match,
++	.ofdata_to_platdata = riscv_sbi_ofdata_to_platdata,
++	.platdata_auto_alloc_size = sizeof(struct riscv_sbi_uart_platdata),
++#endif
++	.bind = riscv_sbi_bind,
++	.probe = riscv_sbi_probe,
++	.ops	= &riscv_sbi_ops,
++#if !CONFIG_IS_ENABLED(OF_CONTROL)
++	.flags	= DM_FLAG_PRE_RELOC,
++#endif
++};
++
++#if !CONFIG_IS_ENABLED(OF_CONTROL) || CONFIG_IS_ENABLED(OF_PLATDATA)
++static const struct riscv_sbi_uart_platdata riscv_sbi_serial_info_non_fdt = {
++  .getc_buffer = -1,
++};
++U_BOOT_DEVICE(riscv_sbi_serial_non_fdt) = {
++  .name = "riscv_sbi_serial",
++  .platdata = &riscv_sbi_serial_info_non_fdt,
++};
++#endif /*!CONFIG_IS_ENABLED(OF_CONTROL) || CONFIG_IS_ENABLED(OF_PLATDATA)*/
+-- 
+2.17.1
+

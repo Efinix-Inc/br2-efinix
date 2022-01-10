@@ -1,0 +1,395 @@
+From c890920e9de525ed5329e7441ec3c1b1dedcceed Mon Sep 17 00:00:00 2001
+From: Dolu1990 <charles.papon.90@gmail.com>
+Date: Fri, 7 Jan 2022 16:06:25 +0800
+Subject: [PATCH 2/5] drivers: add vexriscv_spi driver
+
+Signed-off-by: Dolu1990 <charles.papon.90@gmail.com>
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/spi/Kconfig        |   8 +
+ drivers/spi/Makefile       |   1 +
+ drivers/spi/vexriscv_spi.c | 341 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 350 insertions(+)
+ create mode 100644 drivers/spi/vexriscv_spi.c
+
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 09b9cb17d8..c3b657645e 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -368,6 +368,14 @@ config UNIPHIER_SPI
+ 	  be used to access SPI chips on platforms embedding this
+ 	  UniPhier IP core.
+ 
++config VEXRISCV_SPI
++       bool "Vexriscv SPI driver"
++       help
++         Enable the Vexriscv SPI driver. This SPI
++         controller support 8 bit SPI transfers.
++         For more info on Vexriscv SPI Register
++         see driver file - drivers/spi/vexriscv_spi.c
++
+ config XILINX_SPI
+ 	bool "Xilinx SPI driver"
+ 	help
+diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+index 54881a7412..f1e6fc3268 100644
+--- a/drivers/spi/Makefile
++++ b/drivers/spi/Makefile
+@@ -59,6 +59,7 @@ obj-$(CONFIG_TEGRA20_SFLASH) += tegra20_sflash.o
+ obj-$(CONFIG_TEGRA20_SLINK) += tegra20_slink.o
+ obj-$(CONFIG_TEGRA210_QSPI) += tegra210_qspi.o
+ obj-$(CONFIG_UNIPHIER_SPI) += uniphier_spi.o
++obj-$(CONFIG_VEXRISCV_SPI) += vexriscv_spi.o
+ obj-$(CONFIG_XILINX_SPI) += xilinx_spi.o
+ obj-$(CONFIG_ZYNQ_SPI) += zynq_spi.o
+ obj-$(CONFIG_ZYNQ_QSPI) += zynq_qspi.o
+diff --git a/drivers/spi/vexriscv_spi.c b/drivers/spi/vexriscv_spi.c
+new file mode 100644
+index 0000000000..ade6ca7889
+--- /dev/null
++++ b/drivers/spi/vexriscv_spi.c
+@@ -0,0 +1,341 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ *
++ * Based on Linux spi_spinal_lib_driver by charles.papon.90@gmail.com
++ * Copyright (C) 2019 roman3017 <rbacik@hotmail.com>
++ *
++ */
++
++#include <common.h>
++#include <dm.h>
++#include <dm/lists.h>
++#include <errno.h>
++#include <malloc.h>
++#include <fdtdec.h>
++#include <spi.h>
++#include <asm/io.h>
++#include <log.h>
++
++#define SPI_CMD_WRITE (1 << 8)
++#define SPI_CMD_READ (1 << 9)
++#define SPI_CMD_SS (1 << 11)
++
++#define SPI_RSP_VALID (1 << 31)
++
++#define SPI_STATUS_CMD_INT_ENABLE = (1 << 0)
++#define SPI_STATUS_RSP_INT_ENABLE = (1 << 1)
++#define SPI_STATUS_CMD_INT_FLAG = (1 << 8)
++#define SPI_STATUS_RSP_INT_FLAG = (1 << 9)
++
++#define SPI_MODE_CPOL (1 << 0)
++#define SPI_MODE_CPHA (1 << 1)
++
++struct vexriscv_spi_regs {
++	u32 data;
++	u32 buffer;
++	u32 config;
++	u32 interrupt;
++	u32 reserved[4];
++	u32 clk_div;
++	u32 ss_setup;
++	u32 ss_hold;
++	u32 ss_disable;
++	u32 ss_active_high;
++};
++
++struct vexriscv_spi_platdata {
++	struct vexriscv_spi_regs *regs;
++	u32 cs;
++	u32 max_hz;
++	u32 mode;
++	u32 clock;
++	u32 num_cs;
++	u32 rsp_fifo_depth;
++	u32 cmd_fifo_depth;
++	u32 ss_active_high;
++};
++
++static u32 spi_spinal_lib_cmd_availability(struct vexriscv_spi_platdata *hw){
++	return readl(&hw->regs->buffer) & 0xFFFF;
++}
++
++static u32 spi_spinal_lib_rsp_occupancy(struct vexriscv_spi_platdata *hw)
++{
++	return readl(&hw->regs->buffer) >> 16;
++}
++
++static void spi_spinal_lib_cmd(struct vexriscv_spi_platdata *hw, u32 cmd)
++{
++	writel(cmd, &hw->regs->data);
++}
++
++static void spi_spinal_lib_cmd_wait(struct vexriscv_spi_platdata *hw)
++{
++	while(spi_spinal_lib_cmd_availability(hw) == 0)
++		;//udelay(1);
++}
++
++static u32 spi_spinal_lib_rsp(struct vexriscv_spi_platdata *hw)
++{
++	return readl(&hw->regs->data);
++}
++
++//static void spi_spinal_lib_rsp_wait(struct vexriscv_spi_platdata *hw)
++//{
++//	while(spi_spinal_lib_rsp_occupancy(hw) == 0)
++//		;//udelay(1);
++//}
++
++static u32 spi_spinal_lib_rsp_pull(struct vexriscv_spi_platdata *hw)
++{
++	u32 rsp;
++	while(((s32)(rsp = spi_spinal_lib_rsp(hw))) < 0)
++		;//udelay(1);
++	return rsp;
++}
++
++static void spi_spinal_lib_set_cs(struct vexriscv_spi_platdata *hw, u32 cs, bool high)
++{
++	spi_spinal_lib_cmd(hw, cs | SPI_CMD_SS |
++		((high != 0) ^ ((hw->mode & SPI_CS_HIGH) != 0) ? 0x00 : 0x80));
++	spi_spinal_lib_cmd_wait(hw);
++}
++
++#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
++static int vexriscv_spi_claim_bus(struct udevice *dev)
++{
++	debug("!!!%s:%d\n",__func__,__LINE__);
++	struct udevice *bus = dev->parent;
++	struct vexriscv_spi_platdata *plat = dev_get_platdata(bus);
++	struct spi_slave *priv = dev_get_parent_priv(dev);
++	struct dm_spi_slave_platdata *slave = dev_get_parent_platdata(priv->dev);
++	debug("!!!%s:%d %d %d\n",__func__,__LINE__,plat->cs,slave->cs);
++	//if (plat->cs != -1)
++	//	return -EINVAL;
++	plat->cs = slave->cs;
++	return 0;
++}
++
++static int vexriscv_spi_release_bus(struct udevice *dev)
++{
++	debug("!!!%s:%d\n",__func__,__LINE__);
++	struct udevice *bus = dev->parent;
++	struct vexriscv_spi_platdata *plat = dev_get_platdata(bus);
++	plat->cs = -1;
++	return 0;
++}
++
++static int vexriscv_spi_ofdata_to_platdata(struct udevice *dev)
++{
++	debug("!!!%s:%d\n",__func__,__LINE__);
++	struct vexriscv_spi_platdata *plat = dev_get_platdata(dev);
++
++	plat->regs = (void *)dev_read_addr(dev);
++	if (!plat->regs) {
++		printf("%s: could not map device address\n", __func__);
++		return -EINVAL;
++	}
++	plat->num_cs = dev_read_u32_default(dev, "num-cs", 1);
++	plat->clock = dev_read_u32_default(dev, "clock-frequency",
++		50000000);
++	plat->max_hz = dev_read_u32_default(dev, "spi-max-frequency",
++		plat->clock/2);
++	plat->rsp_fifo_depth = dev_read_u32_default(dev, "rsp_fifo_depth", 256);
++	plat->cmd_fifo_depth = dev_read_u32_default(dev, "cmd_fifo_depth", 256);
++
++	return 0;
++}
++#else /* OF_CONTROL && !OF_PLATDATA */
++static int vexriscv_spi_bind(struct udevice *dev)
++{
++	debug("!!!%s:%d\n",__func__,__LINE__);
++	return device_bind_driver(dev, "mmc_spi", "mmc_spi", NULL);
++}
++#endif /* OF_CONTROL && !OF_PLATDATA */
++
++static int vexriscv_spi_probe(struct udevice *dev)
++{
++	debug("!!!%s:%d\n",__func__,__LINE__);
++	struct vexriscv_spi_platdata *plat = dev_get_platdata(dev);
++
++#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
++	plat->cs = -1;
++	plat->ss_active_high = 0;
++#endif
++	/* program defaults into the registers */
++	writel(0, &plat->regs->config);
++	writel(3, &plat->regs->interrupt);
++	writel(3, &plat->regs->clk_div);
++	writel(3, &plat->regs->ss_disable);
++	writel(3, &plat->regs->ss_setup);
++	writel(3, &plat->regs->ss_hold);
++	return 0;
++}
++
++static int vexriscv_spi_remove(struct udevice *dev)
++{
++	debug("!!!%s:%d\n",__func__,__LINE__);
++	return 0;
++}
++
++static int vexriscv_spi_xfer(struct udevice *dev, unsigned int bitlen,
++			    const void *dout, void *din, unsigned long flags)
++{
++	//debug("!!!%s:%d\n",__func__,__LINE__);
++	struct udevice *bus = dev->parent;
++	struct vexriscv_spi_platdata *plat = dev_get_platdata(bus);
++	const u8 *tx_ptr = dout;
++	u8 *rx_ptr = din;
++	u32 len = (bitlen + 7) / 8;
++	u32 count = 0;
++	u32 tx_count = 0;
++
++	if (flags & SPI_XFER_BEGIN)
++		spi_spinal_lib_set_cs(plat, plat->cs, plat->ss_active_high & BIT(plat->cs) ? 1 : 0);
++
++	if(plat->cmd_fifo_depth > 1 && plat->rsp_fifo_depth > 1) {
++		u32 cmd = (tx_ptr ? SPI_CMD_WRITE : 0) | SPI_CMD_READ;
++		u32 token = min(plat->cmd_fifo_depth, plat->rsp_fifo_depth);
++		while (count < len) {
++			{	//rsp
++				u32 burst;
++				u8 *ptr, *end;
++
++				burst = spi_spinal_lib_rsp_occupancy(plat);
++				ptr = rx_ptr + count;
++				end = ptr + burst;
++				if(rx_ptr) {while(ptr != end) {*ptr++ = spi_spinal_lib_rsp(plat);}}
++				else {while(ptr != end) {ptr++; volatile x = spi_spinal_lib_rsp(plat);}}
++				count += burst;
++				token += burst;
++			}
++
++			{	//cmd
++				u32 burst;
++				const u8 *ptr, *end;
++				burst = min(len - tx_count, token);
++				ptr = tx_ptr + tx_count;
++				end = ptr + burst;
++				if(tx_ptr) {while(ptr != end) {writel(cmd | *ptr++, &plat->regs->data);}}
++				else {while(ptr != end) {ptr++; writel(cmd, &plat->regs->data);}}
++				tx_count += burst;
++				token -= burst;
++			}
++		}
++	} else {
++		u32 cmd = (tx_ptr ? SPI_CMD_WRITE : 0) | SPI_CMD_READ;
++		while (count < len) {
++			u32 data = tx_ptr ? tx_ptr[count] : 0;
++			writel(cmd | data, &plat->regs->data);
++			data = spi_spinal_lib_rsp_pull(plat);
++			if (rx_ptr) rx_ptr[count] = data;
++			count++;
++		}
++	}
++
++	if (flags & SPI_XFER_END)
++		spi_spinal_lib_set_cs(plat, plat->cs, plat->ss_active_high & BIT(plat->cs) ? 0 : 1);
++
++	return 0;
++}
++
++static int vexriscv_spi_set_speed(struct udevice *dev, uint speed)
++{
++	debug("!!!%s:%d %x\n",__func__,__LINE__,speed);
++	struct vexriscv_spi_platdata *plat = dev_get_platdata(dev);
++	speed = min(plat->max_hz, speed);
++	u32 clk_divider = (plat->clock/speed/2)-1;
++	writel(clk_divider, &plat->regs->clk_div);
++	return 0;
++}
++
++static int vexriscv_spi_set_mode(struct udevice *dev, uint mode)
++{
++	debug("!!!%s:%d %x\n",__func__,__LINE__,mode);
++	struct vexriscv_spi_platdata *plat = dev_get_platdata(dev);
++	u32 config = 0;
++
++	plat->mode = mode;
++	if (mode & SPI_CS_HIGH)
++		plat->ss_active_high |= BIT(plat->cs);
++	else
++		plat->ss_active_high &= ~BIT(plat->cs);
++
++	writel(plat->ss_active_high, &plat->regs->ss_active_high);
++
++	if (mode & SPI_CPOL)
++		config |= SPI_MODE_CPOL;
++	if (mode & SPI_CPHA)
++		config |= SPI_MODE_CPHA;
++
++	writel(config, &plat->regs->config);
++
++	while(spi_spinal_lib_rsp_occupancy(plat))
++		spi_spinal_lib_rsp(plat); //Flush rsp
++
++	return 0;
++}
++
++static int vexriscv_cs_info(struct udevice *dev, uint cs,
++			  struct spi_cs_info *info)
++{
++	debug("!!!%s:%d\n",__func__,__LINE__);
++	struct vexriscv_spi_platdata *plat = dev_get_platdata(dev);
++
++	if (cs < plat->num_cs)
++		return 0;
++
++	return -EINVAL;
++}
++
++static const struct dm_spi_ops vexriscv_spi_ops = {
++#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
++	.claim_bus	= vexriscv_spi_claim_bus,
++	.release_bus	= vexriscv_spi_release_bus,
++#endif
++	.xfer	= vexriscv_spi_xfer,
++	.set_speed	= vexriscv_spi_set_speed,
++	.set_mode	= vexriscv_spi_set_mode,
++	.cs_info	= vexriscv_cs_info,
++};
++
++#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
++static const struct udevice_id vexriscv_spi_ids[] = {
++	{ .compatible = "vexriscv,spi" },
++	{ }
++};
++#endif /* OF_CONTROL && !OF_PLATDATA */
++
++U_BOOT_DRIVER(vexriscv_spi) = {
++	.name	= "vexriscv_spi",
++	.id	= UCLASS_SPI,
++#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
++	.of_match = vexriscv_spi_ids,
++	.ofdata_to_platdata = vexriscv_spi_ofdata_to_platdata,
++	.platdata_auto_alloc_size	= sizeof(struct vexriscv_spi_platdata),
++#else
++	.bind = vexriscv_spi_bind,
++#endif /* OF_CONTROL && !OF_PLATDATA */
++	.probe	= vexriscv_spi_probe,
++	.ops	= &vexriscv_spi_ops,
++	.remove	= vexriscv_spi_remove,
++	.flags	= DM_FLAG_PRE_RELOC,
++};
++
++#if !CONFIG_IS_ENABLED(OF_CONTROL) || CONFIG_IS_ENABLED(OF_PLATDATA)
++static const struct vexriscv_spi_platdata vexriscv_spi_info_non_fdt = {
++	.regs = (void *)0x10020000,
++	.cs = 1,
++	.max_hz = CONFIG_DEBUG_UART_CLOCK/2,
++	.mode = 0,
++	.clock = CONFIG_DEBUG_UART_CLOCK,
++	.num_cs = 2,
++	.rsp_fifo_depth = 256,
++	.cmd_fifo_depth = 256,
++	.ss_active_high = 0,
++};
++U_BOOT_DEVICE(vexriscv_spi_non_fdt) = {
++  .name = "vexriscv_spi",
++  .platdata = &vexriscv_spi_info_non_fdt,
++};
++#endif
+-- 
+2.17.1
+

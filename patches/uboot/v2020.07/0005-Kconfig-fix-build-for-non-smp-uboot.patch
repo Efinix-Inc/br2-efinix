@@ -1,0 +1,35 @@
+From 15a1f17fb2e4fcb2811e9d319fcbaf0cbbf5a523 Mon Sep 17 00:00:00 2001
+From: Dolu1990 <charles.papon.90@gmail.com>
+Date: Mon, 10 Jan 2022 10:24:04 +0800
+Subject: [PATCH 5/5] Kconfig: fix build for non-smp uboot
+
+Signed-off-by: Dolu1990 <charles.papon.90@gmail.com>
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ arch/riscv/Kconfig | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/riscv/Kconfig b/arch/riscv/Kconfig
+index c0add134ff..432549b146 100644
+--- a/arch/riscv/Kconfig
++++ b/arch/riscv/Kconfig
+@@ -233,7 +233,7 @@ config SBI
+ 
+ choice
+ 	prompt "SBI support"
+-	default SBI_V02
++	default SBI_V01
+ 
+ config SBI_V01
+ 	bool "SBI v0.1 support"
+@@ -261,7 +261,6 @@ config SBI_IPI
+ 	bool
+ 	depends on SBI
+ 	default y if RISCV_SMODE || SPL_RISCV_SMODE
+-	depends on SMP
+ 
+ config XIP
+ 	bool "XIP mode"
+-- 
+2.17.1
+
