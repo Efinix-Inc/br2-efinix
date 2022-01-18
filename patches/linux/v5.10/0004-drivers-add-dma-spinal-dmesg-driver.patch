@@ -1,0 +1,820 @@
+From 2127db047d9e3f8339b8dc856f936d2f355a64ba Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Mon, 10 Jan 2022 18:39:37 +0800
+Subject: [PATCH 4/5] drivers: add dma spinal dmesg driver
+
+Signed-off-by: Dolu1990 <charles.papon.90@gmail.com>
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/dma/Kconfig            |   6 +
+ drivers/dma/Makefile           |   1 +
+ drivers/dma/spinal-lib-dmasg.c | 768 +++++++++++++++++++++++++++++++++
+ 3 files changed, 775 insertions(+)
+ create mode 100644 drivers/dma/spinal-lib-dmasg.c
+
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 90284ffda58a..033a48ce8952 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -569,6 +569,12 @@ config STM32_MDMA
+ 	  If you have a board based on STM32 SoC and wish to use the master DMA
+ 	  say Y here.
+ 
++config SPINAL_LIB_DMASG
++	tristate "SpinalHDL lib DMASG"
++	select DMA_ENGINE
++	help
++	  Enable support for SpinalHDL lib DMASG controller.
++
+ config SPRD_DMA
+ 	tristate "Spreadtrum DMA support"
+ 	depends on ARCH_SPRD || COMPILE_TEST
+diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+index 948a8da05f8b..4477fec3f6af 100644
+--- a/drivers/dma/Makefile
++++ b/drivers/dma/Makefile
+@@ -70,6 +70,7 @@ obj-$(CONFIG_STE_DMA40) += ste_dma40.o ste_dma40_ll.o
+ obj-$(CONFIG_STM32_DMA) += stm32-dma.o
+ obj-$(CONFIG_STM32_DMAMUX) += stm32-dmamux.o
+ obj-$(CONFIG_STM32_MDMA) += stm32-mdma.o
++obj-$(CONFIG_SPINAL_LIB_DMASG) += spinal-lib-dmasg.o
+ obj-$(CONFIG_SPRD_DMA) += sprd-dma.o
+ obj-$(CONFIG_S3C24XX_DMAC) += s3c24xx-dma.o
+ obj-$(CONFIG_TXX9_DMAC) += txx9dmac.o
+diff --git a/drivers/dma/spinal-lib-dmasg.c b/drivers/dma/spinal-lib-dmasg.c
+new file mode 100644
+index 000000000000..9d53865633bf
+--- /dev/null
++++ b/drivers/dma/spinal-lib-dmasg.c
+@@ -0,0 +1,768 @@
++#include <linux/bitops.h>
++#include <linux/dmapool.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/iopoll.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/of_dma.h>
++#include <linux/of_platform.h>
++#include <linux/of_irq.h>
++#include <linux/slab.h>
++#include <linux/clk.h>
++#include <linux/io-64-nonatomic-lo-hi.h>
++
++#include "dmaengine.h"
++
++#pragma GCC diagnostic ignored "-Wunused-function"
++
++#define write_u32(data, address) writel(data,address)
++#define read_u32(address) readl(address)
++
++
++
++#define BIT_0  (1 << 0)
++#define BIT_1  (1 << 1)
++#define BIT_2  (1 << 2)
++#define BIT_3  (1 << 3)
++#define BIT_4  (1 << 4)
++#define BIT_5  (1 << 5)
++#define BIT_6  (1 << 6)
++#define BIT_7  (1 << 7)
++#define BIT_8  (1 << 8)
++#define BIT_9  (1 << 9)
++#define BIT_10 (1 << 10)
++#define BIT_11 (1 << 11)
++#define BIT_12 (1 << 12)
++#define BIT_13 (1 << 13)
++#define BIT_14 (1 << 14)
++#define BIT_15 (1 << 15)
++#define BIT_16 (1 << 16)
++#define BIT_17 (1 << 17)
++#define BIT_18 (1 << 18)
++#define BIT_19 (1 << 19)
++#define BIT_20 (1 << 20)
++#define BIT_21 (1 << 21)
++#define BIT_22 (1 << 22)
++#define BIT_23 (1 << 23)
++#define BIT_24 (1 << 24)
++#define BIT_25 (1 << 25)
++#define BIT_26 (1 << 26)
++#define BIT_27 (1 << 27)
++#define BIT_28 (1 << 28)
++#define BIT_29 (1 << 29)
++#define BIT_30 (1 << 30)
++#define BIT_31 (1 << 31)
++
++
++#define dmasg_ca (base + channel*0x80)
++#define DMASG_CHANNEL_INPUT_ADDRESS 0x00
++#define DMASG_CHANNEL_INPUT_STREAM 0x08
++#define DMASG_CHANNEL_INPUT_CONFIG 0x0C
++#define DMASG_CHANNEL_INPUT_CONFIG_MEMORY BIT_12
++#define DMASG_CHANNEL_INPUT_CONFIG_STREAM 0
++#define DMASG_CHANNEL_INPUT_CONFIG_COMPLETION_ON_PACKET BIT_13
++#define DMASG_CHANNEL_INPUT_CONFIG_WAIT_ON_PACKET BIT_14
++
++#define DMASG_CHANNEL_OUTPUT_ADDRESS 0x10
++#define DMASG_CHANNEL_OUTPUT_STREAM 0x18
++#define DMASG_CHANNEL_OUTPUT_CONFIG  0x1C
++#define DMASG_CHANNEL_OUTPUT_CONFIG_MEMORY BIT_12
++#define DMASG_CHANNEL_OUTPUT_CONFIG_STREAM 0
++#define DMASG_CHANNEL_OUTPUT_CONFIG_LAST BIT_13
++
++#define DMASG_CHANNEL_DIRECT_BYTES 0x20
++#define DMASG_CHANNEL_STATUS 0x2C
++#define DMASG_CHANNEL_STATUS_DIRECT_START BIT_0
++#define DMASG_CHANNEL_STATUS_BUSY BIT_0
++#define DMASG_CHANNEL_STATUS_SELF_RESTART BIT_1
++#define DMASG_CHANNEL_STATUS_STOP BIT_2
++#define DMASG_CHANNEL_STATUS_LINKED_LIST_START BIT_4
++
++#define DMASG_CHANNEL_FIFO 0x40
++#define DMASG_CHANNEL_PRIORITY 0x44
++
++#define DMASG_CHANNEL_INTERRUPT_ENABLE 0x50
++#define DMASG_CHANNEL_INTERRUPT_PENDING 0x54
++// Interrupt at the end of each descriptor
++#define DMASG_CHANNEL_INTERRUPT_DESCRIPTOR_COMPLETION_MASK BIT_0
++// Interrupt at the middle of each descriptor, require the half_completion_interrupt option to be enabled for the channel
++#define DMASG_CHANNEL_INTERRUPT_DESCRIPTOR_COMPLETION_HALF_MASK BIT_1
++// Interrupt when the channel is going off (not busy anymore)
++#define DMASG_CHANNEL_INTERRUPT_CHANNEL_COMPLETION_MASK BIT_2
++// Interrupt each time that a linked list's descriptor status field is updated
++#define DMASG_CHANNEL_INTERRUPT_LINKED_LIST_UPDATE_MASK BIT_3
++// Interrupt each time a S -> M  channel has done transferring a packet into the memory
++#define DMASG_CHANNEL_INTERRUPT_INPUT_PACKET_MASK BIT_4
++
++#define DMASG_CHANNEL_PROGRESS_BYTES 0x60
++#define DMASG_CHANNEL_LINKED_LIST_HEAD 0x70
++
++// Number of bytes (minus one) reserved at the descriptor FROM/TO addresses.
++// If you want to transfer 10 bytes, this field should take the value 9
++#define DMASG_DESCRIPTOR_CONTROL_BYTES 0x7FFFFFF
++//Only for M -> S transfers, specify if a end of packet should be send at the end of the transfer
++#define DMASG_DESCRIPTOR_CONTROL_END_OF_PACKET BIT_30
++
++// Number of bytes transferred by the DMA for this descriptor.
++#define DMASG_DESCRIPTOR_STATUS_BYTES 0x7FFFFFF
++// Only for S -> M transfers, specify if the descriptor mark the end of a received packet
++// Can be used when the dmasg_input_stream function is called with completion_on_packet set.
++#define DMASG_DESCRIPTOR_STATUS_END_OF_PACKET BIT_30
++// Specify if the descriptor was executed by the DMA.
++// If the DMA read a completed descriptor, the channel is stopped and will produce a CHANNEL_COMPLETION interrupt.
++#define DMASG_DESCRIPTOR_STATUS_COMPLETED BIT_31
++
++
++// byte_per_burst need to be a power of two, can be set to zero if the channel has hardcoded burst length
++static void dmasg_input_memory(void __iomem * base, u32 channel, u32 address, u32 byte_per_burst){
++    write_u32(address, dmasg_ca + DMASG_CHANNEL_INPUT_ADDRESS);
++    write_u32(DMASG_CHANNEL_INPUT_CONFIG_MEMORY | ((byte_per_burst-1) & 0xFFF), dmasg_ca + DMASG_CHANNEL_INPUT_CONFIG);
++}
++
++// byte_per_burst need to be a power of two, can be set to zero if the channel has hardcoded burst length
++static void dmasg_output_memory(void __iomem * base, u32 channel, u32 address, u32 byte_per_burst){
++    write_u32(address, dmasg_ca + DMASG_CHANNEL_OUTPUT_ADDRESS);
++    write_u32(DMASG_CHANNEL_OUTPUT_CONFIG_MEMORY | ((byte_per_burst-1) & 0xFFF), dmasg_ca + DMASG_CHANNEL_OUTPUT_CONFIG);
++}
++
++// port identify which physical input port should be used. ex : If a port can be accessed by 4 channels, and you are the second of those channel, then port=1
++// wait_on_packet ensure the channel wait the beggining of a packet before capturing the data (avoid desync)
++// completion_on_packet will limit the descriptor to only contains one packet and force its completion when it is fully transferred into memory.
++static void dmasg_input_stream(void __iomem * base, u32 channel, u32 port, u32 wait_on_packet, u32 completion_on_packet){
++    write_u32(port << 0, dmasg_ca + DMASG_CHANNEL_INPUT_STREAM);
++    write_u32(DMASG_CHANNEL_INPUT_CONFIG_STREAM | (completion_on_packet ? DMASG_CHANNEL_INPUT_CONFIG_COMPLETION_ON_PACKET : 0) | (wait_on_packet ? DMASG_CHANNEL_INPUT_CONFIG_WAIT_ON_PACKET : 0), dmasg_ca + DMASG_CHANNEL_INPUT_CONFIG);
++}
++
++// port identify which physical output port should be used. ex : If a port can be accessed by 4 channels, and you are the second of those channel, then port=1
++// source is equivalent to the AXI-Stream TID used in the packet
++// sink is equivalent to the AXI-Stream TDEST used in the packet
++// last (only for direct DMA control, not linked list) specify if a end of packet should be sent at the end of the transfer
++static void dmasg_output_stream(void __iomem * base, u32 channel, u32 port, u32 source, u32 sink, u32 last){
++    write_u32(port << 0 | source << 8 | sink << 16, dmasg_ca + DMASG_CHANNEL_OUTPUT_STREAM);
++    write_u32(DMASG_CHANNEL_OUTPUT_CONFIG_STREAM | (last ? DMASG_CHANNEL_OUTPUT_CONFIG_LAST : 0), dmasg_ca + DMASG_CHANNEL_OUTPUT_CONFIG);
++}
++
++// Allow to start a channel without using linked list (direct control). Be sure the channel was enabled to support this mode.
++// channel is the DMA channel ID to use.
++// bytes is the size of the transfer
++// self_restart allow the channel to operate into a circular mode. The DESCRIPTOR_COMPLETION_HALF interrupt can be usefull in that mode
++static void dmasg_direct_start(void __iomem * base, u32 channel, u32 bytes, u32 self_restart){
++    write_u32(bytes-1, dmasg_ca + DMASG_CHANNEL_DIRECT_BYTES);
++    write_u32(DMASG_CHANNEL_STATUS_DIRECT_START | (self_restart ? DMASG_CHANNEL_STATUS_SELF_RESTART : 0), dmasg_ca + DMASG_CHANNEL_STATUS);
++}
++
++// Allow to start a channel using a linked list. Be sure the channel was enabled to support this mode.
++// channel is the DMA channel ID to use.
++// head specify the address of the linked list's first element. See dmasg_descriptor struct.
++static void dmasg_linked_list_start(void __iomem * base, u32 channel, u32 head){
++    write_u32((u32) head, dmasg_ca + DMASG_CHANNEL_LINKED_LIST_HEAD);
++    write_u32(DMASG_CHANNEL_STATUS_LINKED_LIST_START, dmasg_ca + DMASG_CHANNEL_STATUS);
++}
++
++// Ask a channel to stop itself. None blocking, so you need to pull on dmasg_busy if you want to wait it to be effective.
++// The status progress (bytes transfered) of the interrupted descriptor will be unknown
++static void dmasg_stop(void __iomem * base, u32 channel){
++    write_u32(DMASG_CHANNEL_STATUS_STOP, dmasg_ca + DMASG_CHANNEL_STATUS);
++}
++
++// See all DMASG_CHANNEL_INTERRUPT_*_MASK defines for possible interrupts
++// Multiple interrupts can be used at once
++// This function clear all pending interrupts for the given channel before enabling the mask's interrupts
++static void dmasg_interrupt_config(void __iomem * base, u32 channel, u32 mask){
++    write_u32(0xFFFFFFFF, dmasg_ca+DMASG_CHANNEL_INTERRUPT_PENDING);
++    write_u32(mask, dmasg_ca+DMASG_CHANNEL_INTERRUPT_ENABLE);
++}
++
++// clear the mask's interrupts, you can mask with 0xFFFFFFFF to clear them all
++static void dmasg_interrupt_pending_clear(void __iomem * base, u32 channel, u32 mask){
++    write_u32(mask, dmasg_ca+DMASG_CHANNEL_INTERRUPT_PENDING);
++}
++
++// Check the status of the specified channel.
++static u32 dmasg_busy(void __iomem * base, u32 channel){
++    return read_u32(dmasg_ca + DMASG_CHANNEL_STATUS) & DMASG_CHANNEL_STATUS_BUSY;
++}
++
++// Specify the buffer mapping of the given channel
++// You don't need to use this function is the buffer address and buffer size are hardcoded in the hardware
++static void dmasg_buffer(void __iomem * base, u32 channel, u32 fifo_base, u32 fifo_bytes){
++    write_u32(fifo_base << 0 | (fifo_bytes-1) << 16,  dmasg_ca+DMASG_CHANNEL_FIFO);
++}
++
++static void dmasg_priority(void __iomem * base, u32 channel, u32 priority){
++    write_u32(priority,  dmasg_ca + DMASG_CHANNEL_PRIORITY);
++}
++
++// Snoop how many bytes were transferred for the current descriptor
++static u32 dmasg_progress_bytes(void __iomem * base, u32 channel){
++    return read_u32(dmasg_ca + DMASG_CHANNEL_PROGRESS_BYTES);
++}
++
++
++#define SPINAL_LIB_DMASG_MAX_TRANS_LEN (1 << 24)
++
++struct spinal_lib_dmasg_chan {
++    struct spinal_lib_dmasg_device *priv;
++    struct device *dev;
++    int hardware_id;
++    int software_id;
++
++    spinlock_t lock;
++    struct dma_chan common;
++    struct dma_pool *segment_pool;
++
++    struct list_head pending_list;
++    struct spinal_lib_dmasg_tx_descriptor *current_descriptor;
++    struct spinal_lib_dmasg_segment * current_segment;
++
++    int irq;
++    struct tasklet_struct tasklet;
++};
++
++
++struct spinal_lib_dmasg_device {
++    void __iomem *regs;
++    struct device *dev;
++    struct dma_device common;
++
++    int chan_count;
++    struct spinal_lib_dmasg_chan *chan;
++};
++
++
++#define to_spinal_lib_dmasg_chan(chan) \
++    container_of(chan, struct spinal_lib_dmasg_chan, common)
++
++#define to_dma_tx_descriptor(tx) \
++    container_of(tx, struct spinal_lib_dmasg_tx_descriptor, async_tx)
++
++struct spinal_lib_dmasg_tx_descriptor {
++    struct dma_async_tx_descriptor async_tx;
++    struct list_head segments;
++    struct list_head node;
++
++    u32 period_left, period_len;
++    u32 buffer_left, buffer_len;
++    dma_addr_t buf_addr;
++};
++
++
++struct spinal_lib_dmasg_segment_hw {
++    u32 status;
++    u32 control;
++    u64 from;
++    u64 to;
++    u64 next;
++} __aligned(64);
++
++/**
++ *
++ */
++struct spinal_lib_dmasg_segment {
++    struct spinal_lib_dmasg_segment_hw hw;
++    struct list_head node;
++    struct spinal_lib_dmasg_segment* next;
++    dma_addr_t phys;
++    bool notify;
++} __aligned(64);
++
++
++static struct spinal_lib_dmasg_segment *spinal_lib_dmasg_alloc_segment(struct spinal_lib_dmasg_chan *chan)
++{
++    struct spinal_lib_dmasg_segment *segment;
++    dma_addr_t phys;
++
++    segment = dma_pool_zalloc(chan->segment_pool, GFP_ATOMIC, &phys);
++    if (!segment)
++        return NULL;
++
++    segment->phys = phys;
++
++    return segment;
++}
++
++
++static struct spinal_lib_dmasg_tx_descriptor *
++spinal_lib_dmasg_alloc_tx_descriptor(struct spinal_lib_dmasg_chan *chan)
++{
++    struct spinal_lib_dmasg_tx_descriptor *desc;
++
++    desc = kzalloc(sizeof(*desc), GFP_KERNEL);
++    if (!desc)
++        return NULL;
++
++    INIT_LIST_HEAD(&desc->segments);
++
++    return desc;
++}
++
++static int spinal_lib_dmasg_free_tx_descriptor(struct spinal_lib_dmasg_chan *chan, struct spinal_lib_dmasg_tx_descriptor *desc){
++    struct spinal_lib_dmasg_segment *segment;
++    //printk("spinal_lib_dmasg_free_tx_descriptor %x %x %x\n", (u32)&(desc->segments), (u32)(desc->segments.prev), (u32)(desc->segments.next));
++
++    list_for_each_entry(segment, &desc->segments, node) {
++        dma_pool_free(chan->segment_pool, segment, segment->phys);
++    }
++
++    kzfree(desc);
++    return 0;
++}
++
++
++static int spinal_lib_dmasg_chan_reset(struct spinal_lib_dmasg_chan *chan)
++{
++    //printk("spinal_lib_dmasg_chan_reset\n");
++
++    return 0;
++}
++
++
++static void spinal_lib_dmasg_cyclic_segment_update(struct spinal_lib_dmasg_chan* chan, bool init){
++    unsigned long flags = 0;
++    if(!init)
++        spin_lock_irqsave(&chan->lock, flags);
++
++//    printk("spinal_lib_dmasg_cyclic_segment_update\n");
++    while(1){
++        dma_async_tx_callback callback;
++        void *callback_param;
++        struct spinal_lib_dmasg_segment *segment;
++        struct spinal_lib_dmasg_tx_descriptor *desc;
++        u32 bytes;
++
++        segment = chan->current_segment;
++        desc = chan->current_descriptor;
++
++        if(!segment || !(segment->hw.status & DMASG_DESCRIPTOR_STATUS_COMPLETED)) {
++            break;
++        }
++
++        if(!init && segment->notify){
++            callback = desc->async_tx.callback;
++            callback_param = desc->async_tx.callback_param;
++        } else {
++            callback = NULL;
++        }
++
++        // Update segment
++        bytes = min_t(u32, min_t(u32, SPINAL_LIB_DMASG_MAX_TRANS_LEN, desc->period_left), desc->buffer_left);
++        segment->hw.control = bytes-1;
++        segment->hw.from = desc->buf_addr + (desc->buffer_len - desc->buffer_left);
++        segment->hw.status = 0;
++
++
++        // Update for next desc
++        desc->period_left -= bytes;
++        desc->buffer_left -= bytes;
++
++        if(desc->period_left == 0){
++            desc->period_left = desc->period_len;
++            segment->notify = true;
++        } else {
++            segment->notify = false;
++        }
++        if(desc->buffer_left == 0){
++            desc->buffer_left = desc->buffer_len;
++        }
++
++        chan->current_segment = segment->next;
++
++        if(callback){
++            spin_unlock_irqrestore(&chan->lock, flags);
++            callback(callback_param);
++            spin_lock_irqsave(&chan->lock, flags);
++        }
++    }
++    if(!init)
++        spin_unlock_irqrestore(&chan->lock, flags);
++}
++
++static void spinal_lib_dmasg_do_tasklet(unsigned long data)
++{
++    struct spinal_lib_dmasg_chan *chan = (struct spinal_lib_dmasg_chan *)data;
++
++    //printk("spinal_lib_dmasg_do_tasklet %x\n", (u32)chan);
++
++
++    spinal_lib_dmasg_cyclic_segment_update(chan, false);
++
++}
++
++static irqreturn_t spinal_lib_dmasg_interrupt(int irq, void *dev_id)
++{
++    struct spinal_lib_dmasg_chan *chan = dev_id;
++
++    //printk("spinal_lib_dmasg_interrupt %d %p\n", irq, dev_id);
++
++
++
++    dmasg_interrupt_config(chan->priv->regs, chan->hardware_id, DMASG_CHANNEL_INTERRUPT_DESCRIPTOR_COMPLETION_MASK);
++
++
++    tasklet_schedule(&chan->tasklet);
++
++    return IRQ_HANDLED;
++}
++
++static int spinal_lib_dmasg_chan_probe(struct spinal_lib_dmasg_device *priv,
++                  struct device_node *node, int software_id)
++{
++    struct spinal_lib_dmasg_chan *chan;
++    int err;
++
++    //printk("spinal_lib_dmasg_chan_probe enter\n");
++
++    chan = &priv->chan[software_id];
++    chan->dev = priv->dev;
++    chan->priv = priv;
++    chan->software_id = software_id;
++
++
++    spin_lock_init(&chan->lock);
++    INIT_LIST_HEAD(&chan->pending_list);
++    chan->segment_pool = dma_pool_create("spinal_lib_dmasg_segment_pool",
++               chan->dev,
++               sizeof(struct spinal_lib_dmasg_segment),
++               __alignof__(struct spinal_lib_dmasg_segment),
++               0);
++
++    /* Retrieve the channel properties from the device tree */
++    err = of_property_read_s32(node, "reg", &chan->hardware_id );
++    if (err) {
++        dev_err(priv->dev, "missing hardware-id property\n");
++        return err;
++    }
++
++
++
++    /*
++     * Initialize the DMA channel and add it to the DMA engine channels
++     * list.
++     */
++    chan->common.device = &priv->common;
++
++    list_add_tail(&chan->common.device_node, &priv->common.channels);
++
++    /* Reset the channel */
++    err = spinal_lib_dmasg_chan_reset(chan);
++    if (err < 0) {
++        dev_err(priv->dev, "Reset channel failed\n");
++        return err;
++    }
++
++    /* Initialize the tasklet */
++    tasklet_init(&chan->tasklet, spinal_lib_dmasg_do_tasklet, (unsigned long)chan);
++
++    /* Request the interrupt */
++    chan->irq = irq_of_parse_and_map(node, 0);
++    err = request_irq(chan->irq, spinal_lib_dmasg_interrupt, IRQF_SHARED,
++              "spinal-lib-dmasg", chan);
++    if (err) {
++        dev_err(chan->dev, "unable to request IRQ %d\n", chan->irq);
++        return err;
++    }
++
++    return 0;
++}
++
++static int spinal_lib_dmasg_alloc_chan_resources(struct dma_chan *dchan)
++{
++    //printk("spinal_lib_dmasg_alloc_chan_resources\n");
++
++    return 0;
++}
++
++static void spinal_lib_dmasg_free_chan_resources(struct dma_chan *dchan)
++{
++    //printk("spinal_lib_dmasg_free_chan_resources\n");
++
++}
++
++
++static int spinal_lib_dmasg_terminate_all(struct dma_chan *dchan)
++{
++    struct spinal_lib_dmasg_chan *chan = to_spinal_lib_dmasg_chan(dchan);
++    struct spinal_lib_dmasg_tx_descriptor *desc;
++    unsigned long flags;
++    //printk("spinal_lib_dmasg_terminate_all\n");
++
++    spin_lock_irqsave(&chan->lock, flags);
++
++    dmasg_interrupt_config(chan->priv->regs, chan->hardware_id, 0);
++    dmasg_stop(chan->priv->regs, chan->hardware_id);
++    while(dmasg_busy(chan->priv->regs, chan->hardware_id));
++
++
++    if(chan->current_descriptor){
++        spinal_lib_dmasg_free_tx_descriptor(chan, chan->current_descriptor);
++        chan->current_descriptor = NULL;
++        chan->current_segment = NULL;
++    }
++
++    list_for_each_entry(desc, &chan->pending_list, node) {
++        spinal_lib_dmasg_free_tx_descriptor(chan, desc);
++    }
++
++    INIT_LIST_HEAD(&chan->pending_list);
++    spin_unlock_irqrestore(&chan->lock, flags);
++
++    return 0;
++}
++
++
++
++
++
++static void spinal_lib_dmasg_issue_pending(struct dma_chan *dchan)
++{
++    struct spinal_lib_dmasg_chan *chan = to_spinal_lib_dmasg_chan(dchan);
++    struct spinal_lib_dmasg_tx_descriptor *desc;
++    struct spinal_lib_dmasg_segment * head_segment;
++    unsigned long flags;
++    //printk("spinal_lib_dmasg_issue_pending\n");
++
++    spin_lock_irqsave(&chan->lock, flags);
++
++    if (list_empty(&chan->pending_list))
++        goto done;
++
++    desc = list_first_entry(&chan->pending_list, struct spinal_lib_dmasg_tx_descriptor, node);
++    head_segment = list_first_entry(&desc->segments, struct spinal_lib_dmasg_segment, node);
++
++    list_del_init(&desc->node);
++
++    chan->current_descriptor = desc;
++    chan->current_segment = head_segment;
++
++    spinal_lib_dmasg_cyclic_segment_update(chan, true);
++
++    dmasg_interrupt_config(chan->priv->regs, chan->hardware_id, DMASG_CHANNEL_INTERRUPT_DESCRIPTOR_COMPLETION_MASK);
++    dmasg_input_memory(chan->priv->regs, chan->hardware_id, 0, 16);
++    dmasg_output_stream (chan->priv->regs, chan->hardware_id, 0, 0, 0, 1);
++    dmasg_linked_list_start(chan->priv->regs, chan->hardware_id, (u32) head_segment->phys);
++
++
++
++done:
++    spin_unlock_irqrestore(&chan->lock, flags);
++}
++
++static enum dma_status spinal_lib_dmasg_tx_status(struct dma_chan *dchan,
++                    dma_cookie_t cookie,
++                    struct dma_tx_state *txstate)
++{
++    //printk("spinal_lib_dmasg_tx_status\n");
++    return DMA_IN_PROGRESS;
++}
++
++static struct dma_chan *of_dma_spinal_lib_xlate(struct of_phandle_args *dma_spec,
++                        struct of_dma *ofdma)
++{
++    struct spinal_lib_dmasg_device *priv = ofdma->of_dma_data;
++    int chan_id;
++
++    //printk("of_dma_spinal_lib_xlate !!!!!\n");
++    chan_id = dma_spec->args[0];
++    if (chan_id >= priv->chan_count)
++        return NULL;
++
++    return dma_get_slave_channel(&priv->chan[chan_id].common); // dma_get_slave_channel(&priv->chan[chan_id]->common);
++}
++
++
++static dma_cookie_t spinal_lib_dmasg_tx_submit(struct dma_async_tx_descriptor *tx)
++{
++    struct spinal_lib_dmasg_tx_descriptor *desc = to_dma_tx_descriptor(tx);
++    struct spinal_lib_dmasg_chan *chan = to_spinal_lib_dmasg_chan(tx->chan);
++    dma_cookie_t cookie;
++    unsigned long flags;
++
++    //printk("spinal_lib_dmasg_tx_submit\n");
++
++    spin_lock_irqsave(&chan->lock, flags);
++
++    cookie = dma_cookie_assign(tx);
++    list_add_tail(&desc->node, &chan->pending_list);
++
++    spin_unlock_irqrestore(&chan->lock, flags);
++
++    return cookie;
++}
++
++
++static struct dma_async_tx_descriptor *spinal_lib_dmasg_prep_dma_cyclic(
++    struct dma_chan *dchan, dma_addr_t buf_addr, size_t buf_len,
++    size_t period_len, enum dma_transfer_direction direction,
++    unsigned long flags)
++{
++    struct spinal_lib_dmasg_chan *chan = to_spinal_lib_dmasg_chan(dchan);
++    struct spinal_lib_dmasg_tx_descriptor * desc;
++    struct spinal_lib_dmasg_segment *head_segment, *prev = NULL;
++    int i;
++
++    //printk("spinal_lib_dmasg_prep_dma_cyclic\n");
++
++    if (!period_len)
++        return NULL;
++
++    desc = spinal_lib_dmasg_alloc_tx_descriptor(chan);
++
++    dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
++    desc->async_tx.tx_submit = spinal_lib_dmasg_tx_submit;
++    desc->period_len = period_len;
++    desc->period_left = period_len;
++    desc->buffer_len = buf_len;
++    desc->buffer_left = buf_len;
++    desc->buf_addr = buf_addr;
++
++    for (i = 0; i < 10; ++i) {
++        struct spinal_lib_dmasg_segment *segment;
++
++        segment = spinal_lib_dmasg_alloc_segment(chan);
++        segment->hw.status = DMASG_DESCRIPTOR_STATUS_COMPLETED;
++
++        if (prev){
++            prev->hw.next = segment->phys;
++            prev->next = segment;
++        }
++
++        prev = segment;
++
++        list_add_tail(&segment->node, &desc->segments);
++    }
++
++    head_segment = list_first_entry(&desc->segments, struct spinal_lib_dmasg_segment, node);
++    prev->hw.next = head_segment->phys;
++    prev->next = head_segment;
++
++    return &desc->async_tx;
++}
++
++static struct dma_async_tx_descriptor *spinal_lib_dmasg_prep_slave_sg(
++    struct dma_chan *dchan, struct scatterlist *sgl, unsigned int sg_len,
++    enum dma_transfer_direction direction, unsigned long flags,
++    void *context)
++{
++    //printk("spinal_lib_dmasg_prep_slave_sg\n");
++
++    return NULL;
++}
++
++static void spinal_lib_dmasg_chan_remove(struct spinal_lib_dmasg_chan *chan)
++{
++    //printk("spinal_lib_dmasg_chan_remove\n");
++
++    list_del(&chan->common.device_node);
++}
++
++static int spinal_lib_dmasg_probe(struct platform_device *pdev)
++{
++    struct spinal_lib_dmasg_device *priv;
++    struct device_node *node = pdev->dev.of_node;
++    struct device_node *child = pdev->dev.of_node;
++    int i, err;
++
++    //printk("spinal_lib_dmasg_probe\n");
++
++    /* Allocate and initialize the DMA engine structure */
++    priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
++    if (!priv)
++        return -ENOMEM;
++
++
++    priv->dev = &pdev->dev;
++    priv->common.dev = &pdev->dev;
++
++    /* Count sub channels */
++    priv->chan_count = 0;
++    for_each_child_of_node(node, child) {
++        priv->chan_count += 1;
++    }
++
++    priv->chan = devm_kzalloc(&pdev->dev, sizeof(*priv->chan)*priv->chan_count, GFP_KERNEL);
++    if (!priv->chan)
++        return -ENOMEM;
++
++    /* Request and map I/O memory */
++    priv->regs = devm_ioremap_resource(&pdev->dev, platform_get_resource(pdev, IORESOURCE_MEM, 0));
++    if (IS_ERR(priv->regs))
++        return PTR_ERR(priv->regs);
++
++    INIT_LIST_HEAD(&priv->common.channels);
++    dma_cap_set(DMA_CYCLIC, priv->common.cap_mask);
++
++    priv->common.device_prep_slave_sg = spinal_lib_dmasg_prep_slave_sg;
++    priv->common.device_alloc_chan_resources = spinal_lib_dmasg_alloc_chan_resources;
++    priv->common.device_free_chan_resources = spinal_lib_dmasg_free_chan_resources;
++    priv->common.device_terminate_all = spinal_lib_dmasg_terminate_all;
++    priv->common.device_tx_status = spinal_lib_dmasg_tx_status;
++    priv->common.device_issue_pending = spinal_lib_dmasg_issue_pending;
++    priv->common.device_prep_dma_cyclic = spinal_lib_dmasg_prep_dma_cyclic;
++    priv->common.residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
++
++    platform_set_drvdata(pdev, priv);
++
++    /* Initialize the channels */
++    i = 0;
++    for_each_child_of_node(node, child) {
++        err = spinal_lib_dmasg_chan_probe(priv, child, i);
++        if (err < 0)
++            goto error;
++        i++;
++    }
++
++    /* Register the DMA engine with the core */
++    dma_async_device_register(&priv->common);
++
++    err = of_dma_controller_register(node, of_dma_spinal_lib_xlate, priv);
++    if (err < 0) {
++        dev_err(&pdev->dev, "Unable to register DMA to DT\n");
++        dma_async_device_unregister(&priv->common);
++        goto error;
++    }
++
++
++    dev_info(&pdev->dev, "Probe success\n");
++
++    return 0;
++
++error:
++    dev_info(&pdev->dev, "Probe failure :(\n");
++    for (i = 0; i < priv->chan_count; i++)
++        spinal_lib_dmasg_chan_remove(&priv->chan[i]);
++
++    return err;
++    return 0;
++}
++
++
++static int spinal_lib_dmasg_remove(struct platform_device *pdev)
++{
++    //printk("spinal_lib_dmasg_remove\n");
++
++    return 0;
++}
++
++
++static const struct of_device_id spinal_lib_dmasg_of_ids[] = {
++    { .compatible = "spinal,lib-dmasg"},
++    {}
++};
++MODULE_DEVICE_TABLE(of, spinal_lib_dmasg_of_ids);
++
++static struct platform_driver spinal_lib_vdma_driver = {
++    .driver = {
++        .name = "spinal,lib-dmasg",
++        .of_match_table = spinal_lib_dmasg_of_ids,
++    },
++    .probe = spinal_lib_dmasg_probe,
++    .remove = spinal_lib_dmasg_remove,
++};
++
++module_platform_driver(spinal_lib_vdma_driver);
++
++MODULE_AUTHOR("Spinal");
++MODULE_DESCRIPTION("SpinalHDL DMASG driver");
++MODULE_LICENSE("GPL v2");
+-- 
+2.17.1
+
