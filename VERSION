@@ -1,1 +1,7 @@
-2020.05
+2021.05.3
+
+buildroot 2021.05.3
+u-boot 20201.04
+opensbi 0.9
+Linux kernel 5.10
+gcc 8.4
