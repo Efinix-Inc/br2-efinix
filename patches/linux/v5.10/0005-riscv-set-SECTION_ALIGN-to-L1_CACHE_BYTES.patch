@@ -1,0 +1,30 @@
+From fe28e0865507ed7efb773963267a4af55cd23e56 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Tue, 18 Jan 2022 08:40:02 +0800
+Subject: [PATCH 5/5] riscv: set SECTION_ALIGN to L1_CACHE_BYTES
+
+If enable CONFIG_ARCH_HAS_STRICT_KERNEL_RWX.
+For some reason the u-boot unable to load and
+boot kernel if SECTION_ALIGN set to previous value.
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ arch/riscv/include/asm/set_memory.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/riscv/include/asm/set_memory.h b/arch/riscv/include/asm/set_memory.h
+index 4c5bae7ca01c..26a3a428efc5 100644
+--- a/arch/riscv/include/asm/set_memory.h
++++ b/arch/riscv/include/asm/set_memory.h
+@@ -31,7 +31,7 @@ int set_direct_map_default_noflush(struct page *page);
+ #ifdef CONFIG_64BIT
+ #define SECTION_ALIGN (1 << 21)
+ #else
+-#define SECTION_ALIGN (1 << 22)
++#define SECTION_ALIGN L1_CACHE_BYTES
+ #endif
+ #else /* !CONFIG_ARCH_HAS_STRICT_KERNEL_RWX */
+ #define SECTION_ALIGN L1_CACHE_BYTES
+-- 
+2.17.1
+
