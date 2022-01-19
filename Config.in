@@ -1,0 +1,1 @@
+source "$BR2_EXTERNAL_EFINIX_PATH/package/opensbi-ext/Config.in"
