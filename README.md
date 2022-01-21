@@ -33,8 +33,8 @@ mkdir build
 
 2. Clone this repo and Buildroot in `workspace` directory.
 ```
-git clone http://gitlab/mnalim/br2-efinix -b 2020.05
-git clone https://github.com/buildroot/buildroot.git -b 2020.05
+git clone http://gitlab/mnalim/br2-efinix -b 2021.05.3
+git clone https://github.com/buildroot/buildroot.git -b 2021.05.3
 ```
 
 3. Go to `build` directory created in step 1.
