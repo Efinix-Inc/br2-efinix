@@ -10,13 +10,13 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Mohamd Noor Alim <mnalim@efinixinc.com");
 MODULE_DESCRIPTION("Sample hello world kernel module");
 
-static int __init hello_world_init(void)
+static int hello_world_init(void)
 {
 	pr_info("Hello world\n");
 	return 0;
 }
 
-static void __exit hello_world_exit(void)
+static void hello_world_exit(void)
 {
 	pr_info("Bye\n");
 }
