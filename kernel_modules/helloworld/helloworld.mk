@@ -16,5 +16,9 @@ define HELLOWORLD_INSTALL_TARGET_CMDS
 	$(MAKE) $(LINUX_MAKE_FLAGS) -C $(LINUX_DIR) M=$(@D) modules_install
 endef
 
+define HELLOWORLD_LINUX_CONFIG_FIXUPS
+	$(call KCONFIG_ENABLE_OPT,CONFIG_MODULE_UNLOAD)
+endef
+
 $(eval $(kernel-module))
 $(eval $(generic-package))
