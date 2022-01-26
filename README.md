@@ -62,57 +62,46 @@ make -j$(nproc)
 
 ## Flash firmware image
 
-OpenSBI and U-boot can be flash on the supported board using OpenOCD and FTDI USB UART cable.
-You need to download Efinix SDK which come with OpenOCD configuration.  
-- [Linux]()  
-- [Windows]()  
+OpenSBI and U-boot can be flash on the supported board using Efinix Efinity programmer and FTDI USB UART cable.  
+You need to download Efinix Efinity on Efinity official website.  
+- [Linux](https://www.efinixinc.com/support/downloads-license.php?platform=linux&os=ubuntu&v=2021.2.323)  
+- [Windows](https://www.efinixinc.com/support/downloads-license.php?platform=windows&os=windows&v=2021.2.323)  
 
 | Name | Binary | SPI flash address |
 | ------ | ------ |------ |
 | OpenSBI | fw_jump.bin | 0x00400000 |
 | U-boot | u-boot.bin | 0x00480000|
 
-To flash the firmware (OpenSBI and U-boot) follow the following steps
-1. Download the Efinix SDK and unzip it to `$HOME` directory.
+To flash the OpenSBI and U-boot, follow the following steps
+1. Download the Efinix Efinix and install it. Follow the official [documentation](https://www.efinixinc.com/docs/efinity-installation-v2.6.pdf) on installation process.
 
+2. Open the Efinity program.
 ```
-cd $HOME
-unzip SDK_Ubuntu.zip
-```
-
-2. Clone Sapphire BSP.
-
-```
-git clone <t120f324_soc>
+cd efinity/<version>/bin
+./setup.sh 
+efinity
 ```
 
-3. Run OpenOCD.
+3. Click the `programmer` icon on the Efinity to launch the `programmer`.
 
-```
-cd <t120f324_soc>
-SDK_Ubuntu/openocd/build-x86_64/bin/openocd \
--f bsp/efinix/EfxSapphireSoc/openocd/ftdi.cfg \
--c "set CPU0_YAML cpu0.yaml" \
--f bsp/efinix/EfxSapphireSoc/openocd/flash.cfg
-```
+4. At the `Image` section on `programmer`, click **Combine Multiple Image Files** to select FPGA bitstream (Sapphire SoC), OpenSBI and U-boot images.
 
-4. Open another terminal to connect to telnet session on port `4444`.
+5. Select `Mode` and choose **Generic Image Combination**. Then give the name of `Output File`. The `Output File` is name of combination file which consist of FPGA bitstream, OpenSBI and U-boot images.
 
-```
-telnet localhost 4444
-```
+6. Click `Add Image` to add FPGA bitstream, OpenSBI and U-boot images. Then set the `Flash Address` for each image file.
 
-5. Flash the OpenSBI.
+7. The table should look like this
 
-```
-> flash write_image erase unlock /path/to/fw_jump.bin 0x00400000
-```
+| Flash Address | Flash Length | Image File |
+| ------ | ------ |------ |
+| soc.hex | | 0x0|
+| fw_jump.bin | | 0x00400000 |
+| u-boot.bin | | 0x00480000|
 
-6. Flash the U-boot.
+8. Click **Apply** to save the output image.
 
-```
-> flash write_image erase unlock /path/to/u-boot.bin 0x00480000
-```
+9. On `programmer` interface at section `Programming Mode`, select `SPI Active` then click icon **Start Program**. It will takes some time to program the SPI flash.
+
 
 ## Flash Linux image on SD card
 
@@ -127,7 +116,7 @@ on Windows, you can use [Etcher](https://www.balena.io/etcher/) to flash the Lin
 
 ## Documentation
 
-1. [buildroot documentation](https://buildroot.org/docs.html).  
+1. [Buildroot documentation](https://buildroot.org/docs.html).  
 2. [RISCV Sapphire SoC datasheet](https://www.efinixinc.com/docs/riscv-t120f324-ds-v2.0.pdf)
 
 ## Supported Board
