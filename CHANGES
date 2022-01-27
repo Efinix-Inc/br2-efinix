@@ -1,3 +1,17 @@
+br2-efinix 2021.05.3,
+
+	Update Linux patches to v5.10.
+	Update OpenSBI platform source to 0.9.
+	Add drivers patches for U-boot 2021.04.
+	Add sample kernel module.
+	Update README on build instruction and flashing firmware.
+
+	Issue resolved
+	#1: U-boot hang when loading Linux v5.10
+	#2: U-boot throw exception illegal instruction during staring Linux v5.10
+	#3: Kernel v5.10 hang when freeing the unused kernel memory on boot
+	#4: Kernel v5.10 failed to load kernel module on RV32 bit
+
 br2-efinix 2020.05,
 
 	Initial ported of Sapphire SoC to Linux v5.0.9 based on Vexriscv Saxon SoC,
