@@ -1,0 +1,8 @@
+br2-efinix 2020.05,
+
+	Initial ported of Sapphire SoC to Linux v5.0.9 based on Vexriscv Saxon SoC,
+	https://github.com/SpinalHDL/buildroot/tree/spinal
+	Add configuration of buildroot, linux, opensbi and u-boot.
+	Add project overview and build instruction.
+	Add U-boot patches to work with U-boot 2020.04.
+	Enable build OpenSBI v0.6.
