@@ -1,2 +1,3 @@
 source "$BR2_EXTERNAL_EFINIX_PATH/package/opensbi-ext/Config.in"
+source "$BR2_EXTERNAL_EFINIX_PATH/package/canny/Config.in"
 source "$BR2_EXTERNAL_EFINIX_PATH/kernel_modules/helloworld/Config.in"

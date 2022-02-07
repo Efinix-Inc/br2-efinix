@@ -1,0 +1,7 @@
+config BR2_PACKAGE_CANNY
+	bool "Canny image"
+	default n
+	depends on BR2_PACKAGE_OPENCV3
+	help
+	  A sample program that use OpenCV library to convert RGB image to canny image.
+
