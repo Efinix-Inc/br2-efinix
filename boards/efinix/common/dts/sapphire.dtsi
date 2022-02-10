@@ -1,0 +1,163 @@
+/dts-v1/;
+
+//include "dt-bindings/interrupt-controller/irq.h"
+//include "dt-bindings/gpio/gpio.h"
+
+/ {
+    #address-cells = <0x1>;
+    #size-cells = <0x1>;
+    compatible = "spinal,vexriscv";
+    model = "spinal,vexriscv_saxon";
+
+    chosen {
+    };
+
+    cpus {
+        #address-cells = <0x1>;
+        #size-cells = <0x0>;
+        cpu@0 {
+            device_type = "cpu";
+            compatible = "riscv";
+            riscv,isa = "rv32imafd";
+            mmu-type = "riscv,sv32";
+            reg = <0>;
+            status = "okay";
+            i-cache-block-size = <32>;
+            i-cache-sets = <16>;
+            i-cache-size = <16384>;
+            d-cache-block-size = <32>;
+            d-cache-sets = <16>;
+            d-cache-size = <16384>;
+            d-tlb-sets = <1>;
+            d-tlb-size = <32>;
+            tlb-split;
+            L0: interrupt-controller {
+                #interrupt-cells = <0x00000001>;
+                interrupt-controller;
+                compatible = "riscv,cpu-intc";
+            };
+        };
+    };
+
+    clocks {
+        compatible = "simple-bus";
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        apbA_clock: clock@1 {
+            compatible = "fixed-clock";
+            reg = <1 0>;
+            #clock-cells = <0>;
+        };
+    };
+
+    apbA@F8000000 {
+        compatible = "simple-bus";
+        #address-cells = <0x1>;
+        #size-cells = <0x1>;
+        ranges = <0x0 0xF8000000 0x01000000>;
+
+        plic: interrupt-controller@c00000 {
+            compatible = "sifive,plic-1.0.0", "sifive,fu540-c000-plic";
+            #interrupt-cells = <1>;
+            interrupt-controller;
+            interrupts-extended = <
+                &L0 11 &L0 9
+               >;
+            reg = <0x00C00000 0x400000>;
+            riscv,ndev = <32>;
+            status = "okay";
+        };
+
+        gpioA: gpio@17000 {
+	        compatible = "spinal-lib,gpio-1.0";
+	        interrupt-parent = <&plic>;
+	        ngpio = <16>;
+	        interrupts = <12 13>;
+	        reg = <0x17000 0x1000>;
+	        gpio-controller;
+	        #gpio-cells = <2>;
+	        interrupt-controller;
+	        #interrupt-cells = <2>;
+                status = "disable";
+        };
+
+	uartA: uart@10000 {
+            compatible = "spinal-lib,uart-1.0";
+            reg = <0x10000 0x1000>;
+            clocks = <&apbA_clock 0>;
+            status = "disable";
+        };
+
+        uartB: uart@11000 {
+            compatible = "spinal-lib,uart-1.0";
+            reg = <0x11000 0x1000>;
+            clocks = <&apbA_clock 0>;
+            status = "disable";
+        };
+
+        spiA: spi@14000 {
+            compatible = "spinal-lib,spi-1.0";
+            #address-cells = <1>;
+            #size-cells = <0>;
+            reg = <0x014000 0x1000>;
+            cmd_fifo_depth = <256>;
+            rsp_fifo_depth = <256>;
+            num-cs = <1>;
+            clocks = <&apbA_clock 0>;
+            status = "disable";
+        };
+
+        spiB: spi@15000 {
+            compatible = "spinal-lib,spi-1.0";
+            #address-cells = <1>;
+            #size-cells = <0>;
+            reg = <0x015000 0x1000>;
+            cmd_fifo_depth = <256>;
+            rsp_fifo_depth = <256>;
+            clocks = <&apbA_clock 0>;
+            num-cs = <1>;
+            status = "disable";
+        };
+
+        spiC: spi@16000 {
+            compatible = "spinal-lib,spi-1.0";
+            #address-cells = <1>;
+            #size-cells = <0>;
+            reg = <0x016000 0x1000>;
+            cmd_fifo_depth = <256>;
+            rsp_fifo_depth = <256>;
+            clocks = <&apbA_clock 0>;
+            num-cs = <1>;
+            status = "disable";
+        };
+
+        i2cA: i2c@18000 {
+           compatible = "spinal-lib,spi-1.0";
+            #address-cells = <1>;
+            #size-cells = <0>;
+            reg = <0x018000 0x1000>;
+            clocks = <&apbA_clock 0>;
+            status = "disable";
+        };
+
+        i2cB: i2c@19000 {
+           compatible = "spinal-lib,spi-1.0";
+            #address-cells = <1>;
+            #size-cells = <0>;
+            reg = <0x019000 0x1000>;
+            clocks = <&apbA_clock 0>;
+            status = "disable";
+        };
+
+        i2cC: i2c@1a000 {
+           compatible = "spinal-lib,spi-1.0";
+            #address-cells = <1>;
+            #size-cells = <0>;
+            reg = <0x01a000 0x1000>;
+            clocks = <&apbA_clock 0>;
+            status = "disable";
+        };
+    };
+
+};
