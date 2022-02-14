@@ -79,21 +79,21 @@
 	        #gpio-cells = <2>;
 	        interrupt-controller;
 	        #interrupt-cells = <2>;
-                status = "disable";
+                status = "disabled";
         };
 
 	uartA: uart@10000 {
             compatible = "spinal-lib,uart-1.0";
             reg = <0x10000 0x1000>;
             clocks = <&apbA_clock 0>;
-            status = "disable";
+            status = "disabled";
         };
 
         uartB: uart@11000 {
             compatible = "spinal-lib,uart-1.0";
             reg = <0x11000 0x1000>;
             clocks = <&apbA_clock 0>;
-            status = "disable";
+            status = "disabled";
         };
 
         spiA: spi@14000 {
@@ -105,7 +105,7 @@
             rsp_fifo_depth = <256>;
             num-cs = <1>;
             clocks = <&apbA_clock 0>;
-            status = "disable";
+            status = "disabled";
         };
 
         spiB: spi@15000 {
@@ -117,7 +117,7 @@
             rsp_fifo_depth = <256>;
             clocks = <&apbA_clock 0>;
             num-cs = <1>;
-            status = "disable";
+            status = "disabled";
         };
 
         spiC: spi@16000 {
@@ -129,7 +129,7 @@
             rsp_fifo_depth = <256>;
             clocks = <&apbA_clock 0>;
             num-cs = <1>;
-            status = "disable";
+            status = "disabled";
         };
 
         i2cA: i2c@18000 {
@@ -138,7 +138,7 @@
             #size-cells = <0>;
             reg = <0x018000 0x1000>;
             clocks = <&apbA_clock 0>;
-            status = "disable";
+            status = "disabled";
         };
 
         i2cB: i2c@19000 {
@@ -147,7 +147,7 @@
             #size-cells = <0>;
             reg = <0x019000 0x1000>;
             clocks = <&apbA_clock 0>;
-            status = "disable";
+            status = "disabled";
         };
 
         i2cC: i2c@1a000 {
@@ -156,7 +156,7 @@
             #size-cells = <0>;
             reg = <0x01a000 0x1000>;
             clocks = <&apbA_clock 0>;
-            status = "disable";
+            status = "disabled";
         };
     };
 
