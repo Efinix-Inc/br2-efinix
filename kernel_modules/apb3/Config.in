@@ -1,0 +1,6 @@
+config BR2_PACKAGE_APB3
+	bool "simple APB3 kernel module"
+	depends on BR2_LINUX_KERNEL
+	help
+	  simple APB3 kernenl module sample
+

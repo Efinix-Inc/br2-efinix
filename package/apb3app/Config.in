@@ -1,0 +1,7 @@
+config BR2_PACKAGE_APB3APP
+	bool "Apb3 Application"
+	default n
+	depends on BR2_PACKAGE_APB3
+	help
+	  A sample program that use apb3 char driver
+
