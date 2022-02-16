@@ -3,7 +3,7 @@
 #include <config.h>
 /include/ "sapphire.dtsi"
 
-#define CLK_FREQ 100000000
+#define CLK_FREQ 250000000
 
 / {
 	compatible = "spinal,vexriscv";

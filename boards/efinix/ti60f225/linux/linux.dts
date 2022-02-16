@@ -2,7 +2,7 @@
 
 /include/ "sapphire.dtsi"
 
-#define CPU_FREQ 100000000
+#define CPU_FREQ 250000000
 
 / {
     chosen {
