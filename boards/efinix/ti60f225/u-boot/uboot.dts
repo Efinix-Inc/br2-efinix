@@ -1,90 +1,59 @@
 /dts-v1/;
 
 #include <config.h>
+/include/ "sapphire.dtsi"
+
 #define CLK_FREQ 100000000
+
 / {
-  #address-cells = <1>;
-  #size-cells = <1>;
-  compatible = "spinal,vexriscv";
-  model = "spinal,vexriscv_saxon";
+	compatible = "spinal,vexriscv";
+	model = "spinal,vexriscv_saxon";
 
-  aliases {
-    serial0 = &serial0;
-	spi0 = &spi0;
-	spi1 = &spi1;
-  };
+	aliases {
+                serial0 = &uartA;
+                spi0 = &spiA;
+                spi1 = &spiB;
+        };
 
-  chosen {
-    bootargs = "console=ttyS0,115200n8";
-    stdout-path = "serial0:115200n8";
-  };
-
-  cpus {
-    #address-cells = <1>;
-    #size-cells = <0>;
-    timebase-frequency = <CLK_FREQ>;
-
-    cpu@0 {
-      device_type = "cpu";
-      compatible = "riscv";
-      riscv,isa = "rv32imafd";
-      clock-frequency = <CLK_FREQ>;
-      mmu-type = "riscv,sv32";
-      reg = <0>;
-      i-cache-size = <0x1000>;
-      i-cache-line-size = <32>;
-      d-cache-size = <0x1000>;
-      d-cache-line-size = <32>;
-      intc0: interrupt-controller {
-          #interrupt-cells = <1>;
-          interrupt-controller;
-          compatible = "riscv,cpu-intc";
-      };
-    };
-  };
-
-  memory {
-    device_type = "memory";
-    reg = <0x00001000 0x01E84800>;
-  };
-
-  serial0: serial@F8010000 {
-    device_type = "serial";
-    compatible = "riscv_sbi,uart";
-  };
-
-  spi0: spi@F8014000 {
-    compatible = "vexriscv,spi";
-    #address-cells = <1>;
-    #size-cells = <0>;
-    reg = <0xF8014000 0x1000>;
-    cmd_fifo_depth = <256>;
-    rsp_fifo_depth = <256>;
-    num-cs = <2>;
-    clock-frequency = <CLK_FREQ>;
-
-	flash: flash@0 {
-	  #address-cells = <1>;
-      #size-cells = <0>;
-	  compatible = "jedec,spi-nor";
-	  reg = <0>;
-	  spi-max-frequency = <6000000>;
+	chosen {
+		bootargs = "console=ttyS0,115200n8";
+		stdout-path = "serial0:115200n8";
 	};
-  };
 
-  spi1: spi@F8015000 {
-    compatible = "vexriscv,spi";
-    #address-cells = <1>;
-    #size-cells = <0>;
-    reg = <0xF8015000 0x1000>;
-    cmd_fifo_depth = <256>;
-    rsp_fifo_depth = <256>;
-    num-cs = <1>;
-    clock-frequency = <CLK_FREQ>;
-	mmc0: mmc@1 {
-      compatible = "mmc-spi-slot";
-      reg = <0>;
-      spi-max-frequency = <10000000>;
-    };
-  };
+	cpus {
+		timebase-frequency = <100000000>;
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x00001000 0x02000000>;
+  	};
+};
+
+&uartA {
+	status = "okay";
+	device_type = "serial";
+	compatible = "riscv_sbi,uart";
+};
+
+&spiA {
+	status = "okay";
+	compatible = "vexriscv,spi";
+	flash: flash@0 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <6000000>;
+        };
+};
+
+&spiB {
+	status = "okay";
+	compatible = "vexriscv,spi";
+	mmc0: mmc@0 {
+		compatible = "mmc-spi-slot";
+		reg = <0>;
+		spi-max-frequency = <10000000>;
+	};
 };
