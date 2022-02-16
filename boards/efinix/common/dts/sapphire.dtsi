@@ -72,7 +72,7 @@
         gpioA: gpio@17000 {
 	        compatible = "spinal-lib,gpio-1.0";
 	        interrupt-parent = <&plic>;
-	        ngpio = <16>;
+	        ngpio = <4>;
 	        interrupts = <12 13>;
 	        reg = <0x17000 0x1000>;
 	        gpio-controller;
