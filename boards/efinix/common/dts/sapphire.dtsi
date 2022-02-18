@@ -23,13 +23,11 @@
             reg = <0>;
             status = "okay";
             i-cache-block-size = <32>;
-            i-cache-sets = <16>;
-            i-cache-size = <16384>;
+            i-cache-size = <0x1000>;
+            i-cache-sets = <1>;
             d-cache-block-size = <32>;
-            d-cache-sets = <16>;
-            d-cache-size = <16384>;
-            d-tlb-sets = <1>;
-            d-tlb-size = <32>;
+            d-cache-size = <0x1000>;
+            d-cache-sets = <1>;
             tlb-split;
             L0: interrupt-controller {
                 #interrupt-cells = <0x00000001>;
