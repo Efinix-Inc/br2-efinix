@@ -1,0 +1,235 @@
+Archive member included to satisfy reference by file (symbol)
+
+/home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32iafd/ilp32d/libc.a(lib_a-init.o)
+                              build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/common/start.o (__libc_init_array)
+
+Discarded input sections
+
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .group         0x0000000000000000        0xc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+ram              0x00000000f9000000 0x0000000000001000 axwl !r
+*default*        0x0000000000000000 0xffffffffffffffff
+
+Linker script and memory map
+
+LOAD build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+LOAD build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/common/start.o
+LOAD /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32iafd/ilp32d/libc.a
+LOAD /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/rv32iafd/ilp32d/libgcc.a
+                0x0000000000000100                __stack_size = DEFINED (__stack_size)?__stack_size:0x100
+
+.init           0x00000000f9000000       0x60
+ *(SORT_NONE(.init))
+ .init          0x00000000f9000000       0x60 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/common/start.o
+                0x00000000f9000000                _start
+                0x00000000f900005c                _init
+
+.text           0x00000000f9000060      0x5bc
+ *(.text.unlikely .text.unlikely.*)
+ *(.text.startup .text.startup.*)
+ *(.text .text.*)
+ .text          0x00000000f9000060      0x528 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+                0x00000000f90004d0                bspMain
+                0x00000000f9000570                main
+ .text          0x00000000f9000588        0x0 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/common/start.o
+ .text          0x00000000f9000588        0x0 /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32iafd/ilp32d/libc.a(lib_a-init.o)
+ .text.__libc_init_array
+                0x00000000f9000588       0x94 /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32iafd/ilp32d/libc.a(lib_a-init.o)
+                0x00000000f9000588                __libc_init_array
+ *(.gnu.linkonce.t.*)
+ *(.note.gnu.build-id)
+
+.rela.dyn       0x00000000f900061c        0x0
+ .rela.init     0x00000000f900061c        0x0 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .rela.text.__libc_init_array
+                0x00000000f900061c        0x0 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+
+.fini
+ *(SORT_NONE(.fini))
+                [!provide]                        PROVIDE (__etext = .)
+                [!provide]                        PROVIDE (_etext = .)
+                [!provide]                        PROVIDE (etext = .)
+                0x00000000f900061c                . = ALIGN (0x4)
+
+.preinit_array  0x00000000f900061c        0x0
+                0x00000000f900061c                PROVIDE (__preinit_array_start = .)
+ *(.preinit_array)
+                0x00000000f900061c                PROVIDE (__preinit_array_end = .)
+
+.init_array     0x00000000f900061c        0x0
+                0x00000000f900061c                PROVIDE (__init_array_start = .)
+ *(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*))
+ *(.init_array EXCLUDE_FILE(*crtend?.o *crtend.o *crtbegin?.o *crtbegin.o) .ctors)
+                0x00000000f900061c                PROVIDE (__init_array_end = .)
+
+.fini_array     0x00000000f900061c        0x0
+                [!provide]                        PROVIDE (__fini_array_start = .)
+ *(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*))
+ *(.fini_array EXCLUDE_FILE(*crtend?.o *crtend.o *crtbegin?.o *crtbegin.o) .dtors)
+                [!provide]                        PROVIDE (__fini_array_end = .)
+
+.ctors
+ *crtbegin.o(.ctors)
+ *crtbegin?.o(.ctors)
+ *(EXCLUDE_FILE(*crtend?.o *crtend.o) .ctors)
+ *(SORT_BY_NAME(.ctors.*))
+ *(.ctors)
+
+.dtors
+ *crtbegin.o(.dtors)
+ *crtbegin?.o(.dtors)
+ *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
+ *(SORT_BY_NAME(.dtors.*))
+ *(.dtors)
+
+.lalign         0x00000000f900061c        0x0
+                0x00000000f900061c                . = ALIGN (0x4)
+                0x00000000f900061c                PROVIDE (_data_lma = .)
+
+.dalign         0x00000000f900061c        0x0
+                0x00000000f900061c                . = ALIGN (0x4)
+                0x00000000f900061c                PROVIDE (_data = .)
+
+.data           0x00000000f900061c       0x3e
+ *(.rdata)
+ *(.rodata .rodata.*)
+ .rodata.str1.4
+                0x00000000f900061c       0x30 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+                                         0x2e (size before relaxing)
+ *(.gnu.linkonce.r.*)
+ *(.data .data.*)
+ .data          0x00000000f900064c        0x0 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .data          0x00000000f900064c        0x0 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/common/start.o
+ .data          0x00000000f900064c        0x0 /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32iafd/ilp32d/libc.a(lib_a-init.o)
+ *(.gnu.linkonce.d.*)
+                0x00000000f9000650                . = ALIGN (0x8)
+ *fill*         0x00000000f900064c        0x4 
+                0x00000000f9000e40                PROVIDE (__global_pointer$ = (. + 0x7f0))
+ *(.sdata .sdata.*)
+ *(.gnu.linkonce.s.*)
+                0x00000000f9000650                . = ALIGN (0x8)
+ *(.srodata.cst16)
+ *(.srodata.cst8)
+ *(.srodata.cst4)
+ *(.srodata.cst2)
+ *(.srodata .srodata.*)
+                0x00000000f900065a                . = (. + 0xa)
+ *fill*         0x00000000f9000650        0xa 
+                0x00000000f900065c                . = ALIGN (0x4)
+                0x00000000f900065c                PROVIDE (_edata = .)
+                [!provide]                        PROVIDE (edata = .)
+                [!provide]                        PROVIDE (_fbss = .)
+                0x00000000f900065c                PROVIDE (__bss_start = .)
+
+.bss            0x00000000f900065a        0x2
+ *(.sbss*)
+ *(.gnu.linkonce.sb.*)
+ *(.bss .bss.*)
+ .bss           0x00000000f900065a        0x0 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .bss           0x00000000f900065a        0x0 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/common/start.o
+ .bss           0x00000000f900065a        0x0 /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32iafd/ilp32d/libc.a(lib_a-init.o)
+ *(.gnu.linkonce.b.*)
+ *(COMMON)
+                0x00000000f900065c                . = ALIGN (0x4)
+ *fill*         0x00000000f900065a        0x2 
+                0x00000000f9000660                . = ALIGN (0x8)
+                0x00000000f9000660                PROVIDE (_end = .)
+                [!provide]                        PROVIDE (end = .)
+                0x00000000f9000660                . = ALIGN (0x10)
+
+.stack          0x00000000f900065c      0x100
+                [!provide]                        PROVIDE (_heap_end = .)
+                0x0000000000000100                . = __stack_size
+ *fill*         0x00000000f900065c      0x100 
+                0x00000000f900075c                PROVIDE (_sp = .)
+LOAD /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32iafd/ilp32d/libm.a
+LOAD /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/rv32iafd/ilp32d/libgcc.a
+START GROUP
+LOAD /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/rv32iafd/ilp32d/libgcc.a
+LOAD /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32iafd/ilp32d/libg.a
+LOAD /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32iafd/ilp32d/libc.a
+END GROUP
+LOAD /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/rv32iafd/ilp32d/libgcc.a
+START GROUP
+LOAD /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/rv32iafd/ilp32d/libgcc.a
+LOAD /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32iafd/ilp32d/libc.a
+LOAD /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32iafd/ilp32d/libnosys.a
+END GROUP
+OUTPUT(build/bootloader.elf elf32-littleriscv)
+
+.debug_info     0x0000000000000000      0xc86
+ .debug_info    0x0000000000000000      0xc60 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_info    0x0000000000000c60       0x26 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/common/start.o
+
+.debug_abbrev   0x0000000000000000      0x253
+ .debug_abbrev  0x0000000000000000      0x23f build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_abbrev  0x000000000000023f       0x14 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/common/start.o
+
+.debug_loc      0x0000000000000000      0x818
+ .debug_loc     0x0000000000000000      0x818 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+
+.debug_aranges  0x0000000000000000       0x40
+ .debug_aranges
+                0x0000000000000000       0x20 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_aranges
+                0x0000000000000020       0x20 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/common/start.o
+
+.debug_ranges   0x0000000000000000       0x18
+ .debug_ranges  0x0000000000000000       0x18 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+
+.debug_macro    0x0000000000000000     0x11c2
+ .debug_macro   0x0000000000000000       0xbb build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x00000000000000bb      0x79c build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000857       0x22 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000879       0x8e build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000907       0x51 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000958      0x103 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000a5b       0x6a build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000ac5      0x1df build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000ca4       0xc4 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000d68      0x118 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000e80       0x10 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000e90       0x1c build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000eac       0x16 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000ec2       0x76 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000f38       0x70 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000fa8       0x2e build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x0000000000000fd6      0x1b8 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_macro   0x000000000000118e       0x34 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+
+.debug_line     0x0000000000000000      0xb86
+ .debug_line    0x0000000000000000      0xacc build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_line    0x0000000000000acc       0xba build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/common/start.o
+
+.debug_str      0x0000000000000000     0x5139
+ .debug_str     0x0000000000000000     0x511b build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+                                       0x528f (size before relaxing)
+ .debug_str     0x000000000000511b       0x1e build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/common/start.o
+                                         0xbb (size before relaxing)
+
+.comment        0x0000000000000000       0x33
+ .comment       0x0000000000000000       0x33 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+                                         0x34 (size before relaxing)
+
+.debug_frame    0x0000000000000000      0x2bc
+ .debug_frame   0x0000000000000000      0x280 build//home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/software/standalone/bootloader/src/main.o
+ .debug_frame   0x0000000000000280       0x3c /home/mnalim/workspace/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32iafd/ilp32d/libc.a(lib_a-init.o)
