@@ -77,4 +77,5 @@
 
 &gpioA {
     status = "okay";
+    reg = <0x16000 0x1000>;
 };
