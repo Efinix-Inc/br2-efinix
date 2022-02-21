@@ -22,7 +22,7 @@ The version of Buildroot must be matched with this repo version.
 ## Build
 
 To build Linux image, OpenSBI and U-boot follow the steps below.
-This step will build Linux based on Buildroot 2020.05.
+This step will build Linux based on Buildroot 2020.05.3
 
 1. Create a working directory.
 ```
@@ -33,13 +33,13 @@ mkdir build
 
 2. Clone this repo and Buildroot in `workspace` directory.
 ```
-git clone http://gitlab/mnalim/br2-efinix -b 2021.05.3
+git clone http://gitlab/mnalim/br2-efinix -b dev-next
 git clone https://github.com/buildroot/buildroot.git -b 2021.05.3
 ```
 
 3. Go to `build` directory created in step 1.
 
-4. Configure the Buildroot to build the `efinix_t120f324_defconfig`.  
+4. Configure the Buildroot to build the Linux image for T120T324 board `efinix_t120f324_defconfig`.  
    `<path/to/br2-external>` is `$HOME/workspace/br2-efinix`  
    `<path/to/buildroot>` is `$HOME/workspace/buildroot`  
    `<target_buildroot_defconfig>` is `efinix_t120f324_defconfig`
@@ -117,12 +117,14 @@ on Windows, you can use [Etcher](https://www.balena.io/etcher/) to flash the Lin
 ## Documentation
 
 1. [Buildroot documentation](https://buildroot.org/docs.html).  
-2. [RISCV Sapphire SoC datasheet](https://www.efinixinc.com/docs/riscv-t120f324-ds-v2.0.pdf)
+2. [RISCV Sapphire SoC datasheet](https://www.efinixinc.com/docs/riscv-sapphire-ds-v2.0.pdf)  
+3. [Others documentation](http://gitlab/mnalim/br2-efinix/-/tree/dev-next/docs)
 
 ## Supported Board
 
 Currently supported board as follows  
-1. Trion t120f324
+1. Trion T120F324  
+2. Titanium Ti60F225  
 
 ## License
 
