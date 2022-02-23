@@ -21,7 +21,7 @@
 	};
 
 	cpus {
-		timebase-frequency = <100000000>;
+		timebase-frequency = <CLK_FREQ>;
 	};
 
 	memory {
