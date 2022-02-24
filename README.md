@@ -117,7 +117,7 @@ on Windows, you can use [Etcher](https://www.balena.io/etcher/) to flash the Lin
 
 1. [Buildroot documentation](https://buildroot.org/docs.html).  
 2. [RISCV Sapphire SoC datasheet](https://www.efinixinc.com/docs/riscv-sapphire-ds-v2.0.pdf)  
-3. [Others documentation](https://github.com/Efinix-Inc/br2-efinix/-/tree/main/docs)
+3. [Others documentation](https://github.com/Efinix-Inc/br2-efinix/tree/main/docs)
 
 ## Supported Board
 
