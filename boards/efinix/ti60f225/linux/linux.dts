@@ -3,6 +3,7 @@
 /include/ "sapphire.dtsi"
 
 #define CPU_FREQ 250000000
+#define PERIPHERAL_FREQ 50000000
 
 / {
     chosen {
@@ -10,7 +11,10 @@
     };
 
     cpus {
-        timebase-frequency = <CPU_FREQ>;
+        timebase-frequency = <PERIPHERAL_FREQ>;
+        cpu@0 {
+            clock-frequency = <CPU_FREQ>;
+        };
     };
 
     memory@1000 {
@@ -30,7 +34,7 @@
 };
 
 &apbA_clock {
-    clock-frequency = <CPU_FREQ>;
+    clock-frequency = <PERIPHERAL_FREQ>;
 };
 
 &spiA {

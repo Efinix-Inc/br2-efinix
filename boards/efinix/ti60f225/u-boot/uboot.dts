@@ -4,7 +4,7 @@
 /include/ "sapphire.dtsi"
 
 #define CLK_FREQ 250000000
-
+#define PERIPHERAL_FREQ 50000000
 / {
 	compatible = "spinal,vexriscv";
 	model = "spinal,vexriscv_saxon";
@@ -21,13 +21,20 @@
 	};
 
 	cpus {
-		timebase-frequency = <100000000>;
+		timebase-frequency = <PERIPHERAL_FREQ>;
+              cpu@0 {
+                  clock-frequency = <CLK_FREQ>;
+              };
 	};
 
 	memory {
 		device_type = "memory";
 		reg = <0x00001000 0x02000000>;
   	};
+};
+
+&apbA_clock {
+    clock-frequency = <PERIPHERAL_FREQ>;
 };
 
 &uartA {
