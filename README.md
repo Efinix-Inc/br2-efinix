@@ -17,12 +17,10 @@ bzip2 perl tar cpio unzip rsync file bc wget autoconf automake libtool
 
 This repo require specific version of Buildroot to work with.
 See the VERSION file that contain the Buildroot version to use.
-The version of Buildroot must be matched with this repo version.
 
 ## Build
 
-To build Linux image, OpenSBI and U-boot follow the steps below.
-This step will build Linux based on Buildroot 2020.05.3
+Follow the steps to build Linux image, OpenSBI and U-boot for T120F324 board.
 
 1. Create a working directory.
 ```
@@ -33,13 +31,14 @@ mkdir build
 
 2. Clone this repo and Buildroot in `workspace` directory.
 ```
-git clone http://gitlab/mnalim/br2-efinix -b dev-next
+git clone https://github.com/Efinix-Inc/br2-efinix
 git clone https://github.com/buildroot/buildroot.git -b 2021.05.3
 ```
 
 3. Go to `build` directory created in step 1.
 
 4. Configure the Buildroot to build the Linux image for T120T324 board `efinix_t120f324_defconfig`.  
+   See `configs` directory to build different target boards.  
    `<path/to/br2-external>` is `$HOME/workspace/br2-efinix`  
    `<path/to/buildroot>` is `$HOME/workspace/buildroot`  
    `<target_buildroot_defconfig>` is `efinix_t120f324_defconfig`
@@ -118,7 +117,7 @@ on Windows, you can use [Etcher](https://www.balena.io/etcher/) to flash the Lin
 
 1. [Buildroot documentation](https://buildroot.org/docs.html).  
 2. [RISCV Sapphire SoC datasheet](https://www.efinixinc.com/docs/riscv-sapphire-ds-v2.0.pdf)  
-3. [Others documentation](http://gitlab/mnalim/br2-efinix/-/tree/dev-next/docs)
+3. [Others documentation](https://github.com/Efinix-Inc/br2-efinix/-/tree/main/docs)
 
 ## Supported Board
 
