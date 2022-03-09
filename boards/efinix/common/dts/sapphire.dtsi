@@ -67,12 +67,12 @@
             status = "okay";
         };
 
-        gpioA: gpio@17000 {
+        gpioA: gpio@16000 {
 	        compatible = "spinal-lib,gpio-1.0";
 	        interrupt-parent = <&plic>;
 	        ngpio = <4>;
 	        interrupts = <12 13>;
-	        reg = <0x17000 0x1000>;
+	        reg = <0x16000 0x1000>;
 	        gpio-controller;
 	        #gpio-cells = <2>;
 	        interrupt-controller;
@@ -83,13 +83,6 @@
 	uartA: uart@10000 {
             compatible = "spinal-lib,uart-1.0";
             reg = <0x10000 0x1000>;
-            clocks = <&apbA_clock 0>;
-            status = "disabled";
-        };
-
-        uartB: uart@11000 {
-            compatible = "spinal-lib,uart-1.0";
-            reg = <0x11000 0x1000>;
             clocks = <&apbA_clock 0>;
             status = "disabled";
         };
@@ -118,44 +111,15 @@
             status = "disabled";
         };
 
-        spiC: spi@16000 {
-            compatible = "spinal-lib,spi-1.0";
-            #address-cells = <1>;
-            #size-cells = <0>;
-            reg = <0x016000 0x1000>;
-            cmd_fifo_depth = <256>;
-            rsp_fifo_depth = <256>;
-            clocks = <&apbA_clock 0>;
-            num-cs = <1>;
-            status = "disabled";
-        };
-
-        i2cA: i2c@18000 {
+        i2cA: i2c@17000 {
            compatible = "spinal-lib,spi-1.0";
             #address-cells = <1>;
             #size-cells = <0>;
-            reg = <0x018000 0x1000>;
+            reg = <0x017000 0x1000>;
             clocks = <&apbA_clock 0>;
             status = "disabled";
         };
 
-        i2cB: i2c@19000 {
-           compatible = "spinal-lib,spi-1.0";
-            #address-cells = <1>;
-            #size-cells = <0>;
-            reg = <0x019000 0x1000>;
-            clocks = <&apbA_clock 0>;
-            status = "disabled";
-        };
-
-        i2cC: i2c@1a000 {
-           compatible = "spinal-lib,spi-1.0";
-            #address-cells = <1>;
-            #size-cells = <0>;
-            reg = <0x01a000 0x1000>;
-            clocks = <&apbA_clock 0>;
-            status = "disabled";
-        };
     };
 
 };
