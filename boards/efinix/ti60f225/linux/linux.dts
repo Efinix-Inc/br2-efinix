@@ -1,6 +1,7 @@
 /dts-v1/;
 
 /include/ "sapphire.dtsi"
+#include <dt-bindings/gpio/gpio.h>
 
 #define CPU_FREQ 250000000
 #define PERIPHERAL_FREQ 50000000
@@ -29,6 +30,26 @@
 
         opensbi: sbi@1000000 {
             reg = <0x01000000 0x80000>;
+        };
+    };
+
+    efx_gpio_devs {
+        compatible = "efinix,efx-gpio";
+        sw6 {
+            label = "SW";
+            efx-gpios = <&gpioA 0 GPIO_ACTIVE_LOW>;
+        };
+        led1_b {
+            label = "LED1";
+            efx-gpios = <&gpioA 1 GPIO_ACTIVE_HIGH>;
+        };
+        led1_r {
+            label = "LED2";
+            efx-gpios = <&gpioA 2 GPIO_ACTIVE_HIGH>;
+        };
+        led1_g {
+            label = "LED3";
+            efx-gpios = <&gpioA 3 GPIO_ACTIVE_HIGH>;
         };
     };
 };

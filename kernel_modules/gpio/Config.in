@@ -1,0 +1,7 @@
+config BR2_PACKAGE_GPIO
+	bool "GPIO consumer kernel module"
+	depends on BR2_LINUX_KERNEL
+	default n
+	help
+	  GPIO consumer driver
+
