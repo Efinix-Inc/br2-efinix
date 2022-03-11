@@ -1,0 +1,7 @@
+config BR2_PACKAGE_GPIO_APP
+	bool "GPIO app"
+        depends on BR2_PACKAGE_GPIO
+	default n
+	help
+	  Demonstrate the usage of GPIO consumer driver by toggling on board LED
+
