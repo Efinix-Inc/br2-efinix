@@ -1,3 +1,17 @@
+br2-efinix 2021.05.4,
+
+	Add GPIO consumer driver and GPIO sample application for blinking on-board LED
+	Add Sapphire SoC FPGA example design for Ti60F225 and T120F324 board
+	Add custom driver to access apb3 device
+	Enable OpenCV3 library and add sample OpenCV application
+	Enable C++ support on RISC-V GCC toolchain
+	Enable FPU support on Sapphire SoC and Linux
+	Optimize Linux build with GCC level 2 optimization
+	Organize device tree for soc level (*.dtsi) and board level (*.dts)
+
+	Issue resolved
+	#5 Delay observed when enable peripheral clock on Sapphire SoC
+
 br2-efinix 2021.05.3,
 
 	Update Linux patches to v5.10.
