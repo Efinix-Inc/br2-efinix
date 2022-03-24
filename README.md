@@ -31,7 +31,7 @@ mkdir build
 
 2. Clone this repo and Buildroot in `workspace` directory.
 ```
-git clone https://github.com/Efinix-Inc/br2-efinix
+git clone https://github.com/Efinix-Inc/br2-efinix -b 2021.05.4
 git clone https://github.com/buildroot/buildroot.git -b 2021.05.3
 ```
 
