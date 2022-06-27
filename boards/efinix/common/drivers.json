@@ -1,0 +1,183 @@
+{
+    "dt_version": "/dts-v1/;",
+    "model": "efinix,sapphire",
+    "devkits": [
+	"t120f324",
+	"ti60f225"
+    ],
+    "drivers": {
+	"bus": {
+		"compatible": ["simple-bus"]
+	},
+	"spi": {
+		"compatible": ["spinal-lib,spi-1.0"],
+		"private_data": [
+			"cmd_fifo_depth = <256>;",
+			"rsp_fifo_depth = <256>;",
+			"num-cs = <1>;",
+			"clocks = <&apbA_clock 0>;"
+		]
+	},
+	"uart": {
+		"compatible": ["spinal-lib,uart-1.0"],
+		"private_data": [
+			"clocks = <&apbA_clock 0>;"
+		]
+	},
+	"gpio": {
+		"compatible": ["spinal-lib,gpio-1.0"],
+		"private_data": [
+			"ngpio = <4>;",
+			"gpio-controller;",
+			"#gpio-cells = <2>;",
+			"#interrupt-cells = <2>;",
+			"clocks = <&apbA_clock 0>;"
+		]
+	},
+	"i2c": {
+		"compatible": ["i2c-gpio"]
+	},
+	"dma": {
+		"compatible": ["spinal,lib-dmasg"]
+	},
+	"clock": {
+		"compatible": ["fixed-clock"]
+	},
+	"plic": {
+		"compatible": ["sifive,plic-1.0.0", "sifive,fu540-c000-plic"],
+		"private_data": [
+			"#interrupt-cells = <1>;",
+			"interrupt-controller;",
+			"riscv,ndev = <32>;"
+		]
+	}
+    },
+    "controller": {
+	"plic": {
+		"compatible": ["riscv,cpu-intc"],
+		"private_data": [
+			"#interrupt-cells = <1>;",
+			"interrupt-controller;"
+		]
+	}
+    },
+    "dts": {
+	"include": ["sapphire.dtsi"],
+	"#include": ["dt-bindings/gpio/gpio.h"],
+	"root": {
+		"chosen": {
+			"name": "chosen",
+			"private_data": ["bootargs = \"rootwait console=hvc0  earlycon=sbi root=/dev/mmcblk0p2 init=/sbin/init mmc_core.use_spi_crc=0\";"]
+		},
+		"reserved-memory": {
+			"name": "reserved-memory",
+			"addr_cell": 1,
+			"size_cell": 1,
+			"private_data": [
+				"ranges;"
+			],
+			"opensbi": {
+				"name": "sbi",
+				"label": "opensbi",
+				"addr": "1000000",
+				"size": "0x80000",
+				"reg": "reg = <0x01000000 0x80000>;"
+			}
+		},
+		"efx_gpio_devs": {
+			"name": "efx_gpio_devs",
+			"compatible": "compatible = \"efinix,efx-gpio\";",
+			"switch": {
+				"name": "switch",
+				"private_data": [
+					"label = \"SW\";",
+					"efx-gpios = <&gpioA 0 GPIO_ACTIVE_LOW>;"
+				]
+			},
+			"led1": {
+                                "name": "led1",
+                                "private_data": [
+                                        "label = \"LED1\";",
+                                        "efx-gpios = <&gpioA 1 GPIO_ACTIVE_LOW>;"
+                                ]
+                        },
+			"led2": {
+                                "name": "led2",
+                                "private_data": [
+                                        "label = \"LED2\";",
+                                        "efx-gpios = <&gpioA 2 GPIO_ACTIVE_LOW>;"
+                                ]
+                        },
+			"led3": {
+                                "name": "led3",
+                                "private_data": [
+                                        "label = \"LED3\";",
+                                        "efx-gpios = <&gpioA 3 GPIO_ACTIVE_LOW>;"
+                                ]
+                        }
+		}
+	},
+	"spiA": {
+		"addr_cell": 1,
+                "size_cell": 0,
+		"flash": {
+			"name": "flash",
+			"label": "flash",
+			"addr": "0",
+			"addr_cell": 1,
+                        "size_cell": 1,
+			"private_data": [
+				"compatible = \"spi-nor\";",
+				"reg = <0>;",
+				"spi-max-frequency = <6000000>;"
+			],
+			"part0": {
+				"name": "partition",
+				"addr": "0",
+				"private_data": [
+					"label = \"fpga_bitstream\";",
+					"reg = <0x000000 0x400000>;"
+				]
+			},
+			"part1": {
+				"name": "partition",
+				"addr": "1",
+				"private_data": [
+					"label = \"opensbi\";",
+					"reg = <0x400000 0x080000>;"
+				]
+			},
+			"part2": {
+				"name": "partition",
+				"addr": "2",
+				"private_data": [
+					"label = \"uboot\";",
+					"reg = <0x480000 0x080000>;"
+				]
+			},
+			"part3": {
+				"name": "partition",
+				"addr": "3",
+				"private_data": [
+					"label = \"user\";",
+					"reg = <0x500000 0x300000>;"
+				]
+			}
+		}
+	},
+	"spiB": {
+		"addr_cell": 1,
+                "size_cell": 0,
+		"mmc-slot": {
+			"name": "mmc-slot",
+			"addr": "0",
+			"private_data": [
+				"compatible = \"mmc-spi-slot\";",
+				"reg = <0>;",
+				"voltage-ranges = <3300 3300>;",
+				"spi-max-frequency = <10000000>;"
+			]
+		}
+	}
+    }
+}
