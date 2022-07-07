@@ -1,118 +1,143 @@
-# Efinix Buildroot External
+# BR2-Efinix
 
-Buildroot external tree for building Linux on Sapphire SoC.
-It include OpenSBI, U-boot, Linux, Buildroot configuration files
-and some patches. This project has customize configurations to support Efinix Sapphire SoC.
+Welcome to BR2-Efinix.
 
-## System Dependencies
+BR2-Efinix is a custom Buildroot external tree to build Linux for Efinix Sapphire RISC-V SoC. Customized configurations to support Sapphire SoC is given, where OpenSBI, U-boot, Linux, Buildroot configuration files as well as patches are provided.
+
+## Overview
+
+### Buildroot
+
+Buildroot is a simple, efficient and easy-to-use tool to generate embedded Linux systems through cross-compilation. Learn more at [Buildroot](https://buildroot.org/) official website.
+
+### OpenSBI
+
+OpenSBI project provide an open-source reference implementation of the RISC-V SBI specifications for platform-specific firmwares executing in M-mode. Learn more at [OpenSBI](https://github.com/riscv-software-src/opensbi) repository.
+
+### U-Boot
+
+U-Boot is a boot loader for Embedded boards based on RISCV, PowerPC, ARM, MIPS and several other processors, which can be installed in a boot ROM and used to
+initialize and test the hardware or to download and run application code. Learn more at [U-Boot](https://github.com/u-boot/u-boot) repository.
+
+### RISC-V Boot Sequence
+
+![alt text](docs/img/boot_sequence.jpg)
+
+image from https://riscv.org/wp-content/uploads/2019/12/Summit_bootflow.pdf
+
+When the board power on, the first stage bootloader copy OpenSBI and U-Boot from SPI flash to external memory (RAM). Then, OpenSBI get executed to initialize the memory, stack pointer, cpus and jump to U-Boot. U-Boot load the Linux kernel and start the Linux.
+
+### Efinix Sapphire RISC-V SoC
+
+The Sapphire SoC is based on the VexRiscv core created by Charles Papon. The VexRiscv core is a 32-bit CPU using the ISA RISCV32I with M, A, F, D, and C extensions, has six pipeline stages (fetch, injector, decode, execute, memory, and writeback), and a configurable feature set. See [RISC-V Sapphire User Guide](https://www.efinixinc.com/docs/riscv-sapphire-ug-v3.2.pdf) from Efinix Support page for more detail on Sapphire SoC.
+
+## Requirements
+
+### System Dependencies
+
+Some libraries and tools are needed to be installed for building Linux.
 
 Tested on Ubuntu 18.04 LTS
+
 ```
 sudo apt-get update && sudo apt-get upgrade -y
 sudo apt-get install -y sed make binutils build-essential bash patch gzip \
 bzip2 perl tar cpio unzip rsync file bc wget autoconf automake libtool
+
+sudo apt-get install minicom jq
 ```
 
-## Buildroot Dependencies
+### Buildroot Dependencies
 
-This repo require specific version of Buildroot to work with.
-See the VERSION file that contain the Buildroot version to use.
-The version of Buildroot must be matched with this repo version.
+This repo require specific version of Buildroot to work with. See the [VERSION](VERSION) file for the compatible Buildroot version.
 
-## Build
+### Efinix RISC-V Sapphire SoC version
 
-To build Linux image, OpenSBI and U-boot follow the steps below.
-This step will build Linux based on Buildroot 2020.05.3
+- 2.1 and above
 
-1. Create a working directory.
-```
-mkdir ~/workspace
-cd workspace
-mkdir build
-```
+### Efinity software version version
 
-2. Clone this repo and Buildroot in `workspace` directory.
-```
-git clone https://github.com/Efinix-Inc/br2-efinix -b 2021.05.4
-git clone https://github.com/buildroot/buildroot.git -b 2021.05.3
-```
+- [Efinity](https://www.efinixinc.com/support/efinity.php) 2021.2 and above
+- Follow the official [documentation](https://www.efinixinc.com/docs/efinity-installation-v2.6.pdf) on installation process.
 
-3. Go to `build` directory created in step 1.
+### Hardware Requirements
 
-4. Configure the Buildroot to build the Linux image for T120T324 board `efinix_t120f324_defconfig`.  
-   `<path/to/br2-external>` is `$HOME/workspace/br2-efinix`  
-   `<path/to/buildroot>` is `$HOME/workspace/buildroot`  
-   `<target_buildroot_defconfig>` is `efinix_t120f324_defconfig`
+- Supported Efinix devkit
+  1. Trion T120F324
+  2. Titanium Ti60F225
+- 1GB SD card
+- PMOD microSD card module*
+- UART module*
+- 3x male-to-female jumper cable*
+- 1x MIPI and LVDS extension daughter card*
+- 2x USB micro cable*
 
-```
-make O=$PWD BR2_EXTERNAL=<path/to/br2-external> -C <path/to/buildroot> <target_buildroot_defconfig>
-```
+`Note: * only required for Trion T120F324.`
 
-Run this command. It will takes a while to compile.  
-In a mean time you can drink some coffee :D
-```
-make O=$PWD BR2_EXTERNAL=$HOME/workspace/br2-efinix -C $HOME/workspace/buildroot efinix_t120f324_defconfig
-make -j$(nproc)
-```
+### Hardware Setup
 
-5. The output is located in `$HOME/workspace/build/images`.  
-    `sdcard.img` is a Linux image   
-    `fw_jump.bin` is an OpenSBI image  
-    `u-boot` is an U-boot image  
+For hardware setup please refer to [setup development board](docs/setup_development_board.md) document.
 
-## Flash firmware image
+## Generate Efinix Sapphire RISC-V SoC
 
-OpenSBI and U-boot can be flash on the supported board using Efinix Efinity programmer and FTDI USB UART cable.  
-You need to download Efinix Efinity on Efinity official website.  
-- [Linux](https://www.efinixinc.com/support/downloads-license.php?platform=linux&os=ubuntu&v=2021.2.323)  
-- [Windows](https://www.efinixinc.com/support/downloads-license.php?platform=windows&os=windows&v=2021.2.323)  
+Efinity software is required to generate the Sapphire RISC-V SoC. There are two ways to generate the Efinix Sapphire RISC-V SoC.
 
-| Name | Binary | SPI flash address |
-| ------ | ------ |------ |
-| OpenSBI | fw_jump.bin | 0x00400000 |
-| U-boot | u-boot.bin | 0x00480000|
+### 1. Use preconfigure Efinity project
 
-To flash the OpenSBI and U-boot, follow the following steps
-1. Download the Efinix Efinix and install it. Follow the official [documentation](https://www.efinixinc.com/docs/efinity-installation-v2.6.pdf) on installation process.
+Preconfigure Efinity project with Linux also provided in the repository for quick start. User just need to load the `soc.xml` project file in the Efinity software and click `Synthesize` button to generate the fpga bitstream.
 
-2. Open the Efinity program.
-```
-cd efinity/<version>/bin
-./setup.sh 
-efinity
-```
+- T120F324: `boards/efinix/t120f324/hardware/T120F324_devkit/soc.xml`
 
-3. Click the `programmer` icon on the Efinity to launch the `programmer`.
+- Ti60F225: `boards/efinix/ti60f225/hardware/Ti60F225_devkit/soc.xml`
 
-4. At the `Image` section on `programmer`, click **Combine Multiple Image Files** to select FPGA bitstream (Sapphire SoC), OpenSBI and U-boot images.
+### 2. Generate yourself
 
-5. Select `Mode` and choose **Generic Image Combination**. Then give the name of `Output File`. The `Output File` is name of combination file which consist of FPGA bitstream, OpenSBI and U-boot images.
+Follow the [generate Efinix Sapphire RISC-V SoC](docs/generate_sapphire_soc_for_linux.md) document to generate the custom soc that can boot Linux.
 
-6. Click `Add Image` to add FPGA bitstream, OpenSBI and U-boot images. Then set the `Flash Address` for each image file.
+## Build OpenSBI, U-Boot and Linux
 
-7. The table should look like this
+Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 development kit. These steps will build Linux based on Buildroot 2021.05.3
 
-| Flash Address | Flash Length | Image File |
-| ------ | ------ |------ |
-| soc.hex | | 0x0|
-| fw_jump.bin | | 0x00400000 |
-| u-boot.bin | | 0x00480000|
+1. Clone this repository.
+   
+   ```bash
+   git clone https://github.com/Efinix-Inc/br2-efinix -b 2021.05.4
+   cd br2-efinix
+   ```
 
-8. Click **Apply** to save the output image.
+2. Run `init.sh` script. `init.sh` require 2 arguments. First argument is board name such as `t120f324`. Second argument is `/path/to/soc.h`. You can get the `soc.h` from `Efinity` project directory. For example, `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h`.
+   
+   In this example, we would build the target image for T120F324 devkit and using existing `soc.h` from the preconfigure Efinity project.
+   
+   ```bash
+   ./init.sh t120f324 boards/efinix/t120f324/hardware/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/bsp/efinix/EfxSapphireSoc/include/soc.h
+   ```
 
-9. On `programmer` interface at section `Programming Mode`, select `SPI Active` then click icon **Start Program**. It will takes some time to program the SPI flash.
+3. Build the Linux
+   
+   ```bash
+   make -j$(nproc)
+   ```
 
+4. The output images are located in `$HOME/workspace/build/images`.
+   
+   - `sdcard.img` is a Linux image
+   
+   - `fw_jump.bin` is an OpenSBI image
+   
+   - `u-boot` is an U-boot image
 
-## Flash Linux image on SD card
+5. Flash firmware images.
+   
+   - Follow [Flash firmware image](docs/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot.
 
-You need at least 1GB of SD card. To flash Linux image on SD card, you need privilege mode by using `sudo` command.  
-`sdX` is your SD card. `X` can be any number.
+6. Flash Linux image `sdcard.img` in to SD card.
+   
+   - you can use [Etcher](https://www.balena.io/etcher/) for Linux
+   
+   - or, Linux command line to flash the Linux image into SD card. See [flash linux](docs/flash_linux.md) document.
 
-```
-cd $HOME/workspace/build/images
-sudo dd if=sdcard.img of=/dev/sdX
-```
-on Windows, you can use [Etcher](https://www.balena.io/etcher/) to flash the Linux image on SD card.
+7. Access the board serial console over USB UART. See [accessing uart terminal](docs/accessing_uart_terminal.md) document.
 
 ## Documentation
 
@@ -123,6 +148,7 @@ on Windows, you can use [Etcher](https://www.balena.io/etcher/) to flash the Lin
 ## Supported Board
 
 Currently supported board as follows  
+
 1. Trion T120F324  
 2. Titanium Ti60F225  
 
