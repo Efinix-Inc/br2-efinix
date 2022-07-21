@@ -797,9 +797,12 @@ def dt_create_cpu_node(cfg):
 def dt_create_memory_node(cfg):
     name = "memory"
     memory_keyword = "DDR_BMB"
+    conf = load_config_file()
+    # addr use linux start addr
+    addr = conf['memory_mapped']['uImage']
 
-    addr = get_property_value(cfg, memory_keyword, memory_keyword + ' ')
     size = get_property_value(cfg, memory_keyword, 'SIZE ')
+    size = hex(int(size,0) - int(addr, 0))
     reg = "reg = <{0} {1}>;".format(addr, size)
     mem_node = {
         "name": name,

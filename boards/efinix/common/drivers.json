@@ -5,6 +5,12 @@
 	"t120f324",
 	"ti60f225"
     ],
+    "memory_mapped": {
+        "uImage": "0x00400000",
+	"linux.dtb": "0x00CF0000",
+	"opensbi": "0x01000000",
+	"u-boot": "0x01040000"
+    },
     "drivers": {
 	"bus": {
 		"compatible": ["simple-bus"]
