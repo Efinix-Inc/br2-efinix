@@ -1,6 +1,6 @@
 # GPIO Consumer Driver
 
-GPIO consumer driver for Efinix RISC-V Sapphire SoC used to control the GPIO pin. The default configuration of Efinix RISC-V Sapphire SoC already enable 4 GPIO pins on the GPIO port A. 3 pins for LEDs and 1 pin for the switch button.
+GPIO consumer driver for Efinix RISC-V Sapphire SoC used to control the GPIO pin. The default configuration of Efinix RISC-V Sapphire SoC only enable 4 GPIO pins on the GPIO port A. 3 pins for LEDs and 1 pin for the switch button.
 
 This is an example of generated device tree file in `boards/efinix/common/dts/sapphire.dtsi`.
 
