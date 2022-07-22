@@ -2,7 +2,7 @@
 
 Welcome to BR2-Efinix.
 
-BR2-Efinix is a custom Buildroot external tree to build Linux for Efinix Sapphire RISC-V SoC. Customized configurations to support Sapphire SoC is given, where OpenSBI, U-boot, Linux, Buildroot configuration files as well as patches are provided.
+BR2-Efinix is a custom Buildroot external tree for building Linux for Efinix Sapphire RISC-V SoC. Customized configurations to support Sapphire SoC is given, where OpenSBI, U-boot, Linux, Buildroot configuration files as well as patches are provided.
 
 ## Overview
 
@@ -109,13 +109,13 @@ Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 develop
 
 2. Run `init.sh` script. `init.sh` require 2 arguments. First argument is board name such as `t120f324`. Second argument is `/path/to/soc.h`. You can get the `soc.h` from `Efinity` project directory. For example, `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h`.
    
-   In this example, we would build the target image for T120F324 devkit and using existing `soc.h` from the preconfigure Efinity project.
+   Please note that `$EFINITY_PROJECT` is path to your Efinity project.
    
    ```bash
-   ./init.sh t120f324 boards/efinix/t120f324/hardware/T120F324_devkit/embedded_sw/sapphire_rv32imafd_80Mhz/bsp/efinix/EfxSapphireSoc/include/soc.h
+   source init.sh t120f324 $EFINITY_PROJECT/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h
    ```
 
-3. Build the Linux
+3. Build the Linux.
    
    ```bash
    make -j$(nproc)
@@ -129,11 +129,9 @@ Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 develop
    
    - `u-boot` is an U-boot image
 
-> The build folder is generated at the same directory with br2-efinix folder. 
-
 5. Flash firmware images.
    
-   - Follow [Flash firmware image](docs/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot.
+   - Follow [Flash firmware image](docs/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the T120F324 devkit.
 
 6. Flash Linux image `sdcard.img` in to SD card.
    
@@ -142,6 +140,19 @@ Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 develop
    - or, Linux command line to flash the Linux image into SD card. See [flash linux](docs/flash_linux.md) document.
 
 7. Access the board serial console over USB UART. See [accessing uart terminal](docs/accessing_uart_terminal.md) document.
+
+8. Example of Linux boot.
+   
+   ![alt text](docs/img/boot_linux_smp.gif)
+
+9. Use the login prompt as `root` at linux prompt.
+
+10. Try run gpio demo application. See [gpio](kernel_modules/gpio/README.md) for more info. Observe the LEDs blinking on the T120F324 board.
+    
+    ```bash
+    modprobe gpio
+    gpio_app
+    ```
 
 ## Documentation
 
@@ -158,5 +169,6 @@ Currently supported board as follows
 
 ## License
 
-This project is licensed under the [GPLv2](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html) or later.  
+This project is licensed under the [GPLv2](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html) or later.
+
 Buildroot is licensed under the [GPLv2](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html) or later with exceptions.
