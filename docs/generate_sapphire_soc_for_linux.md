@@ -22,9 +22,9 @@ Follow the official [document](https://www.efinixinc.com/docs/efinity-installati
    
    - select `Core Number` to 4
    
-   - set `Frequency` to 80Mhz
+   - set `Frequency` to 50Mhz
    
-   - enable `Peripheral Clock Frequency` and set it to 80Mhz
+   - enable `Peripheral Clock Frequency` and set it to 50Mhz
    
    - enable `Cache`
    
@@ -37,6 +37,8 @@ Follow the official [document](https://www.efinixinc.com/docs/efinity-installati
 7. Click `Generate` to generate the soc.
 
 8. Click `Ok` after the soc successfully generated.
+
+>`Note:` Peripheral Clock Frequency should be set within the supported frequency of the connected peripheral.
 
 ## Modify Bootloader
 
@@ -51,7 +53,7 @@ Table below shows the best known configuration for assigning the pinout for SPI 
 | T120F324 | system_spi_1_io_data_0<br/>system_spi_1_io_data_1<br/>system_spi_1_io_sclk_write<br/>system_spi_1_io_ss<br/><br/>system_uart_0_io_rxd<br/>system_uart_0_io_txd | GPIOT_RXP21<br/>GPIOT_RXP22<br/>GPIOT_RXP23<br/>GPIOT_RXP20<br/><br/>GPIOT_RXP07<br/>GPIOT_RXN07 | inout<br/>inout<br/>output<br/>output<br/><br/>input<br/>output | 3.3 V LVCMOS | *io_peripheralClk or io_systemClk |
 | Ti60F225 | system_spi_1_io_data_0<br/>system_spi_1_io_data_1<br/>system_spi_1_io_sclk_write<br/>system_spi_1_io_ss                                                        | GPIOR_16<br/>GPIOR_18<br/>GPIOR_15<br/>GPIOR_13                                                  | inout<br/>inout<br/>output<br/>output                           | 3.3 V LVCMOS | *io_peripheralClk or io_systemClk |
 
-`Note:` * if peripheral clock is enable then use `io_peripheralClk` as clock signal. Else use `io_systemClk`.
+>`Note:` * if peripheral clock is enable then use `io_peripheralClk` as clock signal. Else use `io_systemClk`.
 
 1. Open the generated soc project. Select `File -> Open Project` then browse to `$EFINITY_HOME/project/soc/ip/soc1/T120F324_devkit/soc.xml` then click `Open`.
 
@@ -68,7 +70,7 @@ Table below shows the best known configuration for assigning the pinout for SPI 
    
    a) Create block for `system_spi_1_io_data_0` and `system_spi_1_io_data_1`.
    
-   - set `Instance Name` as `system_spi_1_io_data_0` and hit `Enter`.
+   - At the `Block Editor`, set `Instance Name` as `system_spi_1_io_data_0` and hit `Enter`.
    
    - set `Mode` to `inout`.
    
@@ -78,15 +80,17 @@ Table below shows the best known configuration for assigning the pinout for SPI 
      
      - select `Register` option as `register`.
      
-     - set `Clock Pin Name` as `io_peripheralClk`.
-   
+     - set `Clock Pin Name` as `io_peripheralClk` and hit `Enter`.
+
+> You may verify if the setting has been successfully set to the interface by checking on the `Block Summary`.If the `io_peripheralClk` are not shown in the Block Summary after you hit `Enter`, you may want to remove the `io_peripheralClk` setting first, select other block at the GPIO(n) tab. Go back to the `system_spi_1_io_data_0` block and retry the setting of `io_peripheralClk`. 
+
    - at `Output`,
      
      - set `Pin Name` as `system_spi_1_io_data_0_write` and hit `Enter`.
      
      - select `Register` option as `register`.
      
-     - set `Clock Pin Name` as `io_peripheralClk`.
+     - set `Clock Pin Name` as `io_peripheralClk` and hit `Enter`.
    
    - at `Output Enable`,
      
@@ -98,7 +102,7 @@ Table below shows the best known configuration for assigning the pinout for SPI 
    
    b) Create a new block for `system_spi_1_io_sclk_write` and `system_spi_1_io_ss`.
    
-   - set `Instance Name` as `system_spi_1_io_sclk_write`.
+   - set `Instance Name` as `system_spi_1_io_sclk_write` and hit `Enter`.
    
    - set `Mode` as `output`.
    
@@ -140,6 +144,7 @@ Table below shows the best known configuration for assigning the pinout for SPI 
    ...
    )
    ```
+>The newly added ports must be placed in between other ports. Placing the new ports after the spi_0 ports are preferred. Appending these codes to the last line of the port instantiation will cause some errors due to the comma location. 
 
 3. Modify `soc_inst()` by adding the pin name in the parenthesis `()` and save.
    
@@ -167,4 +172,4 @@ Table below shows the best known configuration for assigning the pinout for SPI 
 ## Compile the Efinity Project
 
 1. Compile the Efinity project by clicking the `Synthesis` button. 
-   - If the timing is not meet then use optimization `TIMING_2` or `TIMING_3`. Change it at `FILE -> Edit Project -> Place and Route -> Optimization Level -> TIMING_3`.
+> If the timing is not meet then use optimization setting `TIMING_2` or `TIMING_3`. Change it at `FILE -> Edit Project -> Place and Route -> Optimization Level -> TIMING_3`.

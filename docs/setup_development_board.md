@@ -34,11 +34,11 @@ Connect the MIPI and LVDS Expansion daughter card to the board at P2 header.
 
 1. Connect male to female jumper wires to the daughter card and UART module:
    
-   - Rx to pin 4
+   - Rx of UART module to pin 4 of daughter card 
    
-   - Tx to pin 2
+   - Tx of UART module to pin 2 of daughter card
    
-   - GND to pin 6
+   - GND of UART module to pin 6 of daughter card
 
 2. Connect the UART module to your computer via USB micro cable.
 

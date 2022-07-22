@@ -71,6 +71,8 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 - 3x male-to-female jumper cable*
 - 1x MIPI and LVDS extension daughter card*
 - 2x USB micro cable*
+- External SD Card reader (if integrated SD Card Reader unavailable)
+- MicroSD Adapter to adapt MicroSD to SD Card Reader (if MicroSD Card Reader unavailable)
 
 `Note: * only required for Trion T120F324.`
 
@@ -119,13 +121,15 @@ Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 develop
    make -j$(nproc)
    ```
 
-4. The output images are located in `$HOME/workspace/build/images`.
+4. The output images are located in `<path/to/br2-efinix/../build/images`.
    
    - `sdcard.img` is a Linux image
    
    - `fw_jump.bin` is an OpenSBI image
    
    - `u-boot` is an U-boot image
+
+> The build folder is generated at the same directory with br2-efinix folder. 
 
 5. Flash firmware images.
    
