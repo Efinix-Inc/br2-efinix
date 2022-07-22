@@ -3,9 +3,9 @@
 The bootloader is the first program get executed when the FPGA board power on. For the Sapphire SoC, the bootloader will load the program at designated location as specify in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/bsp/efinix/EfxSapphireSoc/app/bootloaderConfig.h`. By default, the bootloader will load user software binary from address `0x00380000` in  the SPI flash memory. Then it will copy the user software binary to RAM at address `0x00001000`.
 
 In this tutorial, we are going to modify the bootloader program so that it can boot Linux. OpenSBI and U-Boot will be loaded first by this bootloader program before it can boot Linux.
-> `$EFINITY_PROJECT` is the path to the current Efinity project. You may either replace the `$EFINITY_PROJECT` with the absolute path to your current Efinity Project(i.e. /home/<username>/efinity/2022.M/project/linux_test/soc/ip/soc1) or you may add the path in .bashrc file(only for linux) as below;
->>> #custom path to eclipse project 
->>> export EFINITY_PROJECT="/home/jjho/efinity/2022.M/project/linux_test/soc/ip/soc1"
+
+> `$EFINITY_PROJECT` is the path to the current Efinity project. You may either replace the `$EFINITY_PROJECT` with the absolute path to your current Efinity Project (i.e. /home/<username>/efinity/2022.M/project/linux_test/soc/ip/soc1)
+
 ## Prerequsite
 
 ### Install RISC-V SDK
@@ -64,6 +64,12 @@ void bspMain()
 }
 ```
 
+If the target SoC is multicore, then enable SMP flag in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw//bsp/efinix/EfxSapphireSoc/include/soc.mk` . Just append it in `soc.mk`.
+
+```makefile
+CFLAGS += -DSMP
+```
+
 ## Compile Bootloader Program
 
 Bootloader program is located in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/software/standalone/bootloader`. There are two ways to compile the bootloader program.
@@ -79,21 +85,21 @@ Bootloader program is located in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<
    ```
 
 2. Then, select 1 to use SapphireSoC configuration to launch Eclipse.
-3. At the Eclipse IDE Launcher, click `Browse` button. Select the folder, `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>` as the workspace. 
->The workspace must be placed in this directory in order for the Eclipse toolchain to use the correct bsp files. 
 
+3. At the Eclipse IDE Launcher, click `Browse` button. Select the folder, `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>` as the workspace.
+   
+   > The workspace must be placed in this directory in order for the Eclipse toolchain to use the correct bsp files.
 
-3. Click on `File` -> `New` -> `MakeFile Project with Existing Code`. Select `Browse` to find the bootloader project in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/software/standalone/bootloader`. Leave the `Toolchain for indexer Settings` as `<none>`. Then click `Finish`.
+4. Click on `File` -> `New` -> `MakeFile Project with Existing Code`. Select `Browse` to find the bootloader project in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/software/standalone/bootloader`. Leave the `Toolchain for indexer Settings` as `<none>`. Then click `Finish`.
 
-4. Right click on the `bootloader` on the `Project Explorer` and select `Build Project`.
+5. Right click on the `bootloader` on the `Project Explorer` and select `Build Project`.
 
 ### Using Command Line in Linux
 
 ```bash
 export PATH=</path/to/SDK_Ubuntu>/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin:$PATH
 cd $EFINITY_PROJECT/T120F324_devkit/embedded_sw/<Project Name>/software/standalone/bootloader
-BSP_PATH=$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/bsp/efinix/EfxSapphireSoc
-make
+BSP_PATH=$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/bsp/efinix/EfxSapphireSoc make
 ```
 
 ## Generate Memory Initialization Files
@@ -109,14 +115,14 @@ The memory initialization binary files are named as  `EfxSapphireSoc.v_toplevel_
    python3 binGen.py -f 1 -s 4096 -b ../software/standalone/bootloader/build/bootloader.bin
    ```
    
-   
->   where,
->   -f, fpu. If enable set to 1. Else set to 0
->   -s, On-Chip RAM size. You can get this value at parameter "--onChipRamSize"
->    in $EFINITY_PROJECT/source/soc_config. The value must be in decimal. By default
->    the value is 4096(0x1000 in hexadecimal).
->   -b, path of bootloader.bin
-   
+   ```
+   where,
+    -f, fpu. If enable set to 1. Else set to 0
+    -s, On-Chip RAM size. You can get this value at parameter "--onChipRamSize"
+    in $EFINITY_PROJECT/source/soc_config. The value must be in decimal. By default
+    the value is 4096(0x1000 in hexadecimal).
+    -b, path of bootloader.bin
+   ```
 
 2. Copy the generated memory initialization bin files
    
