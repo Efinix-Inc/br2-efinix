@@ -17,10 +17,15 @@
 #include <sbi_utils/irqchip/plic.h>
 #include <sbi_utils/serial/uart8250.h>
 #include <sbi_utils/sys/clint.h>
+#include <soc.h>
 
-/* clang-format off */
+ /* clang-format off */
+#ifndef SYSTEM_CORES_COUNT
+#define VEX_HART_COUNT  1
+#else
+#define VEX_HART_COUNT  SYSTEM_CORES_COUNT
+#endif
 
-#define VEX_HART_COUNT			1
 #define VEX_PLATFORM_FEATURES  \
 	(SBI_PLATFORM_HAS_TIMER_VALUE | SBI_PLATFORM_HAS_MFAULTS_DELEGATION)
 

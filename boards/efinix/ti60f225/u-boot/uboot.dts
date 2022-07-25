@@ -29,7 +29,7 @@
 
 	memory {
 		device_type = "memory";
-		reg = <0x00001000 0x02000000>;
+		reg = <0x00400000 0x1C00000>;
   	};
 };
 
