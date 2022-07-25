@@ -23,6 +23,31 @@ The table below shows the SPI flash address and corresponding RAM address for ea
 
 ## Modified Bootloader Program
 
+### Using script
+
+Modifying bootloader program can be challenging for beginner. You can use `modify_bootloader.sh` script to simplify the steps for modifying bootloader program. The script will handle compiling bootloader and generating the memory initialization files. You can skip **Modified Bootloader Program** and **Generate Memory Initilization Files** if using `modify_bootloader.sh`. `modify_bootloader.sh` located in `br2-efinix/boards/efinix/common`.
+
+```bash
+This script used to modify bootloader program for booting Linux.
+
+command
+./modify_bootloader.sh <devkit> <efinity project directory> <RISCV SDK directory> <Efinity installation directory>
+
+supported <devkit> are t120f324, ti60f225
+<Efinity project directory> can be /home/<user>/soc/ip/soc1
+<RISCV SDK> can be /home/<user>/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin
+<Efinity installation directory> can be /home/<user>/efinity/2022.1/bin
+
+Example command for t120f324 devkit
+./modify_bootloader.sh \
+t120f324 \
+/home/<user>/soc/ip/soc1 \
+/home/<user>/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin \
+/home/<user>/efinity/2022.1/bin
+```
+
+### Modify manually
+
 This is an example of modified `bootloaderConfig.h` for booting Linux. This file is located in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/bsp/efinix/EfxSapphireSoc/app/bootloaderConfig.h`. You may copy and replace it.
 
 ```c
