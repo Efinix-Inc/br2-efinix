@@ -32,13 +32,15 @@ Follow the official [document](https://www.efinixinc.com/docs/efinity-installati
    
    - enable `Floating-point unit`
 
-6. Under `SPI` tab, enable SPI 1.
+6. Under `Cache/Memory` tab, set `External Memory Address Size` to `256 MB` for `T120F324`. Set to `32 MB` for `Ti60F225`.
 
-7. Click `Generate` to generate the soc.
+7. Under `SPI` tab, enable SPI 1.
 
-8. Click `Ok` after the soc successfully generated.
+8. Click `Generate` to generate the soc.
 
->`Note:` Peripheral Clock Frequency should be set within the supported frequency of the connected peripheral.
+9. Click `Ok` after the soc successfully generated.
+
+> `Note:` Peripheral Clock Frequency should be set within the supported frequency of the connected peripheral.
 
 ## Modify Bootloader
 
@@ -53,7 +55,7 @@ Table below shows the best known configuration for assigning the pinout for SPI 
 | T120F324 | system_spi_1_io_data_0<br/>system_spi_1_io_data_1<br/>system_spi_1_io_sclk_write<br/>system_spi_1_io_ss<br/><br/>system_uart_0_io_rxd<br/>system_uart_0_io_txd | GPIOT_RXP21<br/>GPIOT_RXP22<br/>GPIOT_RXP23<br/>GPIOT_RXP20<br/><br/>GPIOT_RXP07<br/>GPIOT_RXN07 | inout<br/>inout<br/>output<br/>output<br/><br/>input<br/>output | 3.3 V LVCMOS | *io_peripheralClk or io_systemClk |
 | Ti60F225 | system_spi_1_io_data_0<br/>system_spi_1_io_data_1<br/>system_spi_1_io_sclk_write<br/>system_spi_1_io_ss                                                        | GPIOR_16<br/>GPIOR_18<br/>GPIOR_15<br/>GPIOR_13                                                  | inout<br/>inout<br/>output<br/>output                           | 3.3 V LVCMOS | *io_peripheralClk or io_systemClk |
 
->`Note:` * if peripheral clock is enable then use `io_peripheralClk` as clock signal. Else use `io_systemClk`.
+> `Note:` * if peripheral clock is enable then use `io_peripheralClk` as clock signal. Else use `io_systemClk`.
 
 1. Open the generated soc project. Select `File -> Open Project` then browse to `$EFINITY_HOME/project/soc/ip/soc1/T120F324_devkit/soc.xml` then click `Open`.
 
@@ -84,40 +86,39 @@ Table below shows the best known configuration for assigning the pinout for SPI 
 
 > You may verify if the setting has been successfully set to the interface by checking on the `Block Summary`.If the `io_peripheralClk` are not shown in the Block Summary after you hit `Enter`, you may want to remove the `io_peripheralClk` setting first, select other block at the GPIO(n) tab. Go back to the `system_spi_1_io_data_0` block and retry the setting of `io_peripheralClk`. 
 
-   - at `Output`,
-     
-     - set `Pin Name` as `system_spi_1_io_data_0_write` and hit `Enter`.
-     
-     - select `Register` option as `register`.
-     
-     - set `Clock Pin Name` as `io_peripheralClk` and hit `Enter`.
-   
-   - at `Output Enable`,
-     
-     - set `Pin Name` as `system_spi_1_io_data_0_writeEnable` and hit `Enter`.
-     
-     - select `Register` option as `register`.
-   
-   - repeat step 2a for `system_spi_1_io_data_1`.
-   
-   b) Create a new block for `system_spi_1_io_sclk_write` and `system_spi_1_io_ss`.
-   
-   - set `Instance Name` as `system_spi_1_io_sclk_write` and hit `Enter`.
-   
-   - set `Mode` as `output`.
-   
-   - at `Output`,
-     
-     - set `Pin Name` as `system_spi_1_io_sclk_write.
-     
-     - select `Register` option as `register`.
-   
-   - at `Output Clock`,
-     
-     - set `Pin Name` as `io_peripheralClk` and hit `Enter`.
-   
-   - repeat step 2b for `system_spi_1_io_ss`.
+- at `Output`,
+  
+  - set `Pin Name` as `system_spi_1_io_data_0_write` and hit `Enter`.
+  
+  - select `Register` option as `register`.
+  
+  - set `Clock Pin Name` as `io_peripheralClk` and hit `Enter`.
 
+- at `Output Enable`,
+  
+  - set `Pin Name` as `system_spi_1_io_data_0_writeEnable` and hit `Enter`.
+  
+  - select `Register` option as `register`.
+
+- repeat step 2a for `system_spi_1_io_data_1`.
+  
+  b) Create a new block for `system_spi_1_io_sclk_write` and `system_spi_1_io_ss`.
+
+- set `Instance Name` as `system_spi_1_io_sclk_write` and hit `Enter`.
+
+- set `Mode` as `output`.
+
+- at `Output`,
+  
+  - set `Pin Name` as `system_spi_1_io_sclk_write.
+  
+  - select `Register` option as `register`.
+
+- at `Output Clock`,
+  
+  - set `Pin Name` as `io_peripheralClk` and hit `Enter`.
+
+- repeat step 2b for `system_spi_1_io_ss`.
 3. Next step is to assign the pinout for the newly created SPI 1 block. On `Efinity Interface Designer` click `Show/Hide GPIO Resource Assigner` icon at the top of `create Block` icon to open `Resouces Assigner`.
    
    In the `Resource Assigner`, assign the `Resource` of `system_spi_1_io_data_0` as `GPIOT_RXP21`. See the table above for the rest of the block. Make sure you reassign the `system_uart_0_io_rxd` and `system_uart_0_io_txd`.
@@ -144,7 +145,8 @@ Table below shows the best known configuration for assigning the pinout for SPI 
    ...
    )
    ```
->The newly added ports must be placed in between other ports. Placing the new ports after the spi_0 ports are preferred. Appending these codes to the last line of the port instantiation will cause some errors due to the comma location. 
+   
+   > The newly added ports must be placed in between other ports. Placing the new ports after the spi_0 ports are preferred. Appending these codes to the last line of the port instantiation will cause some errors due to the comma location. 
 
 3. Modify `soc_inst()` by adding the pin name in the parenthesis `()` and save.
    
@@ -172,4 +174,5 @@ Table below shows the best known configuration for assigning the pinout for SPI 
 ## Compile the Efinity Project
 
 1. Compile the Efinity project by clicking the `Synthesis` button. 
-> If the timing is not meet then use optimization setting `TIMING_2` or `TIMING_3`. Change it at `FILE -> Edit Project -> Place and Route -> Optimization Level -> TIMING_3`.
+   
+   > If the timing is not meet then use optimization setting `TIMING_2` or `TIMING_3`. Change it at `FILE -> Edit Project -> Place and Route -> Optimization Level -> TIMING_3`.
