@@ -96,6 +96,12 @@ for i in {4..1}; do
 done
 
 echo "Detecting $cpu_count RISC-V CPU cores"
+if [[ $cpu_count -gt 1 ]]; then
+	# enable CONFIG_SMP=y in linux.config
+	sed -i 's/^CONFIG_SMP=n/CONFIG_SMP=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
+else
+	sed -i 's/^CONFIG_SMP=y/CONFIG_SMP=n/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
+fi
 
 # modify soc.h by appending SYSTEM_CORES_COUNT
 IFS=$'\n' read -d '' -r -a lines < $SOC_H
