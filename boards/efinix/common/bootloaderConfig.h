@@ -4,6 +4,7 @@
 #include "io.h"
 #include "spiFlash.h"
 #include "riscv.h"
+#include "start.h"
 
 #define SPI SYSTEM_SPI_0_IO_CTRL
 #define SPI_CS 0
