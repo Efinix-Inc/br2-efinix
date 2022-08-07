@@ -17,7 +17,7 @@
 #include <sbi_utils/irqchip/plic.h>
 #include <sbi_utils/serial/uart8250.h>
 #include <sbi_utils/sys/clint.h>
-#include <soc.h>
+#include "soc.h"
 
 /* clang-format off */
 #ifndef SYSTEM_CORES_COUNT
