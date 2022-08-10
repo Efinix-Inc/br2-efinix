@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //           _____       
-//          / _______    Copyright (C) 2013-2021 Efinix Inc. All rights reserved.
+//          / _______    Copyright (C) 2013-2022 Efinix Inc. All rights reserved.
 //         / /       \   
 //        / /  ..    /   design_modules.v
 //       / / .'     /    
@@ -13,6 +13,8 @@
 // Revisions:
 // 1.0 Initial rev
 // 1.1 Added Custom ALU
+// 1.2 Fixed AXI4 slave read first issue
+// 1.3 Added axi full-duplex to half-duplex converter
 // ***********************************************************************
 `timescale 1ns/1ps
 
@@ -623,8 +625,8 @@ reg 			r_axi_interrupt;
 	generate
 		for(i=0;i < (DATA_WIDTH/8); i = i + 1) begin
 	
-		assign rvalid[i] = rdata[i][8];
-		assign rlast[i] = rdata[i][9];
+		assign rvalid[i] = (arlenReg != 'h1)? rdata[i][8] : 1'b1;
+		assign rlast[i] = (arlenReg != 'h1)? rdata[i][9] : 1'b1;
 		assign wdata[i] = {axi_wlast, axi_wvalid, axi_wdata[(i*8+7) -: 8]} ;
 		assign data_o[(i*8+7) -: 8] = rdata[i];
 		assign wEnable[i] = axi_wready & axi_wvalid & axi_wstrb[i];
@@ -693,7 +695,8 @@ output                      pass
 );
 
 ///////////////////////////////////////////////////////////////////////////////
-localparam  ASIZE = (WIDTH == 256)? 5 :
+localparam  ASIZE = (WIDTH == 512)? 6 :
+                    (WIDTH == 256)? 5 :
                     (WIDTH == 128)? 4 :
                     (WIDTH == 64)?  3 : 2;
 
@@ -1389,5 +1392,103 @@ assign cal1_top     = (raw_r1 << 4) + enckey0;
 assign cal1_mid     = raw_r1 + delta_r1;
 assign cal1_bot     = (raw_r1 >> 5) + enckey1;
 assign cal1         = cal1_top ^ cal1_mid ^ cal1_bot;
+
+endmodule
+/////////////////////////////////////////////////////////////////////////////
+module fd_to_hd_wrapper (
+input                       clk,
+input                       reset,
+output  wire                io_ddrA_arw_valid,
+input                       io_ddrA_arw_ready,
+output  wire    [31:0]      io_ddrA_arw_payload_addr,
+output  wire    [7:0]       io_ddrA_arw_payload_id,
+output  wire    [7:0]       io_ddrA_arw_payload_len,
+output  wire    [2:0]       io_ddrA_arw_payload_size,
+output  wire    [1:0]       io_ddrA_arw_payload_burst,
+output  wire    [1:0]       io_ddrA_arw_payload_lock,
+output  wire                io_ddrA_arw_payload_write,
+
+input                       io_ddrA_aw_valid,
+output  wire                io_ddrA_aw_ready,
+input           [31:0]      io_ddrA_aw_payload_addr,
+input           [7:0]       io_ddrA_aw_payload_id,
+input           [7:0]       io_ddrA_aw_payload_len,
+input           [2:0]       io_ddrA_aw_payload_size,
+input           [1:0]       io_ddrA_aw_payload_burst,
+input           [1:0]       io_ddrA_aw_payload_lock,
+
+input                       io_ddrA_ar_valid,
+output  wire                io_ddrA_ar_ready,
+input           [31:0]      io_ddrA_ar_payload_addr,
+input           [7:0]       io_ddrA_ar_payload_id,
+input           [7:0]       io_ddrA_ar_payload_len,
+input           [2:0]       io_ddrA_ar_payload_size,
+input           [1:0]       io_ddrA_ar_payload_burst,
+input           [1:0]       io_ddrA_ar_payload_lock
+);
+/////////////////////////////////////////////////////////////////////////////
+localparam [1:0]    IDLE    = 2'h0,
+                    WRITE   = 2'h1,
+                    READ    = 2'h2;
+
+reg [1:0]           st_cur,
+                    st_next; 
+
+wire                op_write,
+                    op_read;
+/////////////////////////////////////////////////////////////////////////////
+    always@(posedge clk or posedge reset)
+    begin
+    if(reset)
+        st_cur <= IDLE;
+    else
+        st_cur <= st_next;
+    end
+
+    always@*
+    begin
+        st_next = st_cur;
+        case(st_cur)
+        IDLE:
+        begin
+            if(io_ddrA_aw_valid)
+                st_next = WRITE;
+            else if (io_ddrA_ar_valid)
+                st_next = READ;
+            else
+                st_next = IDLE;
+        end
+        WRITE:
+        begin
+            if(io_ddrA_aw_ready)
+                st_next = IDLE;
+            else
+                st_next = WRITE;
+        end
+        READ:
+        begin
+            if(io_ddrA_ar_ready)
+                st_next = IDLE;
+            else
+                st_next = READ;
+        end
+        default: st_next = IDLE;
+        endcase
+    end
+        
+assign op_write = (st_cur == WRITE);
+assign op_read = (st_cur == READ);
+
+assign io_ddrA_arw_valid         = op_write ? io_ddrA_aw_valid : op_read ? io_ddrA_ar_valid : 1'b0; 
+assign io_ddrA_arw_payload_addr  = op_write ? io_ddrA_aw_payload_addr    : io_ddrA_ar_payload_addr;  
+assign io_ddrA_arw_payload_id    = op_write ? io_ddrA_aw_payload_id      : io_ddrA_ar_payload_id;    
+assign io_ddrA_arw_payload_len   = op_write ? io_ddrA_aw_payload_len     : io_ddrA_ar_payload_len;   
+assign io_ddrA_arw_payload_size  = op_write ? io_ddrA_aw_payload_size    : io_ddrA_ar_payload_size;  
+assign io_ddrA_arw_payload_burst = op_write ? io_ddrA_aw_payload_burst   : io_ddrA_ar_payload_burst; 
+assign io_ddrA_arw_payload_lock  = op_write ? io_ddrA_aw_payload_lock    : io_ddrA_ar_payload_lock;  
+assign io_ddrA_arw_payload_write = op_write;
+
+assign io_ddrA_aw_ready = op_write ? io_ddrA_arw_ready : 1'b0;
+assign io_ddrA_ar_ready = op_read ? io_ddrA_arw_ready : 1'b0;
 
 endmodule

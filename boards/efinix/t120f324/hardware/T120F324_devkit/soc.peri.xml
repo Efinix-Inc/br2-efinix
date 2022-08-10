@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<efxpt:design_db name="soc" device_def="T120F324" location="/home/mnalim/workspace/projects/sapphire_soc/ip/sapphire_rv32imafd_80Mhz/T120F324_devkit" version="2021.2.323.1.8" db_version="20212999" last_change_date="Tue Feb 15 09:49:53 2022" xmlns:efxpt="http://www.efinixinc.com/peri_design_db" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.efinixinc.com/peri_design_db peri_design_db.xsd ">
+<efxpt:design_db name="soc" device_def="T120F324" location="/home/mnalim/workspace/efinity/2022.1.200-dev/project/soc/ip/soc1/T120F324_devkit" version="2022.1.200" db_version="20221006" last_change_date="Wed Aug 10 10:33:18 2022" xmlns:efxpt="http://www.efinixinc.com/peri_design_db" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.efinixinc.com/peri_design_db peri_design_db.xsd ">
     <efxpt:device_info>
         <efxpt:iobank_info>
             <efxpt:iobank name="1A" iostd="3.3 V LVTTL / LVCMOS"/>
@@ -11,7 +11,6 @@
             <efxpt:iobank name="3A" iostd="1.2 V"/>
             <efxpt:iobank name="3B" iostd="1.2 V"/>
             <efxpt:iobank name="3D_TR_BR" iostd="3.3 V LVTTL / LVCMOS"/>
-            <efxpt:iobank name="3E" iostd="1.5 V"/>
             <efxpt:iobank name="4E" iostd="3.3 V LVTTL / LVCMOS"/>
             <efxpt:iobank name="4F" iostd="3.3 V LVTTL / LVCMOS"/>
             <efxpt:iobank name="BL" iostd="1.2 V"/>
@@ -106,13 +105,13 @@
         <efxpt:bus name="system_gpio_0_io" mode="inout" msb="3" lsb="0"/>
     </efxpt:gpio_info>
     <efxpt:pll_info>
-        <efxpt:pll name="my_ddr_pll" pll_def="PLL_BR0" ref_clock_name="" ref_clock_freq="50.00" multiplier="32" pre_divider="1" post_divider="4" reset_name="memoryClk_rstn" locked_name="memoryClk_locked" is_ipfrz="false" is_bypass_lock="true">
+        <efxpt:pll name="my_ddr_pll" pll_def="PLL_BR0" ref_clock_name="" ref_clock_freq="50.0000" multiplier="32" pre_divider="1" post_divider="4" reset_name="memoryClk_rstn" locked_name="" is_ipfrz="false" is_bypass_lock="true">
             <efxpt:output_clock name="my_ddr_pll_CLKOUT0" number="0" out_divider="1" adv_out_phase_shift="0"/>
             <efxpt:output_clock name="io_memoryClk" number="1" out_divider="4" adv_out_phase_shift="0"/>
             <efxpt:adv_prop ref_clock_mode="external" ref_clock1_name="" ext_ref_clock_id="2" clksel_name="" feedback_clock_name="" feedback_mode="internal"/>
         </efxpt:pll>
-        <efxpt:pll name="my_pll" pll_def="PLL_BR2" ref_clock_name="" ref_clock_freq="10.00" multiplier="56" pre_divider="1" post_divider="1" reset_name="systemClk_rstn" locked_name="systemClk_locked" is_ipfrz="false" is_bypass_lock="true">
-            <efxpt:output_clock name="io_systemClk" number="0" out_divider="7" adv_out_phase_shift="0"/>
+        <efxpt:pll name="my_pll" pll_def="PLL_BR2" ref_clock_name="" ref_clock_freq="10.0000" multiplier="50" pre_divider="1" post_divider="1" reset_name="systemClk_rstn" locked_name="systemClk_locked" is_ipfrz="false" is_bypass_lock="true">
+            <efxpt:output_clock name="io_systemClk" number="0" out_divider="10" adv_out_phase_shift="0"/>
             <efxpt:adv_prop ref_clock_mode="external" ref_clock1_name="" ext_ref_clock_id="2" clksel_name="" feedback_clock_name="" feedback_mode="internal"/>
         </efxpt:pll>
     </efxpt:pll_info>
@@ -122,21 +121,21 @@
         <efxpt:jtag name="jtag_inst1" jtag_def="JTAG_USER1">
             <efxpt:gen_pin>
                 <efxpt:pin name="jtag_inst1_CAPTURE" type_name="CAPTURE" is_bus="false"/>
-                <efxpt:pin name="jtag_inst1_RESET" type_name="RESET" is_bus="false"/>
-                <efxpt:pin name="jtag_inst1_UPDATE" type_name="UPDATE" is_bus="false"/>
+                <efxpt:pin name="" type_name="RESET" is_bus="false"/>
+                <efxpt:pin name="" type_name="UPDATE" is_bus="false"/>
                 <efxpt:pin name="jtag_inst1_TDO" type_name="TDO" is_bus="false"/>
-                <efxpt:pin name="jtag_inst1_RUNTEST" type_name="RUNTEST" is_bus="false"/>
+                <efxpt:pin name="" type_name="RUNTEST" is_bus="false"/>
                 <efxpt:pin name="jtag_inst1_TCK" type_name="TCK" is_bus="false"/>
                 <efxpt:pin name="jtag_inst1_SEL" type_name="SEL" is_bus="false"/>
-                <efxpt:pin name="jtag_inst1_TMS" type_name="TMS" is_bus="false"/>
+                <efxpt:pin name="" type_name="TMS" is_bus="false"/>
                 <efxpt:pin name="jtag_inst1_SHIFT" type_name="SHIFT" is_bus="false"/>
                 <efxpt:pin name="jtag_inst1_TDI" type_name="TDI" is_bus="false"/>
-                <efxpt:pin name="jtag_inst1_DRCK" type_name="DRCK" is_bus="false"/>
+                <efxpt:pin name="" type_name="DRCK" is_bus="false"/>
             </efxpt:gen_pin>
         </efxpt:jtag>
     </efxpt:jtag_info>
     <efxpt:ddr_info>
-        <efxpt:ddr name="ddr_inst1" ddr_def="DDR_0" cs_preset_id="" cs_mem_type="LPDDR3" cs_ctrl_width="x16" cs_dram_width="x16" cs_dram_density="4G" cs_speedbin="1066" target0_enable="false" target1_enable="true" ctrl_type="none">
+        <efxpt:ddr name="ddr_inst1" ddr_def="DDR_0" cs_preset_id="" cs_mem_type="LPDDR3" cs_ctrl_width="x16" cs_dram_width="x16" cs_dram_density="4G" cs_speedbin="1066" target0_enable="false" target1_enable="true" ctrl_type="ena_user_rst">
             <efxpt:gen_pin_target0>
                 <efxpt:pin name="io_ddrA_w_payload_last" type_name="WLAST_0" is_bus="false"/>
                 <efxpt:pin name="io_ddrA_arw_payload_len" type_name="ALEN_0" is_bus="true"/>
@@ -194,9 +193,9 @@
             <efxpt:gen_pin_config>
                 <efxpt:pin name="" type_name="CFG_SDA_OEN" is_bus="false"/>
                 <efxpt:pin name="" type_name="CFG_SCL_IN" is_bus="false"/>
-                <efxpt:pin name="" type_name="CFG_SEQ_START" is_bus="false"/>
-                <efxpt:pin name="" type_name="RSTN" is_bus="false"/>
-                <efxpt:pin name="" type_name="CFG_SEQ_RST" is_bus="false"/>
+                <efxpt:pin name="ddr_inst1_CFG_SEQ_START" type_name="CFG_SEQ_START" is_bus="false"/>
+                <efxpt:pin name="ddr_inst1_CFG_RST_N" type_name="RSTN" is_bus="false"/>
+                <efxpt:pin name="ddr_inst1_CFG_SEQ_RST" type_name="CFG_SEQ_RST" is_bus="false"/>
                 <efxpt:pin name="" type_name="CFG_SDA_IN" is_bus="false"/>
             </efxpt:gen_pin_config>
             <efxpt:cs_fpga>
