@@ -1,3 +1,22 @@
+br2-efinix 2021.05.5,
+
+	Add 2 examples of OpenCV DNN application
+	Update soc design with 1,2 and 4 cores for T120F324
+	Update soc design with 1 and 2 cores for Ti60F225
+	Add documents for enabling kernel modules and packages
+	Add documents for Linux enablement on Sapphire SoC
+	Update memory mapped address in uboot.dts
+	Enable SMP on linux
+	Add a script to simplify the build flow
+	Fix loading linux kernel address to 4 bytes align
+	Fix FW_JUMP_FDT_ADDR to linux.dtb address
+	Add device tree generator script
+
+	Issues resolved
+	#8 U-boot failed to boot with multicore Sapphire SoC RV32IMA
+	#7 Linux won't able to boot when set the RAM size more than 512MB
+	#6 Linux SMP not able to boot cpu1-3 on quad core Sapphire SoC
+
 br2-efinix 2021.05.4,
 
 	Add GPIO consumer driver and GPIO sample application for blinking on-board LED
