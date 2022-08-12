@@ -84,6 +84,13 @@ cp $SOC_H $OPENSBI_DIR
 
 SOC_H=$OPENSBI_DIR/soc.h
 
+# check for SPI1
+if [[ -z $(cat $SOC_H | grep SYSTEM_SPI_1_IO_CTRL) ]]; then
+	echo Error: The generated SoC does not enable SPI1.
+	echo        Please regenerate the SoC with SPI1.
+	return
+fi
+
 # count number of cpu core and modify soc.h
 cpu_count=1
 for i in {4..1}; do
