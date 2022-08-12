@@ -53,11 +53,11 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 
 ### Efinix RISC-V Sapphire SoC version
 
-- 2.1 and above
+- 2.2 and above
 
 ### Efinity software version version
 
-- [Efinity](https://www.efinixinc.com/support/efinity.php) 2021.2 and above
+- [Efinity](https://www.efinixinc.com/support/efinity.php) 2022.1 and above
 - Follow the official [documentation](https://www.efinixinc.com/docs/efinity-installation-v2.6.pdf) on installation process.
 
 ### Hardware Requirements
