@@ -5,6 +5,7 @@
 
 BOARD=$1
 SOC_H=$2
+OPT_DIR=$3
 
 INPUT_FILE="VERSION"
 JSON_FILE="boards/efinix/common/drivers.json"
@@ -17,13 +18,11 @@ BUILDROOT_REPO="https://github.com/buildroot/buildroot.git"
 
 PROJ_DIR=$PWD
 BR2_EXTERNAL_DIR=$PROJ_DIR
-BUILDROOT_DIR="$PROJ_DIR/../buildroot"
-BUILD_DIR="$PROJ_DIR/../build"
 BUILDROOT_DEFCONFIG=""
 
 function usage()
 {
-	echo "$0 <board [t120f324|ti60f225]> <path/to/soc.h>"
+	echo "$0 <board [t120f324|ti60f225]> <path/to/soc.h> <optional workdir>"
 	echo
 	echo "Example,"
 	echo "$0 t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
@@ -57,6 +56,18 @@ if [[ $found == false ]]; then
 	return
 fi
 
+WORKSPACE="build_$BOARD"
+
+if [[ ! -z $OPT_DIR ]]; then
+	WORKSPACE=$OPT_DIR
+fi
+
+WORKSPACE_DIR="$PROJ_DIR/../$WORKSPACE"
+BUILDROOT_DIR="$PROJ_DIR/../$WORKSPACE/buildroot"
+BUILD_DIR="$PROJ_DIR/../$WORKSPACE/build"
+
+mkdir -p $WORKSPACE_DIR
+
 # Read the VERSION file to get buildroot version
 while IFS= read -r line; do
 	if [[ $line == *$substr* ]];
@@ -80,7 +91,7 @@ mv buildroot $BUILDROOT_DIR
 
 # copy soc.h to opensbi directory. Opensbi has dependency on soc.h.
 OPENSBI_DIR="$BR2_EXTERNAL_DIR/boards/efinix/$BOARD/opensbi"
-cp $SOC_H $OPENSBI_DIR
+cp $SOC_H $OPENSBI_DIR/soc.h
 
 SOC_H=$OPENSBI_DIR/soc.h
 
