@@ -88,9 +88,17 @@ Efinity software is required to generate the Sapphire RISC-V SoC. There are two 
 
 Preconfigure Efinity project with Linux also provided in the repository for quick start. User just need to load the `soc.xml` project file in the Efinity software and click `Synthesize` button to generate the fpga bitstream.
 
-- T120F324: `boards/efinix/t120f324/hardware/T120F324_devkit/soc.xml`
+- T120F324
+  
+  - `boards/efinix/t120f324/hardware/1-core/T120F324_devkit/soc.xml`
+  
+  - `boards/efinix/t120f324/hardware/4-cores/T120F324_devkit/soc.xml`
 
-- Ti60F225: `boards/efinix/ti60f225/hardware/Ti60F225_devkit/soc.xml`
+- Ti60F225
+  
+  - `boards/efinix/ti60f225/hardware/1-core/Ti60F225_devkit/soc.xml`
+  
+  - `boards/efinix/ti60f225/hardware/2-cores/Ti60F225_devkit/soc.xml`
 
 ### 2. Generate yourself
 
