@@ -121,7 +121,7 @@ Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 develop
    make -j$(nproc)
    ```
 
-4. The output images are located in `<path/to/br2-efinix/../build/images`.
+4. The output images are located in `<path/to/br2-efinix/../build_t120f324/build/images`.
    
    - `sdcard.img` is a Linux image
    
