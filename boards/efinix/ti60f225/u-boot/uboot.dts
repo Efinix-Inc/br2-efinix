@@ -3,8 +3,6 @@
 #include <config.h>
 /include/ "sapphire.dtsi"
 
-#define CLK_FREQ 250000000
-#define PERIPHERAL_FREQ 50000000
 / {
 	compatible = "spinal,vexriscv";
 	model = "spinal,vexriscv_saxon";
@@ -20,21 +18,10 @@
 		stdout-path = "serial0:115200n8";
 	};
 
-	cpus {
-		timebase-frequency = <PERIPHERAL_FREQ>;
-              cpu@0 {
-                  clock-frequency = <CLK_FREQ>;
-              };
-	};
-
 	memory {
 		device_type = "memory";
 		reg = <0x00400000 0x1C00000>;
   	};
-};
-
-&apbA_clock {
-    clock-frequency = <PERIPHERAL_FREQ>;
 };
 
 &uartA {
