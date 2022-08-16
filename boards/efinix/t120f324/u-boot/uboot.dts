@@ -3,8 +3,6 @@
 #include <config.h>
 /include/ "sapphire.dtsi"
 
-#define CLK_FREQ 80000000
-
 / {
 	compatible = "spinal,vexriscv";
 	model = "spinal,vexriscv_saxon";
@@ -18,10 +16,6 @@
 	chosen {
 		bootargs = "console=ttyS0,115200n8";
 		stdout-path = "serial0:115200n8";
-	};
-
-	cpus {
-		timebase-frequency = <CLK_FREQ>;
 	};
 
 	memory {
