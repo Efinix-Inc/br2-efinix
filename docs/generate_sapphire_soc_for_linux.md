@@ -21,20 +21,28 @@ Follow the official [document](https://www.efinixinc.com/docs/efinity-installati
 5. Under `SOC` tab, 
    
    - select `Core Number` to 4
+     
+     - the core number is configurable up to 4
    
    - set `Frequency` to 50Mhz
+     
+     - the frequency is configurable but you need to make sure the design close the timing constraint
    
    - enable `Peripheral Clock Frequency` and set it to 50Mhz
+     
+     - it is recommended to turn on when the system frequency over 100Mhz
+     
+     - the recommended operating frequency for SPI is between 50Mhz to 100Mhz
    
-   - enable `Cache`
+   - enable `Cache` (compulsory)
    
-   - enable `Linux Memory Management Unit`
+   - enable `Linux Memory Management Unit` (compulsory)
    
-   - enable `Floating-point unit`
+   - enable `Floating-point unit` (optional)
 
 6. Under `Cache/Memory` tab, set `External Memory Address Size` to `256 MB` for `T120F324`. Set to `32 MB` for `Ti60F225`.
 
-7. Under `SPI` tab, enable SPI 1.
+7. Under `SPI` tab, enable SPI 1 for SD card.
 
 8. Click `Generate` to generate the soc.
 
@@ -48,7 +56,7 @@ See [Modify fpga bootloader](modify_fpga_bootloader.md) document.
 
 ## Assign Pinout for SPI 1
 
-Table below shows the best known configuration for assigning the pinout for SPI 1. Please note that `system_uart_0_io_*` also need to reassign for `T120F324`. You can use other pinout by referring to the devkit user guide and schematics at [Efinix support page](https://www.efinixinc.com/support/docs.php).
+Table below shows the best known configuration for assigning the pinout for SPI 1. The SPI 1 is used for SD card. Please note that `system_uart_0_io_*` also need to reassign for `T120F324`. You can use other pinout by referring to the devkit user guide and schematics at [Efinix support page](https://www.efinixinc.com/support/docs.php).
 
 | Board    | Instance Name                                                                                                                                                  | Pin                                                                                              | Mode                                                            | I/O standard | Clock Signal                      |
 | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ------------ | --------------------------------- |
