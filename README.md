@@ -99,6 +99,20 @@ Preconfigure Efinity project with Linux also provided in the repository for quic
   
   - `boards/efinix/ti60f225/hardware/2-cores/Ti60F225_devkit/soc.xml`
 
+The compiled bitstream file also provided for quick start in `soc.zip` format. By using these files, user are not require to load and compile the Efinity project. User just need to unzip the file. The files located in
+
+- T120F324
+  
+  - `boards/efinix/t120f324/hardware/1-core/T120F324_devkit/soc.zip`
+  
+  - `boards/efinix/t120f324/hardware/4-cores/T120F324_devkit/soc.zip`
+
+- Ti60F225
+  
+  - `boards/efinix/ti60f225/hardware/1-core/Ti60F225_devkit/soc.zip`
+  
+  - `boards/efinix/ti60f225/hardware/2-cores/Ti60F225_devkit/soc.zip`
+
 ### 2. Generate yourself
 
 Follow the [generate Efinix Sapphire RISC-V SoC](docs/generate_sapphire_soc_for_linux.md) document to generate the custom soc that can boot Linux.
