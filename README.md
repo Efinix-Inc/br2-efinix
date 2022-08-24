@@ -42,9 +42,8 @@ Tested on Ubuntu 18.04 LTS
 ```
 sudo apt-get update && sudo apt-get upgrade -y
 sudo apt-get install -y sed make binutils build-essential bash patch gzip \
-bzip2 perl tar cpio unzip rsync file bc wget autoconf automake libtool
-
-sudo apt-get install minicom jq
+bzip2 perl tar cpio unzip rsync file bc wget autoconf automake libtool \
+mtools jq minicom
 ```
 
 ### Buildroot Dependencies
@@ -121,6 +120,12 @@ Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 develop
    
    ```bash
    source init.sh t120f324 $EFINITY_PROJECT/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h
+   ```
+   
+   If you are using preconfigure Efinity project for T120F324 with 4 cores, then point the path to `soc.h` as follows
+   
+   ```bash
+   source init.sh t120f324 boards/efinix/t120f324/hardware/4-cores/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h
    ```
 
 3. Build the Linux.
