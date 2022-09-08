@@ -250,12 +250,12 @@ def get_cpu_isa(cfg, core):
     system_core = "SYSTEM_CORES_{}".format(core)
 
     value = get_property_value(cfg, system_core, MMU)
-    if value:
+    if value == "1":
         # append 'a' for atomic RISCV instruction extension
         isa = "{}a".format(isa)
 
     value = get_property_value(cfg, system_core, FPU)
-    if value:
+    if value == "1":
         # append 'fd' for floating point & double percision RISCV instruction extension
         isa = "{}fd".format(isa)
 
