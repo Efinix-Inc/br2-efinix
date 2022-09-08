@@ -127,6 +127,16 @@ lines[${#lines[@]}-1]="#define SYSTEM_CORES_COUNT $cpu_count"
 lines[${#lines[@]}]="#endif"
 printf "%s\n" "${lines[@]}" > ${SOC_H}
 
+# check for floating point from soc.h
+fp=$(cat ${SOC_H} | grep FPU | awk  '{print $3}')
+if [[ $fp == 0 ]]; then
+	# disable the floating point
+	echo disable floating point in $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG
+	sed -i 's/^BR2_RISCV_ISA_CUSTOM_RVF=y/BR2_RISCV_ISA_CUSTOM_RVF=n/g' $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG
+	sed -i 's/^BR2_RISCV_ISA_CUSTOM_RVD=y/BR2_RISCV_ISA_CUSTOM_RVD=n/g' $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG
+	sed -i 's/^BR2_RISCV_ABI_ILP32D=y/BR2_RISCV_ABI_ILP32=y/g' $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG
+fi
+
 # generate device tree
 python3 boards/efinix/common/device_tree_generator.py $SOC_H $BOARD
 
