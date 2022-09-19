@@ -1,3 +1,9 @@
+/*
+ * Copyright (C) 2022 Efinix Inc. All rights reserved.
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ *
+ */
 #include <time.h>
 #include "gpio.h"
 
