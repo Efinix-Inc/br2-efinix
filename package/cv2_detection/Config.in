@@ -1,0 +1,7 @@
+config BR2_PACKAGE_CV2_DETECTION
+	bool "CV2 Detection"
+	default n
+	depends on BR2_PACKAGE_OPENCV3
+	help
+	  A sample program that use OpenCV library and Mobilenet neural network to classify the object.
+
