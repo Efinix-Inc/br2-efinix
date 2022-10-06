@@ -79,7 +79,13 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 
 For hardware setup please refer to [setup development board](docs/setup_development_board.md) document.
 
-## Generate Efinix Sapphire RISC-V SoC
+## Development Flow
+
+The development flow divided into hardware and software. The hardware part more to generating the SoC FPGA bitstream while software more to build Linux kernel and related user space packages.
+
+![alt text](docs/img/development_flow.jpg)
+
+## Hardware: Generate Efinix Sapphire RISC-V SoC
 
 Efinity software is required to generate the Sapphire RISC-V SoC. There are two ways to generate the Efinix Sapphire RISC-V SoC.
 
@@ -117,7 +123,7 @@ The compiled bitstream file also provided for quick start in `soc.zip` format. B
 
 Follow the [generate Efinix Sapphire RISC-V SoC](docs/generate_sapphire_soc_for_linux.md) document to generate the custom soc that can boot Linux.
 
-## Build OpenSBI, U-Boot and Linux
+## Software: Build OpenSBI, U-Boot and Linux
 
 Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 development kit. These steps will build Linux based on Buildroot 2021.05.3
 
@@ -180,6 +186,10 @@ Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 develop
     modprobe gpio
     gpio_app
     ```
+
+## What's Next?
+
+You might want to write you own driver or custom application but do no know how to integrate it with Buildroot. See [kernel module and package](docs/kernel_module_and_packages.md) tutorial.
 
 ## Documentation
 
