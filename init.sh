@@ -5,6 +5,7 @@
 
 OPTIND=1
 unset RECONFIGURE
+unset RECONFIGURE_ALL
 unset OPT_DIR
 
 BOARD=$1
@@ -37,6 +38,7 @@ function usage()
 	echo "				By default is <board>_build"
 	echo "				Example, if board is ti60f225 then name of build directory is ti60f225_build"
 	echo "	-r			Reconfigure the Buildroot configuration"
+	echo "	-a			Reconfigure the Buildroot configuration and regenerate Linux device tree"
 
 	echo "Example usage,"
 	echo "$0 t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
@@ -146,15 +148,23 @@ do
 	shift
 done
 
-while getopts ":d:r:h" o; do
+while getopts ":d:rah" o; do
 	case "${o}" in
+		:)
+                        echo "ERROR: Option -$OPTARG requires an argument"
+                        ;;
 		d)
 			OPT_DIR=${OPTARG}
+			;;
+		a)
+			RECONFIGURE_ALL=1
+			RECONFIGURE=1
 			;;
 		r)
 			RECONFIGURE=1
 			;;
-		h)	usage
+		h)
+			usage
 			return
 			;;
 		\?)
@@ -195,7 +205,9 @@ if [[ $RECONFIGURE == 1 ]]; then
 	if [[ -d "$BUILD_DIR" ]]; then
 		check_smp
 		modify_soc_h
-		generate_device_tree
+		if [[ $RECONFIGURE_ALL == 1 ]]; then
+			generate_device_tree
+		fi
 		cd $BUILD_DIR && \
 		make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BUILDROOT_DEFCONFIG 
 	else
