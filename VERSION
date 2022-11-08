@@ -1,7 +1,7 @@
 2021.05.4
 
 buildroot 2021.05.3
-u-boot 20201.04
+u-boot 2021.04
 opensbi 0.9
 Linux kernel 5.10
 gcc 8.4
