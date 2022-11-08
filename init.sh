@@ -200,12 +200,14 @@ OPENSBI_DIR="$BR2_EXTERNAL_DIR/boards/efinix/$BOARD/opensbi"
 
 if [[ $RECONFIGURE == 1 ]]; then
 	# reconfigure the .config
-	SOC_H=$OPENSBI_DIR/soc.h
 
 	if [[ -d "$BUILD_DIR" ]]; then
-		check_smp
-		modify_soc_h
 		if [[ $RECONFIGURE_ALL == 1 ]]; then
+			cp $SOC_H $OPENSBI_DIR/soc.h
+			SOC_H=$OPENSBI_DIR/soc.h
+
+			check_smp
+			modify_soc_h
 			generate_device_tree
 		fi
 		cd $BUILD_DIR && \
