@@ -23,7 +23,7 @@ function usage()
 	echo "<Efinity installation directory> can be $HOME/efinity/2022.1/bin"
 	echo
 	echo "Example command for t120f324 devkit"
-	echo "$0 t120f324 $HOME/soc/ip/soc1 $HOME/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin $HOME/efinity/2022.1/bin"
+	echo "$0 t120f324 $HOME/soc/ip/soc1 $HOME/efinity/efinity-riscv-ide-2022.2.3 $HOME/efinity/2022.1/bin"
 	exit
 }
 
