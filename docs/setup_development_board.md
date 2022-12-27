@@ -46,6 +46,16 @@ Connect the MIPI and LVDS Expansion daughter card to the board at P2 header.
 
 4. Connect PMOD MicroSD card module to J12 PMOD header on the board.
 
+5. Jumper settings
+   
+   - J2, J3 set to 3.3V (pin 1 and 2)
+   
+   - J4 set to 2.8V (pin 9 and 10)
+   
+   - J5 set to 1.8 (pin 5 and 6)
+   
+   - J6 set to 1.2V (pin 3 and 4)
+
 ## Setup Ti60F225
 
 The Titanium Ti60 F225 Development Board has a USB-to-UART converter connected to the Ti60's GPIOL_01 and GPIOL_02 pins. To use the UART, simply connect a USB cable to the FTDI USB connector on the Titanium Ti60 F225 Development Board and to your computer.
