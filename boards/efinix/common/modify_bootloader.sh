@@ -7,7 +7,7 @@
 
 DEVKIT=$1
 EFINITY_PROJECT=$2
-RISCV_SDK=$3
+RISCV_IDE=$3
 EFINITY_HOME=$4
 
 function usage()
@@ -15,11 +15,11 @@ function usage()
 	echo "This script used to modify bootloader program for booting Linux."
 	echo
 	echo "command"
-	echo "$0 <devkit> <efinity project directory> <RISCV SDK directory> <Efinity installation directory>"
+	echo "$0 <devkit> <efinity project directory> <RISCV IDE directory> <Efinity installation directory>"
 	echo
 	echo "supported <devkit> are t120f324, ti60f225"
 	echo "<Efinity project directory> can be $HOME/soc/ip/soc1"
-	echo "<RISCV SDK> can be $HOME/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin"
+	echo "<RISCV IDE> can be $HOME/efinity/efinity-riscv-ide-2022.2.3"
 	echo "<Efinity installation directory> can be $HOME/efinity/2022.1/bin"
 	echo
 	echo "Example command for t120f324 devkit"
@@ -37,8 +37,8 @@ if [[ -z $EFINITY_PROJECT ]]; then
 	usage
 fi
 
-if [[ -z $RISCV_SDK ]]; then
-	echo Error: RISCV_SDK is not set
+if [[ -z $RISCV_IDE ]]; then
+	echo Error: RISCV_IDE is not set
 	usage
 fi
 
@@ -67,12 +67,13 @@ EfxSapphireSoc_DIR="$EFINITY_PROJECT_PATH/bsp/efinix/EfxSapphireSoc"
 APP_DIR="$EfxSapphireSoc_DIR/app"
 SOC_H=$EfxSapphireSoc_DIR/include/soc.h
 
-RISCV_TOOLCHAIN="riscv-xpack-toolchain"
+RISCV_TOOLCHAIN="efinity-riscv-ide-[0-9]+\.[0-9]+\.[0-9]"
 
-if [[ $RISCV_SDK == *"$RISCV_TOOLCHAIN"* ]]; then
-	export PATH=$RISCV_SDK:$PATH
+if [[ $RISCV_IDE =~ $RISCV_TOOLCHAIN ]]; then
+	RISCV_IDE=$RISCV_IDE/toolchain/bin
+	export PATH=$RISCV_IDE:$PATH
 else
-	echo Error: RISCV_SDK is not valid
+	echo Error: RISCV_IDE is not valid
 	exit
 fi
 
