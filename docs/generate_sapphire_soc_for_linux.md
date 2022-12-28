@@ -52,7 +52,7 @@ Follow the official [document](https://www.efinixinc.com/docs/efinity-installati
 
 ## Modify Bootloader
 
-See [Modify fpga bootloader](modify_fpga_bootloader.md) document.
+You are require to modify the bootloader when generating a custom SoC. See [Modify fpga bootloader](modify_fpga_bootloader.md) document.
 
 ## Assign Pinout for SPI 1
 
@@ -131,7 +131,11 @@ Table below shows the best known configuration for assigning the pinout for SPI 
    
    In the `Resource Assigner`, assign the `Resource` of `system_spi_1_io_data_0` as `GPIOT_RXP21`. See the table above for the rest of the block. Make sure you reassign the `system_uart_0_io_rxd` and `system_uart_0_io_txd`.
 
-4. Click `Generate Efinity Constrain Files` icon.
+4. Modify the IO voltage bank for the `SPI1`. On the `Efinity Interface Designer` click `Design: T120F324` -> `Device Setting` -> `I/O Banks`. At the `Block Editor` select `2F` for the `I/O Bank` and set it to `3.3V` at `I/O Voltage`.
+   
+   You may check the `I/O Bank` for each pin at the `Resources Assigner`.
+
+5. Click `Generate Efinity Constrain Files` icon.
 
 ## Modify Top Level Verilog Code
 
