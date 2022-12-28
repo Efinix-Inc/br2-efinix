@@ -1,5 +1,7 @@
 # Modify FPGA Bootloader
 
+You are require to modify the bootloader if generate your own custom Sapphire SoC.
+
 The bootloader is the first program get executed when the FPGA board power on. For the Sapphire SoC, the bootloader will load the program at designated location as specify in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/bsp/efinix/EfxSapphireSoc/app/bootloaderConfig.h`. By default, the bootloader will load user software binary from address `0x00380000` in  the SPI flash memory. Then it will copy the user software binary to RAM at address `0x00001000`.
 
 In this tutorial, we are going to modify the bootloader program so that it can boot Linux. OpenSBI and U-Boot will be loaded first by this bootloader program before it can boot Linux.
@@ -8,9 +10,9 @@ In this tutorial, we are going to modify the bootloader program so that it can b
 
 ## Prerequsite
 
-### Install RISC-V SDK
+### Install Efinity RISC-V Embedded Software IDE
 
-Make sure to install [RISC-V SDK](https://www.efinixinc.com/support/ip/riscv-sdk.php) on your development machine. The RISC-V SDK provide RISC-V toolchain, debugger and Eclipse. Refer to [RISC-V SoC Hardware and Software User Guide](https://www.efinixinc.com/docs/riscv-sapphire-ug-v3.2.pdf) to install the SDK.
+Make sure to install [Efinity RISC-V Embedded Software IDE](https://www.efinixinc.com/support/ip/riscv-sdk.php) on your development machine. The RISC-V IDE provide RISC-V toolchain, debugger and Eclipse. Refer to [RISC-V SoC Hardware and Software User Guide](https://www.efinixinc.com/docs/riscv-sapphire-ug-v5.0.pdf) to install the IDE.
 
 ## Firmware Address
 
@@ -25,24 +27,24 @@ The table below shows the SPI flash address and corresponding RAM address for ea
 
 ### Using script
 
-Modifying bootloader program can be challenging for beginner. You can use `modify_bootloader.sh` script to simplify the steps for modifying bootloader program. The script will handle compiling bootloader and generating the memory initialization files. You can skip **Modified Bootloader Program** and **Generate Memory Initilization Files** if using `modify_bootloader.sh`. `modify_bootloader.sh` located in `br2-efinix/boards/efinix/common`.
+Modifying bootloader program can be challenging for beginner. You can use `modify_bootloader.sh` script to simplify the steps for modifying bootloader program. The script will handle compiling bootloader and generating the memory initialization files. The `modify_bootloader.sh`  script located in `br2-efinix/boards/efinix/common`.
 
 ```bash
 This script used to modify bootloader program for booting Linux.
 
 command
-./modify_bootloader.sh <devkit> <efinity project directory> <RISCV SDK directory> <Efinity installation directory>
+./modify_bootloader.sh <devkit> <efinity project directory> <RISCV IDE directory> <Efinity installation directory>
 
 supported <devkit> are t120f324, ti60f225
 <Efinity project directory> can be /home/<user>/soc/ip/soc1
-<RISCV SDK> can be /home/<user>/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin
+<RISCV IDE> can be /home/<user>/efinity/efinity-riscv-ide-2022.2.3
 <Efinity installation directory> can be /home/<user>/efinity/2022.1/bin
 
 Example command for t120f324 devkit
 ./modify_bootloader.sh \
 t120f324 \
 /home/<user>/soc/ip/soc1 \
-/home/<user>/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin \
+/home/<user>/efinity/efinity-riscv-ide-2022.2.3 \
 /home/<user>/efinity/2022.1/bin
 ```
 
@@ -97,32 +99,33 @@ CFLAGS += -DSMP
 
 ## Compile Bootloader Program
 
-Bootloader program is located in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/software/standalone/bootloader`. There are two ways to compile the bootloader program.
+Bootloader program is located in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/software/standalone/bootloader`. There are **TWO** ways to compile the bootloader program.
 
-### Using Eclipse
+### Using Efinity RISC-V Embedded Software IDE
 
-1. Run Eclipse from terminal.
+1. Run Efinity RISC-V Embedded Software IDE from terminal.
    
    ```bash
-   cd </path/to/SDK_Ubuntu>/SDK_Ubuntu
-   source setup.sh
-   ./run_eclipse.sh
+   cd </path/to/efinity/efinity-riscv-ide-2022.2.3
+   ./efinity-riscv-ide
    ```
 
-2. Then, select 1 to use SapphireSoC configuration to launch Eclipse.
-
-3. At the Eclipse IDE Launcher, click `Browse` button. Select the folder, `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>` as the workspace.
+2. At the Efinity RISC-V IDE Launcher, click `Browse` button. Select the folder, `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>` as the workspace.
    
-   > The workspace must be placed in this directory in order for the Eclipse toolchain to use the correct bsp files.
+   > The workspace must be placed in this directory in order for the Efinity RISC-V IDE toolchain to use the correct bsp files.
 
-4. Click on `File` -> `New` -> `MakeFile Project with Existing Code`. Select `Browse` to find the bootloader project in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/software/standalone/bootloader`. Leave the `Toolchain for indexer Settings` as `<none>`. Then click `Finish`.
+3. Click on `File` -> `Import` -> `Efinix Projects`->`Efinix Makefile Project` then click `Next`.
 
-5. Right click on the `bootloader` on the `Project Explorer` and select `Build Project`.
+4. Put the `BSP Location`. The location could be `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/bsp` then click `Next`.
+
+5. Select `bootloader` then click `Finish`.
+
+6. Right click on the `bootloader` on the `Project Explorer` and select `Build Project`.
 
 ### Using Command Line in Linux
 
 ```bash
-export PATH=</path/to/SDK_Ubuntu>/SDK_Ubuntu/riscv-xpack-toolchain_8.3.0-2.3_linux/bin:$PATH
+export PATH=</path/to/efinity/efinity-riscv-ide-2022.2.3/toolchain/bin:$PATH
 cd $EFINITY_PROJECT/T120F324_devkit/embedded_sw/<Project Name>/software/standalone/bootloader
 BSP_PATH=$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/bsp/efinix/EfxSapphireSoc make
 ```
