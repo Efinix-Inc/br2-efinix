@@ -10,6 +10,9 @@ EFINITY_PROJECT=$2
 RISCV_IDE=$3
 EFINITY_HOME=$4
 
+JSON_FILE="devkits.json"
+DEVKITS=$(jq '.devkits | .[]' $JSON_FILE)
+
 function usage()
 {
 	echo "This script used to modify bootloader program for booting Linux."
@@ -49,15 +52,23 @@ fi
 
 source $EFINITY_HOME/setup.sh
 
-if [[ "t120f324" == *$DEVKIT* ]]; then
-	DEVKIT="T120F324_devkit"
-elif [[ "ti60f225" == *$DEVKIT* ]]; then
-	DEVKIT="Ti60F225_devkit"
-else
+DEVKIT=$(echo $DEVKIT | tr '[:upper:]' '[:lower:]')
+
+found=false
+for devkit in ${DEVKITS[@]}; do
+	if [[ $devkit == *$DEVKIT* ]]; then
+		found=true
+		DEVKIT=$(echo $devkit | tr -d \")
+		break
+	fi
+done
+
+if [[ $found == false ]]; then
 	echo "Error: Devkit $DEVKIT is not supported"
+	exit 1
 fi
 
-echo $DEVKIT
+echo Info: $DEVKIT devkit is supported
 
 IFS='/' read -ra ARRAY <<< "$EFINITY_PROJECT"
 EFINITY_PROJECT_NAME=${ARRAY[-1]}
