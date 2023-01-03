@@ -1,0 +1,101 @@
+/dts-v1/;
+
+/include/ "sapphire.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+
+#define CPU_FREQ 80000000
+
+/ {
+    chosen {
+        bootargs = "rootwait console=hvc0  earlycon=sbi root=/dev/mmcblk0p2 init=/sbin/init mmc_core.use_spi_crc=0";
+    };
+
+    cpus {
+        timebase-frequency = <CPU_FREQ>;
+    };
+
+    memory@1000 {
+        device_type = "memory";
+        reg = <0x00001000 0x1FFFF000>;
+    };
+
+    reserved-memory {
+        #address-cells = <1>;
+        #size-cells = <1>;
+        ranges;
+
+        opensbi: sbi@1000000 {
+            reg = <0x01000000 0x80000>;
+        };
+    };
+
+    efx_gpio_devs {
+        compatible = "efinix,efx-gpio";
+        sw {
+            label = "SW";
+            efx-gpios = <&gpioA 0 GPIO_ACTIVE_LOW>;
+        };
+        led1 {
+            label = "LED1";
+            efx-gpios = <&gpioA 1 GPIO_ACTIVE_HIGH>;
+        };
+        led2 {
+            label = "LED2";
+            efx-gpios = <&gpioA 2 GPIO_ACTIVE_HIGH>;
+        };
+        led3 {
+            label = "LED3";
+            efx-gpios = <&gpioA 3 GPIO_ACTIVE_HIGH>;
+        };
+    };
+};
+
+&apbA_clock {
+    clock-frequency = <CPU_FREQ>;
+};
+
+&spiA {
+    status = "okay";
+    flash: flash@0 {
+        #address-cells = <1>;
+        #size-cells = <1>;
+        compatible = "spi-nor";
+        reg = <0>;
+        spi-max-frequency = <6000000>;
+
+        partition@0 {
+            label = "fpga_bitstream";
+            reg = <0x000000 0x400000>;
+        };
+        partition@1 {
+            label = "opensbi";
+            reg = <0x400000 0x080000>;
+        };
+        partition@2 {
+            label = "uboot";
+            reg = <0x480000 0x080000>;
+        };
+        partition@3 {
+            label = "user";
+            reg = <0x500000 0xB00000>;
+        };
+    };
+};
+
+&spiB {
+    status = "okay";
+    mmc-slot@0 {
+        compatible = "mmc-spi-slot";
+        reg = <0>;
+        voltage-ranges = <3300 3300>;
+        spi-max-frequency = <10000000>;
+    };
+};
+
+&uartA {
+    status = "okay";
+};
+
+&gpioA {
+    status = "okay";
+};
