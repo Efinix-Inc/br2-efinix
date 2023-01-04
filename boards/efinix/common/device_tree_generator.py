@@ -1007,6 +1007,7 @@ def main():
     devkits = conf['devkits']
 
     for devkit in devkits:
+        devkit = devkit.lower()
         if args.board in devkit:
             board = devkit
 

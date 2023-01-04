@@ -2,9 +2,9 @@
     "dt_version": "/dts-v1/;",
     "model": "efinix,sapphire",
     "devkits": [
-	"t120f324",
-	"ti60f225",
-	"ti180m484"
+	"T120F324",
+	"Ti60F225",
+	"Ti180M484"
     ],
     "memory_mapped": {
         "uImage": "0x00400000",

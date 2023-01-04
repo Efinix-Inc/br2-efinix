@@ -10,7 +10,7 @@ EFINITY_PROJECT=$2
 RISCV_IDE=$3
 EFINITY_HOME=$4
 
-JSON_FILE="devkits.json"
+JSON_FILE="drivers.json"
 DEVKITS=$(jq '.devkits | .[]' $JSON_FILE)
 
 function usage()
@@ -56,9 +56,11 @@ DEVKIT=$(echo $DEVKIT | tr '[:upper:]' '[:lower:]')
 
 found=false
 for devkit in ${DEVKITS[@]}; do
+	devkit_l=$(echo $devkit | tr '[:upper:]' '[:lower:]')
 	if [[ $devkit == *$DEVKIT* ]]; then
 		found=true
 		DEVKIT=$(echo $devkit | tr -d \")
+		DEVKIT="${DEVKIT}_devkit"
 		break
 	fi
 done

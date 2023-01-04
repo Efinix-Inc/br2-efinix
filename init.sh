@@ -52,10 +52,14 @@ function sanity_check()
 	fi
 
 	# check the compatible of $BOARD in $JSON_FILE
-	found=false
+	local found=false
+	local devkit_l
+	BOARD=$(echo $BOARD | tr '[:upper:]' '[:lower:]')
+
 	for devkit in ${devkits[@]}; do
-		if [[ $devkit == *$BOARD* ]]; then
-			BOARD=$(echo $devkit | tr -d \")
+		devkit_l=$(echo $devkit | tr '[:upper:]' '[:lower:]')
+		if [[ $devkit_l == *$BOARD* ]]; then
+			BOARD=$(echo $devkit_l | tr -d \")
 			BUILDROOT_DEFCONFIG="efinix_"$BOARD"_defconfig"
 			found=true
 			break
