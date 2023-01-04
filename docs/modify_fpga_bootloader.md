@@ -97,6 +97,12 @@ If the target SoC is multicore, then enable SMP flag in `$EFINITY_PROJECT/T120F3
 CFLAGS += -DSMP
 ```
 
+If the target devkit is **Ti180**, then enable `DEFAULT_ADDRESS_BYTE` flag in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw//bsp/efinix/EfxSapphireSoc/include/soc.mk`. Just append it in`soc.mk`.
+
+```makefile
+CFLAGS += -DDEFAULT_ADDRESS_BYTE
+```
+
 ## Compile Bootloader Program
 
 Bootloader program is located in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/software/standalone/bootloader`. There are **TWO** ways to compile the bootloader program.
