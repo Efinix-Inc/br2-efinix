@@ -98,6 +98,14 @@ if [[ ! -z $SMP ]]; then
     sed -i 's/^#CFLAGS+=-DSMP/CFLAGS+=-DSMP/g' $EfxSapphireSoc_DIR/include/soc.mk
 fi
 
+# Ti180 require 3 bytes addressing mode for SPI flash
+if [[ $DEVKIT =~ "ti180" ]]; then
+	cat $EfxSapphireSoc_DIR/include/soc.mk | grep DEFAULT_ADDRESS_BYTE >> /dev/null
+	if [[ ! $? -eq 0 ]]; then
+		echo CFLAGS += -DDEFAULT_ADDRESS_BYTE >> $EfxSapphireSoc_DIR/include/soc.mk
+	fi
+fi
+
 # compile bootloader program
 cd $EFINITY_PROJECT_PATH/software/standalone/bootloader && \
 	BSP_PATH=$EfxSapphireSoc_DIR make clean && \
