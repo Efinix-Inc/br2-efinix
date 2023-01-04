@@ -40,9 +40,21 @@ Follow the official [document](https://www.efinixinc.com/docs/efinity-installati
    
    - enable `Floating-point unit` (optional)
 
-6. Under `Cache/Memory` tab, set `External Memory Address Size` to `256 MB` for `T120F324`. Set to `32 MB` for `Ti60F225`.
+6. Under `Cache/Memory` tab,
+   
+   - For Ti180M484, click `Enable AXI4 full-duplex interface` and set `External Memory Data Width` to `512`.
+   
+   - Other than Ti180M484, **disabled** `Enable AXI4 full-duplex interface`and set`External Memory Data Width`to`128`.
+   
+   - Set the `External Memory Address Size` as follows
+     
+     | Devkit    | External Memory Address Size |
+     | --------- | ---------------------------- |
+     | T120F324  | 256 MB                       |
+     | Ti60F225  | 32 MB                        |
+     | Ti180M484 | 256 MB                       |
 
-7. Under `SPI` tab, enable SPI 1 for SD card.
+7. Under `SPI` tab, enable SPI 1 for the SD card.
 
 8. Click `Generate` to generate the soc.
 
@@ -58,10 +70,11 @@ You are require to modify the bootloader when generating a custom SoC. See [Modi
 
 Table below shows the best known configuration for assigning the pinout for SPI 1. The SPI 1 is used for SD card. Please note that `system_uart_0_io_*` also need to reassign for `T120F324`. You can use other pinout by referring to the devkit user guide and schematics at [Efinix support page](https://www.efinixinc.com/support/docs.php).
 
-| Board    | Instance Name                                                                                                                                                  | Pin                                                                                              | Mode                                                            | I/O standard | Clock Signal                      |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ------------ | --------------------------------- |
-| T120F324 | system_spi_1_io_data_0<br/>system_spi_1_io_data_1<br/>system_spi_1_io_sclk_write<br/>system_spi_1_io_ss<br/><br/>system_uart_0_io_rxd<br/>system_uart_0_io_txd | GPIOT_RXP21<br/>GPIOT_RXP22<br/>GPIOT_RXP23<br/>GPIOT_RXP20<br/><br/>GPIOT_RXP07<br/>GPIOT_RXN07 | inout<br/>inout<br/>output<br/>output<br/><br/>input<br/>output | 3.3 V LVCMOS | *io_peripheralClk or io_systemClk |
-| Ti60F225 | system_spi_1_io_data_0<br/>system_spi_1_io_data_1<br/>system_spi_1_io_sclk_write<br/>system_spi_1_io_ss                                                        | GPIOR_16<br/>GPIOR_18<br/>GPIOR_15<br/>GPIOR_13                                                  | inout<br/>inout<br/>output<br/>output                           | 3.3 V LVCMOS | *io_peripheralClk or io_systemClk |
+| Board     | Instance Name                                                                                                                                                  | Pin                                                                                              | Mode                                                            | I/O standard | Clock Signal                      |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ------------ | --------------------------------- |
+| T120F324  | system_spi_1_io_data_0<br/>system_spi_1_io_data_1<br/>system_spi_1_io_sclk_write<br/>system_spi_1_io_ss<br/><br/>system_uart_0_io_rxd<br/>system_uart_0_io_txd | GPIOT_RXP21<br/>GPIOT_RXP22<br/>GPIOT_RXP23<br/>GPIOT_RXP20<br/><br/>GPIOT_RXP07<br/>GPIOT_RXN07 | inout<br/>inout<br/>output<br/>output<br/><br/>input<br/>output | 3.3 V LVCMOS | *io_peripheralClk or io_systemClk |
+| Ti60F225  | system_spi_1_io_data_0<br/>system_spi_1_io_data_1<br/>system_spi_1_io_sclk_write<br/>system_spi_1_io_ss                                                        | GPIOR_16<br/>GPIOR_18<br/>GPIOR_15<br/>GPIOR_13                                                  | inout<br/>inout<br/>output<br/>output                           | 3.3 V LVCMOS | *io_peripheralClk or io_systemClk |
+| Ti180M484 | system_spi_1_io_data_0<br/>system_spi_1_io_data_1<br/>system_spi_1_io_sclk_write<br/>system_spi_1_io_ss                                                        | GPIOR_60<br/>GPIOR_61<br/>GPIOR_62<br/>GPIOR_59                                                  | inout<br/>inout<br/>output<br/>output                           | 1.8V LVCMOS  | *io_peripheralClk or io_systemClk |
 
 > `Note:` * if peripheral clock is enable then use `io_peripheralClk` as clock signal. Else use `io_systemClk`.
 

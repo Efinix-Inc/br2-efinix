@@ -44,6 +44,19 @@ Follow these steps to flash OpenSBI and U-boot.
    
    <img src="img/combine_programmer.jpg" title="" alt="alt text" width="369">
 
-7. On `programmer` interface at section `Programming Mode`, select `SPI Active` then click icon **Start Program**. It will takes some time to program the SPI flash.
+7. Program the combine bitstream.
    
-   <img src="img/progrmmer_ui.jpg" title="" alt="alt text" width="371">
+   - For Ti180M484,
+     
+     - On the programmer interface as section `Programming Mode`, select `SPI Active using JTAG Bridge`.
+     
+     - Enable `Auto configure JTAG Bridge Image` and select the `jtag_spi_flash_loader_dual.bit` for the bitstream file. This file is located in `br2-efinix/boards/efinix/ti180m484/hardware/flashloader/jtag_spi_flash_loader_dual.zip`. Unzip this file first before use.
+     
+     - Click the icon `Start Program` to program the board.
+       
+       <img src="img/programmer_ti180_ui.jpg" title="" alt="alt text" width="392">
+     
+     - Press the `CRESET` button at `SW1` on the Ti180M484 once the programming finish.
+- Other devkit, on the `programmer` interface at section `Programming Mode`, select `SPI Active` then click icon **Start Program**. It will takes some time to program the SPI flash.
+  
+  <img src="img/progrmmer_ui.jpg" title="" alt="alt text" width="375">

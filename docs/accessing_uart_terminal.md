@@ -73,3 +73,11 @@ The UART is `/dev/ttyUSB2`. Use the `minicom` to access the UART terminal.
 ```bash
 sudo minicom -D /dev/ttyUSB2
 ```
+
+### Ti180M484 Development board
+
+The UART is `/dev/ttyUSB0`. Use the `minicom` to access the UART terminal.
+
+```bash
+sudo minicom -D /dev/ttyUSB0
+```
