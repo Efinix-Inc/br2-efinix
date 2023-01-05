@@ -196,6 +196,30 @@ Table below shows the best known configuration for assigning the pinout for SPI 
    )
    ```
 
+## Modify Project Bitstream Generation
+
+This section only applicable for **Ti180M484** development board. You can skip this section if using other development board.
+
+1. Click `File` -> `Edit Project ...` -> `Bitstream Generation`.
+
+2. At `Bitstream Generation` tab,
+   
+   - `JTAG USERCODE` set to `Active`
+   
+   - `SPI Programming Clock Divider` set to `DIV8`
+   
+   - `Clock Sampling Edge` set to `Falling`
+   
+   - Disable `Use 4-Byte addressing during configuraton`
+   
+   - Set `Enable Initialized Memory In User RAMs`  to `smart`
+   
+   - Enable `Enable Bitstream Compression`
+
+3. Then, click `OK`.
+   
+   <img src="img/bitstream_generation.jpg" title="" alt="alt text" width="346">
+
 ## Compile the Efinity Project
 
 1. Compile the Efinity project by clicking the `Synthesis` button. 
