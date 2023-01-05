@@ -53,11 +53,12 @@ fi
 source $EFINITY_HOME/setup.sh
 
 DEVKIT=$(echo $DEVKIT | tr '[:upper:]' '[:lower:]')
+DEVKIT_L=$DEVKIT
 
 found=false
 for devkit in ${DEVKITS[@]}; do
 	devkit_l=$(echo $devkit | tr '[:upper:]' '[:lower:]')
-	if [[ $devkit == *$DEVKIT* ]]; then
+	if [[ $devkit_l == *$DEVKIT* ]]; then
 		found=true
 		DEVKIT=$(echo $devkit | tr -d \")
 		DEVKIT="${DEVKIT}_devkit"
@@ -101,7 +102,7 @@ if [[ ! -z $SMP ]]; then
 fi
 
 # Ti180 require 3 bytes addressing mode for SPI flash
-if [[ $DEVKIT =~ "ti180" ]]; then
+if [[ $DEVKIT_L =~ "ti180" ]]; then
 	cat $EfxSapphireSoc_DIR/include/soc.mk | grep DEFAULT_ADDRESS_BYTE >> /dev/null
 	if [[ ! $? -eq 0 ]]; then
 		echo CFLAGS += -DDEFAULT_ADDRESS_BYTE >> $EfxSapphireSoc_DIR/include/soc.mk
