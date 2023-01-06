@@ -56,15 +56,21 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 
 ### Efinity software version version
 
-- [Efinity](https://www.efinixinc.com/support/efinity.php) 2022.1 and above
+- [Efinity](https://www.efinixinc.com/support/efinity.php) 2022.2 and above
 - Follow the official [documentation](https://www.efinixinc.com/docs/efinity-installation-v2.6.pdf) on installation process.
+
+### Efinity RISC-V Embedded Software IDE
+
+- [v2022.2.322](https://www.efinixinc.com/support/efinity.php) and above
+
+- Follow the official [documentation](https://www.efinixinc.com/docs/efinity-riscv-ide-2022.2.3.readme.txt) on installation process
+
+- Learn more at the [official website](https://www.efinixinc.com/products-efinity-riscv-ide.html)
 
 ### Hardware Requirements
 
 - Supported Efinix devkit
-  1. Trion T120F324
-  2. Titanium Ti60F225
-- 1GB SD card
+- 1GB micro SD card
 - PMOD microSD card module*
 - UART module*
 - 3x male-to-female jumper cable*
@@ -91,33 +97,27 @@ Efinity software is required to generate the Sapphire RISC-V SoC. There are two 
 
 ### 1. Use preconfigure Efinity project
 
-Preconfigure Efinity project with Linux also provided in the repository for quick start. User just need to load the `soc.xml` project file in the Efinity software and click `Synthesize` button to generate the fpga bitstream.
+Preconfigure Efinity project with Linux also provided in the repository for quick start. User just need to unzip the project and load the `soc.xml` project file in the Efinity software and click `Synthesize` button to generate the fpga bitstream.
 
 - T120F324
   
-  - `boards/efinix/t120f324/hardware/1-core/T120F324_devkit/soc.xml`
+  - `boards/efinix/t120f324/hardware/1-core/soc1.zip`
   
-  - `boards/efinix/t120f324/hardware/4-cores/T120F324_devkit/soc.xml`
+  - `boards/efinix/t120f324/hardware/4-cores/soc4.zip`
 
 - Ti60F225
   
-  - `boards/efinix/ti60f225/hardware/1-core/Ti60F225_devkit/soc.xml`
+  - `boards/efinix/ti60f225/hardware/1-core/soc1.zip`
   
-  - `boards/efinix/ti60f225/hardware/2-cores/Ti60F225_devkit/soc.xml`
+  - `boards/efinix/ti60f225/hardware/2-cores/soc2.zip`
 
-The compiled bitstream file also provided for quick start in `soc.zip` format. By using these files, user are not require to load and compile the Efinity project. User just need to unzip the file. The files located in
+- Ti180M484
+  
+  - `boards/efinix/ti180m484/hardware/1-core/soc1.zip`
+  
+  - `boards/efinix/ti180m484/hardware/4-cores/soc4.zip`
 
-- T120F324
-  
-  - `boards/efinix/t120f324/hardware/1-core/T120F324_devkit/soc.zip`
-  
-  - `boards/efinix/t120f324/hardware/4-cores/T120F324_devkit/soc.zip`
-
-- Ti60F225
-  
-  - `boards/efinix/ti60f225/hardware/1-core/Ti60F225_devkit/soc.zip`
-  
-  - `boards/efinix/ti60f225/hardware/2-cores/Ti60F225_devkit/soc.zip`
+The compiled bitstream file also provided for quick start in `soc.zip` format. This file stored in the Efinity project file for each supported development board. By using these files, user are not require to load and compile the Efinity project. User just need to unzip the file before use.
 
 ### 2. Generate yourself
 
@@ -203,6 +203,7 @@ Currently supported board as follows
 
 1. Trion T120F324  
 2. Titanium Ti60F225  
+3. Titanium Ti180M484
 
 ## License
 
