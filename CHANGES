@@ -1,3 +1,18 @@
+br2-efinix 2021.05.6,
+
+	Add soc example design with 1 and 4 cores for Ti180M484
+	Update soc example design for Ti60F225 with Efinity 2022.2
+	Add SPI flash loader for programming Ti180M484
+	Add user guide for using Ti180 development board
+	Add cflags to enable 3 bytes addressing mode for SPI flash for Ti180M484
+	Add Linux support for Ti180M484 devkit
+	Update steps to modify fpga bootloader
+	Add instruction to modify jumper setting for T120F324 and Ti60F225 devkits
+	Update helloworld kernel module link
+
+	Issues resolved
+	N/A
+
 br2-efinix 2021.05.5,
 
 	Add 2 examples of OpenCV DNN application
