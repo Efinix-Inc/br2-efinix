@@ -58,7 +58,17 @@ Connect the MIPI and LVDS Expansion daughter card to the board at P2 header.
 
 ## Setup Ti60F225
 
-The Titanium Ti60 F225 Development Board has a USB-to-UART converter connected to the Ti60's GPIOL_01 and GPIOL_02 pins. To use the UART, simply connect a USB cable to the FTDI USB connector on the Titanium Ti60 F225 Development Board and to your computer.
+The Titanium Ti60 F225 Development Board has a USB-to-UART converter connected to the Ti60's GPIOL_01 and GPIOL_02 pins.
+
+1. Connect a USB cable type C to Ti60F225 development board and to your computer.
+
+2. Insert micro SD card into the SD card slot.
+
+3. Set the jumper settings as follows
+   
+   - J5, J6, J7 set to 3.3V (connect pin 1 and 2)
+   
+   - J8, J9, J10, J11 set to 1.8V (connect pin 1 and 2)
 
 ## Setup Ti180M484
 
