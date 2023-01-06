@@ -130,7 +130,7 @@ Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 develop
 1. Clone this repository.
    
    ```bash
-   git clone https://github.com/Efinix-Inc/br2-efinix -b 2021.05.5
+   git clone https://github.com/Efinix-Inc/br2-efinix -b 2021.05.6
    cd br2-efinix
    ```
 
