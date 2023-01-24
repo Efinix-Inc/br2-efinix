@@ -74,7 +74,7 @@
 	"root": {
 		"chosen": {
 			"name": "chosen",
-			"private_data": ["bootargs = \"rootwait console=hvc0  earlycon=sbi root=/dev/mmcblk0p2 init=/sbin/init mmc_core.use_spi_crc=0\";"]
+			"private_data": ["bootargs = \"rootwait console=ttyAL0 earlycon=sbi root=/dev/mmcblk0p2 init=/sbin/init mmc_core.use_spi_crc=0\";"]
 		},
 		"reserved-memory": {
 			"name": "reserved-memory",
