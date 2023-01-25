@@ -1,4 +1,4 @@
-From 416846d77c96c363be2e7fc3dd63df384389bf76 Mon Sep 17 00:00:00 2001
+From 393c30e4e33cb20d5a3ec3508aa9f12173acbdc2 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Mon, 10 Jan 2022 18:09:49 +0800
 Subject: [PATCH] drivers: add serial spinal driver
@@ -8,26 +8,26 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
  drivers/tty/serial/Kconfig             |  23 +
  drivers/tty/serial/Makefile            |   1 +
- drivers/tty/serial/serial_spinal_lib.c | 725 +++++++++++++++++++++++++
+ drivers/tty/serial/serial_spinal_lib.c | 723 +++++++++++++++++++++++++
  include/uapi/linux/serial_core.h       |   3 +
- 4 files changed, 752 insertions(+)
+ 4 files changed, 750 insertions(+)
  create mode 100644 drivers/tty/serial/serial_spinal_lib.c
 
 diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 28f22e58639c..3bf841dad7f9 100644
+index 28f22e58639c..c7cc918b086d 100644
 --- a/drivers/tty/serial/Kconfig
 +++ b/drivers/tty/serial/Kconfig
 @@ -1583,6 +1583,29 @@ config SERIAL_MILBEAUT_USIO_CONSOLE
  	  receives all kernel messages and warnings and which allows logins in
  	  single user mode).
  
-+config SERIAL_SPINAL_LIB
++config SERIAL_SPINAL_LIB_UART
 +       tristate "Spinal lib UART support"
 +       select SERIAL_CORE
 +       help
 +         This driver supports the spinal lib UART port.
 +
-+config SERIAL_SPINAL_LIB_BAUDRATE
++config SERIAL_SPINAL_LIB_UART_BAUDRATE
 +       int "Default baudrate for spinal lib UART ports"
 +       depends on SERIAL_SPINAL_LIB
 +       default 115200
@@ -36,7 +36,7 @@ index 28f22e58639c..3bf841dad7f9 100644
 +         spinal lib UART ports. The usual default varies from board to board,
 +         and this setting is a way of catering for that.
 +
-+config SERIAL_SPINAL_LIB_CONSOLE
++config SERIAL_SPINAL_LIB_UART_CONSOLE
 +       bool "Spinal lib UART console support"
 +       depends on SERIAL_SPINAL_LIB=y
 +       select SERIAL_CORE_CONSOLE
@@ -48,23 +48,23 @@ index 28f22e58639c..3bf841dad7f9 100644
  
  config SERIAL_MCTRL_GPIO
 diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
-index caf167f0c10a..8909e39bc4f9 100644
+index caf167f0c10a..bf3979e223d2 100644
 --- a/drivers/tty/serial/Makefile
 +++ b/drivers/tty/serial/Makefile
 @@ -90,6 +90,7 @@ obj-$(CONFIG_SERIAL_OWL)	+= owl-uart.o
  obj-$(CONFIG_SERIAL_RDA)	+= rda-uart.o
  obj-$(CONFIG_SERIAL_MILBEAUT_USIO) += milbeaut_usio.o
  obj-$(CONFIG_SERIAL_SIFIVE)	+= sifive.o
-+obj-$(CONFIG_SERIAL_SPINAL_LIB) += serial_spinal_lib.o
++obj-$(CONFIG_SERIAL_SPINAL_LIB_UART) += serial_spinal_lib.o
  
  # GPIOLIB helpers for modem control lines
  obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
 diff --git a/drivers/tty/serial/serial_spinal_lib.c b/drivers/tty/serial/serial_spinal_lib.c
 new file mode 100644
-index 000000000000..2622113b4c11
+index 000000000000..2cc1e3982735
 --- /dev/null
 +++ b/drivers/tty/serial/serial_spinal_lib.c
-@@ -0,0 +1,725 @@
+@@ -0,0 +1,723 @@
 +#include <linux/kernel.h>
 +#include <linux/init.h>
 +#include <linux/timer.h>
@@ -83,7 +83,7 @@ index 000000000000..2622113b4c11
 +#define DRV_NAME "spinal_lib_uart"
 +//#define SERIAL_SPINAL_LIB_MAJOR TTY_MAJOR
 +//#define SERIAL_SPINAL_LIB_MINOR 1
-+#define CONFIG_SERIAL_SPINAL_LIB_UART_MAXPORTS 32
++#define SERIAL_SPINAL_LIB_UART_MAXPORTS 32
 +
 +/* Register Offset */
 +#define SPINAL_LIB_UART_DATA 		0x00
@@ -123,6 +123,8 @@ index 000000000000..2622113b4c11
 +        u32 break_on_rx;
 +        u32 imr;
 +};
++
++static struct spinal_lib_uart spinal_lib_uart_ports[SERIAL_SPINAL_LIB_UART_MAXPORTS];
 +
 +static u32 spinal_lib_uart_tx_availability(struct uart_port *port)
 +{
@@ -261,9 +263,9 @@ index 000000000000..2622113b4c11
 +
 +	if (termios->c_cflag & CSTOPB) {
 +		if (termios->c_cflag & PARODD)
-+			SPINAL_LIB_UART_FRAME_CONFIG_ODD;
++			config |= SPINAL_LIB_UART_FRAME_CONFIG_ODD;
 +		else
-+			SPINAL_LIB_UART_FRAME_CONFIG_EVEN;
++			config |= SPINAL_LIB_UART_FRAME_CONFIG_EVEN;
 +	}
 +
 +	spin_lock_irqsave(&port->lock, flags);
@@ -532,7 +534,7 @@ index 000000000000..2622113b4c11
 +	int parity = 'n';
 +	int flow = 'n';
 +
-+	if (co->index < 0 || co->index >= CONFIG_SERIAL_SPINAL_LIB_UART_MAXPORTS)
++	if (co->index < 0 || co->index >= SERIAL_SPINAL_LIB_UART_MAXPORTS)
 +		return -EINVAL;
 +	port = &spinal_lib_uart_ports[co->index].port;
 +	if (!port->membase)
@@ -613,7 +615,7 @@ index 000000000000..2622113b4c11
 +	.dev_name	= "ttySL",
 +//	.major		= SERIAL_SPINAL_LIB_MAJOR,
 +//	.minor		= SERIAL_SPINAL_LIB_MINOR,
-+	.nr		= CONFIG_SERIAL_SPINAL_LIB_UART_MAXPORTS,
++	.nr		= SERIAL_SPINAL_LIB_UART_MAXPORTS,
 +	.cons		= SPINAL_LIB_UART_CONSOLE,
 +};
 +
@@ -625,12 +627,8 @@ index 000000000000..2622113b4c11
 +	int ret;
 +	struct spinal_lib_uart *pp;
 +	struct clk *clk;
-+//	int i = pdev->id;
 +	int irq;
 +	u32 hz;
-+
-+//	if (i < 0 || i >= CONFIG_SERIAL_SPINAL_LIB_UART_MAXPORTS)
-+//		return -EINVAL;
 +
 +	pp = devm_kzalloc(&pdev->dev, sizeof(*pp), GFP_KERNEL);
 +
