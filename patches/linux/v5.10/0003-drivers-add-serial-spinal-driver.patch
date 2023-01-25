@@ -1,4 +1,4 @@
-From 8c58fddaba21a95a7c69896fc24f2855a97a3fe5 Mon Sep 17 00:00:00 2001
+From 416846d77c96c363be2e7fc3dd63df384389bf76 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Mon, 10 Jan 2022 18:09:49 +0800
 Subject: [PATCH] drivers: add serial spinal driver
@@ -8,9 +8,9 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
  drivers/tty/serial/Kconfig             |  23 +
  drivers/tty/serial/Makefile            |   1 +
- drivers/tty/serial/serial_spinal_lib.c | 728 +++++++++++++++++++++++++
+ drivers/tty/serial/serial_spinal_lib.c | 725 +++++++++++++++++++++++++
  include/uapi/linux/serial_core.h       |   3 +
- 4 files changed, 755 insertions(+)
+ 4 files changed, 752 insertions(+)
  create mode 100644 drivers/tty/serial/serial_spinal_lib.c
 
 diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
@@ -61,10 +61,10 @@ index caf167f0c10a..8909e39bc4f9 100644
  obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
 diff --git a/drivers/tty/serial/serial_spinal_lib.c b/drivers/tty/serial/serial_spinal_lib.c
 new file mode 100644
-index 000000000000..1ce7f20f66a0
+index 000000000000..2622113b4c11
 --- /dev/null
 +++ b/drivers/tty/serial/serial_spinal_lib.c
-@@ -0,0 +1,728 @@
+@@ -0,0 +1,725 @@
 +#include <linux/kernel.h>
 +#include <linux/init.h>
 +#include <linux/timer.h>
@@ -267,9 +267,11 @@ index 000000000000..1ce7f20f66a0
 +	}
 +
 +	spin_lock_irqsave(&port->lock, flags);
++
 +	uart_update_timeout(port, termios->c_cflag, baud);
 +	writel(baudclk, port->membase + SPINAL_LIB_UART_CLOCK_DIVIDER);
 +	writel(config, port->membase + SPINAL_LIB_UART_FRAME_CONFIG);
++
 +	spin_unlock_irqrestore(&port->lock, flags);
 +
 +	/*
@@ -387,7 +389,6 @@ index 000000000000..1ce7f20f66a0
 +
 +	spinal_lib_uart_interrupt(0, port);
 +	mod_timer(&pp->tmr, jiffies + uart_poll_timeout(port));
-+
 +}
 +
 +static void spinal_lib_uart_config_port(struct uart_port *port, int flags)
@@ -402,10 +403,8 @@ index 000000000000..1ce7f20f66a0
 +{
 +	struct spinal_lib_uart *pp = container_of(port, struct spinal_lib_uart, port);
 +	unsigned long flags;
-+	//int ret;
 +
 +	if (!port->irq) {
-+		pr_info("Using polling\n");
 +		timer_setup(&pp->tmr, spinal_lib_uart_timer, 0);
 +		mod_timer(&pp->tmr, jiffies + uart_poll_timeout(port));
 +	}
@@ -621,7 +620,6 @@ index 000000000000..1ce7f20f66a0
 +static int spinal_lib_uart_probe(struct platform_device *pdev)
 +{
 +	struct resource *res_mem;
-+	struct resource *res_irq;
 +	struct uart_port *port;
 +	struct device *dev = &pdev->dev;
 +	int ret;
@@ -653,16 +651,14 @@ index 000000000000..1ce7f20f66a0
 +		return -EINVAL;
 +
 +	irq = platform_get_irq(pdev, 0);
-+	if (res_irq < 0)
-+		pr_info("Not able to get IRQ. Use polling\n");
-+
 +	port->irq = irq;
-+
 +	ret = devm_request_irq(pp->dev, port->irq, spinal_lib_uart_interrupt, 0,
 +                                DRV_NAME, port);
-+	if (ret)
++	if (ret) {
++		port->irq = 0;
 +		pr_err(DRV_NAME ": unable to attach Spinal Lib UART %d "
 +                               "interrupt vector=%d\n", port->line, port->irq);
++	}
 +
 +	clk = devm_clk_get(&pdev->dev, NULL);
 +
@@ -683,6 +679,7 @@ index 000000000000..1ce7f20f66a0
 +	if (!port->membase)
 +		return -ENOMEM;
 +
++	port->fifosize = 128;
 +	port->regshift = 0;
 +	port->line = 0;
 +	port->type = PORT_SPINAL_LIB;
