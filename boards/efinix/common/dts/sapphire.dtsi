@@ -81,7 +81,7 @@
         };
 
 	uartA: uart@10000 {
-            compatible = "spinal-lib,uart-1.0";
+            compatible = "spinal-lib,uart-2.0";
             reg = <0x10000 0x1000>;
             clocks = <&apbA_clock 0>;
             status = "disabled";

@@ -26,7 +26,7 @@
 		]
 	},
 	"uart": {
-		"compatible": ["spinal-lib,uart-1.0"],
+		"compatible": ["spinal-lib,uart-2.0"],
 		"private_data": [
 			"clocks = <&apbA_clock 0>;"
 		]
