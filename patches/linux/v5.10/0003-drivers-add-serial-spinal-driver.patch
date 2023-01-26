@@ -1,4 +1,4 @@
-From 07cc312a71fc48f2943799c6bcb6f0d9000676cc Mon Sep 17 00:00:00 2001
+From 261ab36e991380d4693d68a4cb6c7de172190523 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Mon, 10 Jan 2022 18:09:49 +0800
 Subject: [PATCH] drivers: add serial spinal driver
@@ -61,7 +61,7 @@ index caf167f0c10a..bf3979e223d2 100644
  obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
 diff --git a/drivers/tty/serial/serial_spinal_lib.c b/drivers/tty/serial/serial_spinal_lib.c
 new file mode 100644
-index 000000000000..67a159a9b6c4
+index 000000000000..36fbed9a7fe6
 --- /dev/null
 +++ b/drivers/tty/serial/serial_spinal_lib.c
 @@ -0,0 +1,742 @@
@@ -601,7 +601,7 @@ index 000000000000..67a159a9b6c4
 +	return 0;
 +}
 +
-+OF_EARLYCON_DECLARE(uart, "spinal-lib,uart-1.0", spinal_lib_uart_earlycon_setup);
++OF_EARLYCON_DECLARE(uart, "spinal-lib,uart-2.0", spinal_lib_uart_earlycon_setup);
 +
 +#else
 +
@@ -730,7 +730,7 @@ index 000000000000..67a159a9b6c4
 +
 +#ifdef CONFIG_OF
 +static const struct of_device_id spinal_lib_uart_match[] = {
-+	{ .compatible = "spinal-lib,uart-1.0", },
++	{ .compatible = "spinal-lib,uart-2.0", },
 +	{},
 +};
 +MODULE_DEVICE_TABLE(of, spinal_lib_uart_match);
