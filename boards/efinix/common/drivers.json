@@ -91,6 +91,12 @@
 				"reg": "reg = <0x01000000 0x80000>;"
 			}
 		},
+		"aliases": {
+			"name": "aliases",
+			"private_data": [
+				"serial0 = &uartA;"
+			]
+		},
 		"efx_gpio_devs": {
 			"name": "efx_gpio_devs",
 			"compatible": "compatible = \"efinix,efx-gpio\";",
