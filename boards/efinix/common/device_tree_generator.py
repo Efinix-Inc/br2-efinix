@@ -19,6 +19,7 @@ DCACHE = "DCACHE"
 CONTROLLER = ["PLIC", "CLINT", "RAM"]
 PLIC = "PLIC"
 SUPERVISOR = "SUPERVISOR "
+PERIPHERALS = ["UART", "I2C", "SPI", "GPIO"]
 
 def read_file(filename):
     with open(filename, 'r') as f:
@@ -57,6 +58,25 @@ def get_value(prop):
 
     return props[len(props) -1]
 
+"""
+get_peripherals: get a list of supported peripheral from soc.h
+
+@cfg (str): raw data of soc.h
+
+return: list of supported peripheral
+"""
+def get_peripherals(cfg):
+    peripherals = []
+
+    for line in cfg:
+        periph = ''.join([x for x in PERIPHERALS if x in line])
+        if periph:
+            peripherals.append(periph)
+
+    # remove duplicate from list
+    peripherals = list(dict.fromkeys(peripherals))
+
+    return peripherals
 
 """
 get_peripheral_properties: get a list of a peripheral's properties
@@ -1043,7 +1063,8 @@ def main():
     if plic_node:
         apb_node = dt_insert_child_node(apb_node, plic_node)
 
-    for peripheral in ["UART", "SPI", "GPIO", "I2C"]:
+    peripherals = get_peripherals(cfg)
+    for peripheral in peripherals:
         periph_node = dt_create_node(cfg, peripheral)
         if periph_node:
             apb_node = dt_insert_child_node(apb_node, periph_node)
@@ -1065,7 +1086,6 @@ def main():
             json.dump(root_node, f, indent=4, sort_keys=False)
 
         print("Info: device tree json format stored in %s" % output_json)
-
 
 if __name__ == "__main__":
     main()
