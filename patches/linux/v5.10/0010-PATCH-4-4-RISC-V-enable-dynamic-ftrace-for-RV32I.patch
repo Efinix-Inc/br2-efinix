@@ -1,0 +1,47 @@
+From e72dfe784a7e7cc1431af9e1f6da5002dc433862 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Tue, 31 Jan 2023 15:34:24 +0800
+Subject: [PATCH] RISC-V: enable dynamic ftrace for RV32I
+
+The RISC-V mcount function is now capable of supporting RV32I so make it
+available in the kernel config.
+
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+Link: https://lore.kernel.org/r/20221115200832.706370-5-jamie@jamieiles.com
+Signed-off-by: Palmer Dabbelt <palmer@rivosinc.com>
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ arch/riscv/Kconfig | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/riscv/Kconfig b/arch/riscv/Kconfig
+index 44377fd7860e..cc6de5fe667b 100644
+--- a/arch/riscv/Kconfig
++++ b/arch/riscv/Kconfig
+@@ -89,6 +89,11 @@ config RISCV
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select THREAD_INFO_IN_TASK
+ 	select UACCESS_MEMCPY if !MMU
++	select HAVE_DYNAMIC_FTRACE if MMU
++	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
++	select HAVE_FTRACE_MCOUNT_RECORD
++	select HAVE_FUNCTION_GRAPH_TRACER
++	select HAVE_FUNCTION_TRACER
+ 
+ config ARCH_MMAP_RND_BITS_MIN
+ 	default 18 if 64BIT
+@@ -218,11 +223,6 @@ config ARCH_RV64I
+ 	bool "RV64I"
+ 	select 64BIT
+ 	select ARCH_SUPPORTS_INT128 if CC_HAS_INT128 && GCC_VERSION >= 50000
+-	select HAVE_DYNAMIC_FTRACE if MMU
+-	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
+-	select HAVE_FTRACE_MCOUNT_RECORD
+-	select HAVE_FUNCTION_GRAPH_TRACER
+-	select HAVE_FUNCTION_TRACER
+ 	select SWIOTLB if MMU
+ 
+ endchoice
+-- 
+2.17.1
+
