@@ -1,4 +1,4 @@
-From 261ab36e991380d4693d68a4cb6c7de172190523 Mon Sep 17 00:00:00 2001
+From 9e6234f78ae0fe971a559274aca6ace1d97ba5e3 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Mon, 10 Jan 2022 18:09:49 +0800
 Subject: [PATCH] drivers: add serial spinal driver
@@ -8,9 +8,9 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
  drivers/tty/serial/Kconfig             |  23 +
  drivers/tty/serial/Makefile            |   1 +
- drivers/tty/serial/serial_spinal_lib.c | 742 +++++++++++++++++++++++++
+ drivers/tty/serial/serial_spinal_lib.c | 825 +++++++++++++++++++++++++
  include/uapi/linux/serial_core.h       |   3 +
- 4 files changed, 769 insertions(+)
+ 4 files changed, 852 insertions(+)
  create mode 100644 drivers/tty/serial/serial_spinal_lib.c
 
 diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
@@ -61,10 +61,10 @@ index caf167f0c10a..bf3979e223d2 100644
  obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
 diff --git a/drivers/tty/serial/serial_spinal_lib.c b/drivers/tty/serial/serial_spinal_lib.c
 new file mode 100644
-index 000000000000..36fbed9a7fe6
+index 000000000000..1d6b095c5926
 --- /dev/null
 +++ b/drivers/tty/serial/serial_spinal_lib.c
-@@ -0,0 +1,742 @@
+@@ -0,0 +1,825 @@
 +#include <linux/kernel.h>
 +#include <linux/init.h>
 +#include <linux/timer.h>
@@ -81,8 +81,6 @@ index 000000000000..36fbed9a7fe6
 +#include <linux/clk.h>
 +
 +#define DRV_NAME "spinal_lib_uart"
-+//#define SERIAL_SPINAL_LIB_MAJOR TTY_MAJOR
-+//#define SERIAL_SPINAL_LIB_MINOR 1
 +#define SERIAL_SPINAL_LIB_UART_MAXPORTS 4
 +
 +/* Register Offset */
@@ -91,16 +89,13 @@ index 000000000000..36fbed9a7fe6
 +#define SPINAL_LIB_UART_CLOCK_DIVIDER 	0x08
 +#define SPINAL_LIB_UART_FRAME_CONFIG 	0x0C
 +#define SPINAL_LIB_UART_FRAME_FLAGS 	0x10
-+#define SPINAL_LIB_UART_RXDATA_REG	SPINAL_LIB_UART_DATA
-+#define SPINAL_LIB_UART_TXDATA_REG	SPINAL_LIB_UART_DATA
-+#define SPINAL_LIB_UART_CONTROL_REG	SPINAL_LIB_UART_STATUS
-+#define SPINAL_LIB_UART_STATUS_REG	SPINAL_LIB_UART_STATUS
 +
 +#define SPINAL_LIB_UART_STATUS_TX_BUSY 		0x8000
 +#define SPINAL_LIB_UART_FRAME_CONFIG_STOP1 	(0 << 16)
 +#define SPINAL_LIB_UART_FRAME_CONFIG_STOP2 	(1 << 16)
 +#define SPINAL_LIB_UART_FRAME_CONFIG_ODD 	(1 << 8)
 +#define SPINAL_LIB_UART_FRAME_CONFIG_EVEN 	(2 << 8)
++#define SPINAL_LIB_UART_MISC_READ_OVERFLOW	(1 << 1)
 +#define SPINAL_LIB_UART_MISC_BREAK_ACTIVE 	(1 << 8)
 +#define SPINAL_LIB_UART_MISC_BREAK_DETECTED 	(1 << 9)
 +#define SPINAL_LIB_UART_MISC_BREAK_ENABLE 	(1 << 10)
@@ -110,6 +105,9 @@ index 000000000000..36fbed9a7fe6
 +#define SPINAL_LIB_UART_CONTROL_RRDY_MSK 	(1 << 1)
 +#define SPINAL_LIB_UART_STATUS_TRDY_MSK		(1 << 8)
 +#define SPINAL_LIB_UART_STATUS_RRDY_MSK		(1 << 9)
++
++/* Depth of TX/RX FIFO (in bytes) */
++#define SPINAL_LIB_UART_FIFO_DEPTH	128
 +
 +#undef pr_fmt
 +#define pr_fmt(fmt) "%s : " fmt, __func__
@@ -158,10 +156,8 @@ index 000000000000..36fbed9a7fe6
 +         * If the device doesn't have an irq, ensure that the irq bits are
 +         * masked out to keep the irq line inactive.
 +         */
-+//      if (!pp->port.irq)
-+//              imr &= SPINAL_LIB_UART_CONTROL_TRBK_MSK | SPINAL_LIB_UART_CONTROL_RTS_MSK;
 +
-+	spinal_lib_uart_writel(&pp->port, imr, SPINAL_LIB_UART_CONTROL_REG);
++	spinal_lib_uart_writel(&pp->port, imr, SPINAL_LIB_UART_STATUS);
 +}
 +
 +static inline void spinal_lib_uart_disable_tx_interrupt(struct spinal_lib_uart *pp)
@@ -195,6 +191,7 @@ index 000000000000..36fbed9a7fe6
 +
 +static unsigned int spinal_lib_uart_get_mctrl(struct uart_port *port)
 +{
++	pr_info("\n");
 +	return TIOCM_CAR | TIOCM_DSR | TIOCM_CTS;
 +}
 +
@@ -272,8 +269,11 @@ index 000000000000..36fbed9a7fe6
 +	spin_lock_irqsave(&port->lock, flags);
 +
 +	uart_update_timeout(port, termios->c_cflag, baud);
-+	writel(baudclk, port->membase + SPINAL_LIB_UART_CLOCK_DIVIDER);
-+	writel(config, port->membase + SPINAL_LIB_UART_FRAME_CONFIG);
++	/* FIXME: for some reason, during console_register the baudclk and config need to set to 0.
++	 * otherwise, it will print garbage on the terminal
++	 */
++	//writel(baudclk, port->membase + SPINAL_LIB_UART_CLOCK_DIVIDER);
++	//writel(config, port->membase + SPINAL_LIB_UART_FRAME_CONFIG);
 +
 +	spin_unlock_irqrestore(&port->lock, flags);
 +
@@ -289,12 +289,14 @@ index 000000000000..36fbed9a7fe6
 +	struct uart_port *port = &pp->port;
 +	unsigned char ch, flag;
 +	u32 count;
-+	u32 flags = readl(port->membase + SPINAL_LIB_UART_FRAME_FLAGS);
++	u32 flags;
 +
++	flags = spinal_lib_uart_readl(port, SPINAL_LIB_UART_FRAME_FLAGS);
 +	if(!pp->break_on_rx){
 +		if(flags & SPINAL_LIB_UART_MISC_BREAK_DETECTED){
-+			writel(SPINAL_LIB_UART_MISC_BREAK_DETECTED,
-+			       port->membase + SPINAL_LIB_UART_FRAME_FLAGS);
++			spinal_lib_uart_writel(port,
++				SPINAL_LIB_UART_MISC_BREAK_DETECTED,
++				SPINAL_LIB_UART_FRAME_FLAGS);
 +			pp->break_on_rx = 1;
 +			port->icount.brk++;
 +			uart_handle_break(port);
@@ -306,9 +308,8 @@ index 000000000000..36fbed9a7fe6
 +	}
 +
 +	if(!pp->break_on_rx) while((count = spinal_lib_uart_rx_occupancy(port))){
-+
 +		while(count--){
-+			ch = readl(port->membase + SPINAL_LIB_UART_DATA);
++			ch = spinal_lib_uart_readl(port, SPINAL_LIB_UART_DATA);
 +			flag = TTY_NORMAL;
 +			port->icount.rx++;
 +			if (uart_handle_sysrq_char(port, ch))
@@ -322,10 +323,53 @@ index 000000000000..36fbed9a7fe6
 +	spin_lock(&port->lock);
 +}
 +
++/* This copy from sifive uart but not work*/
++static void spinal_lib_uart_tx_chars1(struct spinal_lib_uart *pp)
++{
++	struct circ_buf *xmit = &pp->port.state->xmit;
++	int count;
++
++	if (&pp->port.x_char && spinal_lib_uart_tx_availability(&pp->port)) {
++		/* Send special char - probably flow control */
++		spinal_lib_uart_tx(&pp->port, pp->port.x_char);
++		pp->port.x_char = 0;
++		pp->port.icount.tx++;
++		return;
++	}
++
++	if (uart_circ_empty(xmit) || uart_tx_stopped(&pp->port)) {
++		spinal_lib_uart_stop_tx(&pp->port);
++		return;
++	}
++
++	count = SPINAL_LIB_UART_FIFO_DEPTH;
++	do {
++		spinal_lib_uart_tx(&pp->port, xmit->buf[xmit->tail]);
++		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
++		pp->port.icount.tx++;
++		if (uart_circ_empty(xmit))
++			break;
++	} while (--count > 0);
++
++	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
++		uart_write_wakeup(&pp->port);
++
++	if (uart_circ_empty(xmit))
++		spinal_lib_uart_stop_tx(&pp->port);
++}
++
 +static void spinal_lib_uart_tx_chars(struct spinal_lib_uart *pp)
 +{
 +	struct uart_port *port = &pp->port;
 +	struct circ_buf *xmit = &port->state->xmit;
++	unsigned int numbytes;
++
++	//pr_info("\n");
++	//numbytes = port->fifosize;
++	numbytes = SPINAL_LIB_UART_FIFO_DEPTH;
++
++	//if (uart_circ_empty(xmit))
++	//	spinal_lib_uart_disable_tx_interrupt(pp);
 +
 +	if (port->x_char && spinal_lib_uart_tx_availability(port)) {
 +		/* Send special char - probably flow control */
@@ -335,12 +379,30 @@ index 000000000000..36fbed9a7fe6
 +		return;
 +	}
 +
++	/*
++	if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
++                spinal_lib_uart_stop_tx(port);
++                return;
++        }
++	*/
++
++	/*
 +	while (spinal_lib_uart_tx_availability(port)) {
++		//pr_info("numbytes = %u\n", numbytes);
 +		if (xmit->head == xmit->tail)
 +			break;
 +		spinal_lib_uart_tx(port, xmit->buf[xmit->tail]);
 +		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
 +		port->icount.tx++;
++		numbytes--;
++	}
++	*/
++
++	while (numbytes && !uart_circ_empty(xmit) && spinal_lib_uart_tx_availability(port)) {
++		spinal_lib_uart_tx(port, xmit->buf[xmit->tail]);
++		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
++		port->icount.tx++;
++		numbytes--;
 +	}
 +
 +	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
@@ -352,10 +414,17 @@ index 000000000000..36fbed9a7fe6
 +
 +static void spinal_lib_uart_start_tx(struct uart_port *port)
 +{
-+	struct spinal_lib_uart *pp = container_of(port, struct spinal_lib_uart, port);
++        struct spinal_lib_uart *pp = container_of(port, struct spinal_lib_uart, port);
 +
-+	spinal_lib_uart_enable_tx_interrupt(pp);
-+	spinal_lib_uart_tx_chars(pp);
++        //pr_info("\n");
++        //spinal_lib_uart_enable_tx_interrupt(pp);
++        //spinal_lib_uart_tx_chars(pp);
++
++       // if (uart_circ_empty(&port->state->xmit))
++       //         return;
++
++        //spinal_lib_uart_tx_chars(pp);
++        spinal_lib_uart_enable_tx_interrupt(pp);
 +}
 +
 +static irqreturn_t spinal_lib_uart_interrupt(int irq, void *data)
@@ -364,7 +433,7 @@ index 000000000000..36fbed9a7fe6
 +	struct spinal_lib_uart *pp = container_of(port, struct spinal_lib_uart, port);
 +	unsigned int isr;
 +
-+	isr = spinal_lib_uart_readl(port, SPINAL_LIB_UART_STATUS_REG);
++	isr = spinal_lib_uart_readl(port, SPINAL_LIB_UART_STATUS);
 +
 +	/* Disable Tx/Rx interrupt */
 +	spinal_lib_uart_disable_tx_interrupt(pp);
@@ -374,6 +443,7 @@ index 000000000000..36fbed9a7fe6
 +
 +	if (isr & SPINAL_LIB_UART_STATUS_RRDY_MSK)
 +		spinal_lib_uart_rx_chars(pp);
++
 +	if (isr & SPINAL_LIB_UART_STATUS_TRDY_MSK)
 +		spinal_lib_uart_tx_chars(pp);
 +
@@ -397,9 +467,12 @@ index 000000000000..36fbed9a7fe6
 +static void spinal_lib_uart_config_port(struct uart_port *port, int flags)
 +{
 +	port->type = PORT_SPINAL_LIB;
++	u32 mask;
 +
++	pr_info("\n");
++	mask = SPINAL_LIB_UART_CONTROL_TRDY_MSK | SPINAL_LIB_UART_CONTROL_RRDY_MSK;
 +	/* Clear mask, so no surprise interrupts. */
-+	spinal_lib_uart_writel(port, 0, SPINAL_LIB_UART_CONTROL_REG);
++	spinal_lib_uart_writel(port, ~mask, SPINAL_LIB_UART_STATUS);
 +}
 +
 +static int spinal_lib_uart_startup(struct uart_port *port)
@@ -466,20 +539,28 @@ index 000000000000..36fbed9a7fe6
 +#ifdef CONFIG_CONSOLE_POLL
 +static int spinal_lib_uart_poll_get_char(struct uart_port *port)
 +{
-+	while (!(spinal_lib_uart_readl(port, SPINAL_LIB_UART_STATUS_REG) &
-+		 SPINAL_LIB_UART_STATUS_RRDY_MSK))
-+		cpu_relax();
++	/* enable Rx interrupt */
++	spinal_lib_uart_writel(port, SPINAL_LIB_UART_CONTROL_RRDY_MSK,
++			SPINAL_LIB_UART_STATUS);
 +
-+	return spinal_lib_uart_readl(port, SPINAL_LIB_UART_RXDATA_REG);
++	while (!(spinal_lib_uart_readl(port, SPINAL_LIB_UART_STATUS) &
++		 SPINAL_LIB_UART_STATUS_RRDY_MSK))
++		return NO_POLL_CHAR;
++
++	return spinal_lib_uart_readl(port, SPINAL_LIB_UART_DATA);
 +}
 +
 +static void spinal_lib_uart_poll_put_char(struct uart_port *port, unsigned char c)
 +{
-+	while (!(spinal_lib_uart_readl(port, SPINAL_LIB_UART_STATUS_REG) &
++	/* enable Tx interrupt */
++	spinal_lib_uart_writel(port, SPINAL_LIB_UART_CONTROL_TRDY_MSK,
++			SPINAL_LIB_UART_STATUS);
++
++	while (!(spinal_lib_uart_readl(port, SPINAL_LIB_UART_STATUS) &
 +		 SPINAL_LIB_UART_STATUS_TRDY_MSK))
 +		cpu_relax();
 +
-+	spinal_lib_uart_writel(port, c, SPINAL_LIB_UART_TXDATA_REG);
++	spinal_lib_uart_writel(port, c, SPINAL_LIB_UART_DATA);
 +}
 +#endif
 +
@@ -512,25 +593,43 @@ index 000000000000..36fbed9a7fe6
 +
 +static void spinal_lib_uart_console_putc(struct uart_port *port, int c)
 +{
-+	while (!(spinal_lib_uart_readl(port, SPINAL_LIB_UART_STATUS_REG) &
++	while (!(spinal_lib_uart_readl(port, SPINAL_LIB_UART_STATUS) &
 +		 SPINAL_LIB_UART_STATUS_TRDY_MSK))
 +		cpu_relax();
 +
-+	spinal_lib_uart_writel(port, c, SPINAL_LIB_UART_TXDATA_REG);
++	spinal_lib_uart_writel(port, c, SPINAL_LIB_UART_DATA);
 +}
 +
 +static void spinal_lib_uart_console_write(struct console *co, const char *s,
-+				      unsigned int count)
++					unsigned int count)
 +{
-+	struct uart_port *port;
++	struct spinal_lib_uart *pp = spinal_lib_uart_ports[co->index];
++	unsigned long flags;
++	unsigned int ier;
++	int locked = 1;
 +
-+	port = &spinal_lib_uart_ports[co->index]->port;
-+	uart_console_write(port, s, count, spinal_lib_uart_console_putc);
++	if (!pp)
++		return;
++
++	local_irq_save(flags);
++	if (pp->port.sysrq)
++		locked = 0;
++	else if (oops_in_progress)
++		locked = spin_trylock(&pp->port.lock);
++	else
++		spin_lock(&pp->port.lock);
++
++	spinal_lib_uart_enable_tx_interrupt(pp);
++	uart_console_write(&pp->port, s, count, spinal_lib_uart_console_putc);
++
++	if (locked)
++		spin_unlock(&pp->port.lock);
++	local_irq_restore(flags);
 +}
 +
 +static int __init spinal_lib_uart_console_setup(struct console *co, char *options)
 +{
-+	struct uart_port *port;
++	struct spinal_lib_uart *pp;
 +	int baud = CONFIG_SERIAL_SPINAL_LIB_UART_BAUDRATE;
 +	int bits = 8;
 +	int parity = 'n';
@@ -539,20 +638,20 @@ index 000000000000..36fbed9a7fe6
 +	if (co->index < 0 || co->index >= SERIAL_SPINAL_LIB_UART_MAXPORTS)
 +		return -ENODEV;
 +
-+	port = &spinal_lib_uart_ports[co->index]->port;
-+	if (!port->membase)
++	pp = spinal_lib_uart_ports[co->index];
++	if (!pp)
 +		return -ENODEV;
 +
 +	if (options)
 +		uart_parse_options(options, &baud, &parity, &bits, &flow);
 +
-+	return uart_set_options(port, co, baud, parity, bits, flow);
++	return uart_set_options(&pp->port, co, baud, parity, bits, flow);
 +}
 +
 +static struct uart_driver spinal_lib_uart_driver;
 +
 +static struct console spinal_lib_uart_console = {
-+	.name	= "ttyAL",
++	.name	= "ttySL",
 +	.write	= spinal_lib_uart_console_write,
 +	.device	= uart_console_device,
 +	.setup	= spinal_lib_uart_console_setup,
@@ -576,6 +675,8 @@ index 000000000000..36fbed9a7fe6
 +{
 +	struct earlycon_device *dev = co->data;
 +
++	spinal_lib_uart_writel(&dev->port, SPINAL_LIB_UART_CONTROL_TRDY_MSK,
++			SPINAL_LIB_UART_STATUS);
 +	uart_console_write(&dev->port, s, count, spinal_lib_uart_console_putc);
 +}
 +
@@ -588,20 +689,24 @@ index 000000000000..36fbed9a7fe6
 +	if (!port->membase)
 +		return -ENODEV;
 +
-+	/* Enable RX interrupts now */
-+	spinal_lib_uart_writel(port, SPINAL_LIB_UART_CONTROL_RRDY_MSK,
-+			   SPINAL_LIB_UART_CONTROL_REG);
++	/* Enable TX interrupt */
++	/* enable tx interrupt in earlycon_write() */
++	//spinal_lib_uart_writel(port, SPINAL_LIB_UART_CONTROL_TRDY_MSK,
++	//		SPINAL_LIB_UART_STATUS);
 +
 +	if (dev->baud) {
-+		baudclk = port->uartclk / dev->baud;
++		/* TODO: need to find a way to overwrite 8. Where we get this number? */
++		baudclk = port->uartclk / (dev->baud * 8);
 +		spinal_lib_uart_writel(port, baudclk, SPINAL_LIB_UART_CLOCK_DIVIDER);
++		spinal_lib_uart_writel(port, 7, SPINAL_LIB_UART_FRAME_CONFIG);
 +	}
 +
 +	dev->con->write = spinal_lib_uart_earlycon_write;
++
 +	return 0;
 +}
 +
-+OF_EARLYCON_DECLARE(uart, "spinal-lib,uart-2.0", spinal_lib_uart_earlycon_setup);
++OF_EARLYCON_DECLARE(sluart, "spinal-lib,uart-2.0", spinal_lib_uart_earlycon_setup);
 +
 +#else
 +
@@ -616,8 +721,6 @@ index 000000000000..36fbed9a7fe6
 +	.owner		= THIS_MODULE,
 +	.driver_name	= DRV_NAME,
 +	.dev_name	= "ttySL",
-+//	.major		= SERIAL_SPINAL_LIB_MAJOR,
-+//	.minor		= SERIAL_SPINAL_LIB_MINOR,
 +	.nr		= SERIAL_SPINAL_LIB_UART_MAXPORTS,
 +	.cons		= SPINAL_LIB_UART_CONSOLE,
 +};
@@ -650,9 +753,10 @@ index 000000000000..36fbed9a7fe6
 +		return -ENOMEM;
 +	}
 +
++	spinal_lib_uart_ports[pdev->id] = pp;
 +	pp->dev = &pdev->dev;
 +	pp->break_on_rx = 0;
-+	spinal_lib_uart_ports[pdev->id] = pp;
++
 +	port = &pp->port;
 +
 +	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -662,10 +766,19 @@ index 000000000000..36fbed9a7fe6
 +	else
 +		return -ENODEV;
 +
++	port->membase = devm_ioremap_resource(&pdev->dev, res_mem);
++	if (IS_ERR(port->membase))
++		return PTR_ERR(port->membase);
++
 +	irq = platform_get_irq(pdev, 0);
 +	port->irq = irq;
-+	ret = devm_request_irq(pp->dev, port->irq, spinal_lib_uart_interrupt, 0,
-+                                DRV_NAME, port);
++
++	// disable tx interrupt
++	// FIXME: not sure it's a good idea to set here before register interrupt handler.
++	spinal_lib_uart_disable_tx_interrupt(pp);
++
++	ret = devm_request_irq(pp->dev, port->irq, spinal_lib_uart_interrupt,
++			port->irqflags, DRV_NAME, port);
 +	if (ret) {
 +		port->irq = 0;
 +		pr_err(DRV_NAME ": unable to attach Spinal Lib UART %d "
@@ -678,20 +791,15 @@ index 000000000000..36fbed9a7fe6
 +		dev_info(&pdev->dev, "No peripheral clock\n");
 +		goto exit;
 +	}
-+	hz = clk_get_rate(clk);
 +
++	hz = clk_get_rate(clk);
 +	if(!hz){
 +		dev_info(&pdev->dev, "Bad frequancy\n");
 +		goto exit;
 +	}
 +
 +	port->uartclk = hz;
-+
-+	port->membase = ioremap(port->mapbase, 4096);
-+	if (!port->membase)
-+		return -ENOMEM;
-+
-+	port->fifosize = 128;
++	port->fifosize = SPINAL_LIB_UART_FIFO_DEPTH;
 +	port->regshift = 0;
 +	port->line = pdev->id;
 +	port->type = PORT_SPINAL_LIB;
@@ -703,11 +811,13 @@ index 000000000000..36fbed9a7fe6
 +
 +	platform_set_drvdata(pdev, port);
 +
-+	ret = uart_add_one_port(&spinal_lib_uart_driver,port);
++	ret = uart_add_one_port(&spinal_lib_uart_driver, port);
 +	if (ret) {
 +		spinal_lib_uart_ports[pdev->id]->port.membase = NULL;
 +		return ret;
 +	}
++
++	pr_info("probe success\n");
 +	return 0;
 +
 +exit:
@@ -722,7 +832,6 @@ index 000000000000..36fbed9a7fe6
 +	if (port) {
 +		uart_remove_one_port(&spinal_lib_uart_driver, port);
 +		spinal_lib_uart_ports[pdev->id]->port.membase = NULL;
-+		iounmap(spinal_lib_uart_ports[pdev->id]->port.membase);
 +	}
 +
 +	return 0;
@@ -745,30 +854,6 @@ index 000000000000..36fbed9a7fe6
 +	},
 +};
 +
-+//static int __init spinal_lib_uart_init(void)
-+//{
-+//	int rc;
-+//	printk("*************************************************************\n");
-+//	printk("rawrrrrr 1\n");
-+//	rc = uart_register_driver(&spinal_lib_uart_driver);
-+//	if (rc)
-+//		return rc;
-+//	rc = platform_driver_register(&spinal_lib_uart_platform_driver);
-+//	if (rc)
-+//		uart_unregister_driver(&spinal_lib_uart_driver);
-+//	return rc;
-+//}
-+//
-+//static void __exit spinal_lib_uart_exit(void)
-+//{
-+//	platform_driver_unregister(&spinal_lib_uart_platform_driver);
-+//	uart_unregister_driver(&spinal_lib_uart_driver);
-+//}
-+
-+//module_init(spinal_lib_uart_init);
-+//module_exit(spinal_lib_uart_exit);
-+
-+
 +static int __init spinal_lib_uart_init(void)
 +{
 +	int ret;
@@ -790,7 +875,6 @@ index 000000000000..36fbed9a7fe6
 +
 +static void __exit spinal_lib_uart_exit(void)
 +{
-+	pr_info("Unloading spinal_lib uart driver\n");
 +	platform_driver_unregister(&spinal_lib_uart_platform_driver);
 +	uart_unregister_driver(&spinal_lib_uart_driver);
 +}
@@ -806,7 +890,6 @@ index 000000000000..36fbed9a7fe6
 +MODULE_AUTHOR("Charles Papon <charles.papon.90@gmail.com>");
 +MODULE_LICENSE("GPL");
 +MODULE_ALIAS("platform:" DRV_NAME);
-+//MODULE_ALIAS_CHARDEV_MAJOR(SERIAL_SPINAL_LIB_MAJOR);
 diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
 index 851b982f8c4b..58db9c2c20e2 100644
 --- a/include/uapi/linux/serial_core.h
