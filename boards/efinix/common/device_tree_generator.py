@@ -682,6 +682,10 @@ def dt_create_node(cfg, peripheral):
         if irq:
             node.update({"interrupt": irq})
 
+        clk_freq = dt_get_clock_frequency(cfg)
+        if clk_freq:
+            node.update({"clock_freq": clk_freq})
+
         priv_data = dt_get_private_data(peripheral)
         if priv_data:
             node.update(priv_data)
