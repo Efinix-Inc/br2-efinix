@@ -1,4 +1,4 @@
-From 6dfc304f7e74f6d067946d4d5033d8d5d058a2c3 Mon Sep 17 00:00:00 2001
+From 86d49b163597fced394e5877277643b71b92943e Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Mon, 10 Jan 2022 18:09:49 +0800
 Subject: [PATCH] drivers: add serial spinal driver
@@ -8,9 +8,9 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
  drivers/tty/serial/Kconfig             |  23 +
  drivers/tty/serial/Makefile            |   1 +
- drivers/tty/serial/serial_spinal_lib.c | 747 +++++++++++++++++++++++++
+ drivers/tty/serial/serial_spinal_lib.c | 746 +++++++++++++++++++++++++
  include/uapi/linux/serial_core.h       |   3 +
- 4 files changed, 774 insertions(+)
+ 4 files changed, 773 insertions(+)
  create mode 100644 drivers/tty/serial/serial_spinal_lib.c
 
 diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
@@ -61,10 +61,10 @@ index caf167f0c10a..bf3979e223d2 100644
  obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
 diff --git a/drivers/tty/serial/serial_spinal_lib.c b/drivers/tty/serial/serial_spinal_lib.c
 new file mode 100644
-index 000000000000..d86796fa4f6b
+index 000000000000..99d4340f2959
 --- /dev/null
 +++ b/drivers/tty/serial/serial_spinal_lib.c
-@@ -0,0 +1,747 @@
+@@ -0,0 +1,746 @@
 +#include <linux/kernel.h>
 +#include <linux/init.h>
 +#include <linux/timer.h>
@@ -344,30 +344,28 @@ index 000000000000..d86796fa4f6b
 +
 +static irqreturn_t spinal_lib_uart_interrupt(int irq, void *data)
 +{
-+	struct uart_port *port = data;
-+	struct spinal_lib_uart *pp = container_of(port, struct spinal_lib_uart, port);
-+	unsigned int isr;
-+
-+	isr = spinal_lib_uart_readl(port, SPINAL_LIB_UART_STATUS);
-+
-+	/* Disable Tx/Rx interrupt */
-+	spinal_lib_uart_disable_tx_interrupt(pp);
-+	spinal_lib_uart_disable_rx_interrupt(pp);
++        struct uart_port *port = data;
++        struct spinal_lib_uart *pp = container_of(port, struct spinal_lib_uart, port);
++        unsigned int isr;
 +
 +	spin_lock(&port->lock);
++        isr = spinal_lib_uart_readl(port, SPINAL_LIB_UART_STATUS);
 +
-+	if (isr & SPINAL_LIB_UART_STATUS_RRDY_MSK)
-+		spinal_lib_uart_rx_chars(pp);
++        /* Disable Tx/Rx interrupt */
++        spinal_lib_uart_disable_tx_interrupt(pp);
++        spinal_lib_uart_disable_rx_interrupt(pp);
 +
-+	if (isr & SPINAL_LIB_UART_STATUS_TRDY_MSK)
-+		spinal_lib_uart_tx_chars(pp);
++        if (isr & SPINAL_LIB_UART_STATUS_RRDY_MSK)
++                spinal_lib_uart_rx_chars(pp);
 +
++        if (isr & SPINAL_LIB_UART_STATUS_TRDY_MSK)
++                spinal_lib_uart_tx_chars(pp);
++
++        /* Enable Rx interrupt */
++        spinal_lib_uart_enable_rx_interrupt(pp);
 +	spin_unlock(&port->lock);
 +
-+	/* Enable Rx interrupt */
-+	spinal_lib_uart_enable_rx_interrupt(pp);
-+
-+	return IRQ_RETVAL(isr);
++        return IRQ_RETVAL(isr);
 +}
 +
 +static void spinal_lib_uart_timer(struct timer_list *t)
@@ -532,6 +530,7 @@ index 000000000000..d86796fa4f6b
 +
 +	spinal_lib_uart_enable_tx_interrupt(pp);
 +	uart_console_write(&pp->port, s, count, spinal_lib_uart_console_putc);
++	spinal_lib_uart_disable_tx_interrupt(pp);
 +
 +	if (locked)
 +		spin_unlock(&pp->port.lock);
