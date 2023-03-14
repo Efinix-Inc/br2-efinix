@@ -1,0 +1,36 @@
+From da401e89453266c11277b42e007159a2b6ef82d3 Mon Sep 17 00:00:00 2001
+From: Kefeng Wang <wangkefeng.wang@huawei.com>
+Date: Mon, 11 Jan 2021 20:40:13 +0800
+Subject: [PATCH] riscv: Improve __show_regs
+
+Show the function symbols of epc and ra to improve the
+readability of crash reports, and align the printing
+formats about the raw epc value.
+
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+Signed-off-by: Palmer Dabbelt <palmerdabbelt@google.com>
+---
+ arch/riscv/kernel/process.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/arch/riscv/kernel/process.c b/arch/riscv/kernel/process.c
+index ced48d9f4254..19f4688f2f36 100644
+--- a/arch/riscv/kernel/process.c
++++ b/arch/riscv/kernel/process.c
+@@ -44,7 +44,12 @@ void __show_regs(struct pt_regs *regs)
+ {
+ 	show_regs_print_info(KERN_DEFAULT);
+ 
+-	pr_cont("epc: " REG_FMT " ra : " REG_FMT " sp : " REG_FMT "\n",
++	if (!user_mode(regs)) {
++		pr_cont("epc : %pS\n", (void *)regs->epc);
++		pr_cont(" ra : %pS\n", (void *)regs->ra);
++	}
++
++	pr_cont("epc : " REG_FMT " ra : " REG_FMT " sp : " REG_FMT "\n",
+ 		regs->epc, regs->ra, regs->sp);
+ 	pr_cont(" gp : " REG_FMT " tp : " REG_FMT " t0 : " REG_FMT "\n",
+ 		regs->gp, regs->tp, regs->t0);
+-- 
+2.17.1
+
