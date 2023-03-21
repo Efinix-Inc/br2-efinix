@@ -7,8 +7,13 @@
 #define PERIPHERAL_FREQ 50000000
 
 / {
+    aliases {
+        serial0 = &uartA;
+    };
+
     chosen {
-        bootargs = "rootwait console=hvc0  earlycon=sbi root=/dev/mmcblk0p2 init=/sbin/init mmc_core.use_spi_crc=0";
+	stdout-path = "serial0:115200n8";
+        bootargs = "rootwait console=ttySL0 earlycon root=/dev/mmcblk0p2 init=/sbin/init mmc_core.use_spi_crc=0";
     };
 
     cpus {
