@@ -265,6 +265,14 @@ def get_cache_size(cfg, core, cache_type):
     return size
 
 
+def get_cache_block(cfg, core):
+    # SYSTEM_CORES_0_BYTES_PER_LINE
+    system_core = "SYSTEM_CORES_{}_BYTES_PER_LINE".format(core)
+    block = get_property_value(cfg, system_core, "BYTES_PER_LINE")
+
+    return block
+
+
 def get_cpu_isa(cfg, core):
     isa = "rv32im"
     system_core = "SYSTEM_CORES_{}".format(core)
@@ -299,6 +307,7 @@ def get_cpu_metadata(cfg, idx=0):
     icache_size = get_cache_size(cfg, idx, ICACHE)
     dcache_way = get_cache_way(cfg, idx, DCACHE)
     dcache_size = get_cache_size(cfg, idx, DCACHE)
+    cache_block = get_cache_block(cfg, idx)
 
     node = {
         "name": "cpu",
@@ -315,10 +324,10 @@ def get_cpu_metadata(cfg, idx=0):
         node.update({
             "icache_way": "i-cache-sets = <{}>;".format(icache_way),
             "icache_size": "i-cache-size = <{}>;".format(icache_size),
-            "icache_block_size": "i-cache-block-size = <32>;",
+            "icache_block_size": "i-cache-block-size = <{}>;".format(cache_block),
             "dcache_way": "d-cache-sets = <{}>;".format(dcache_way),
             "dcache_size": "d-cache-size = <{}>;".format(dcache_size),
-            "dcache_block_size": "d-cache-block-size = <32>;",
+            "dcache_block_size": "d-cache-block-size = <{}>;".format(cache_block),
         })
 
     system_core = "SYSTEM_CORES_{}".format(idx)
