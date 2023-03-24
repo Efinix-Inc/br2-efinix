@@ -245,6 +245,12 @@ fi
 
 mv buildroot $BUILDROOT_DIR
 
+# apply out of tree patches for buildroot
+cd $BUILDROOT_DIR && \
+git apply $BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version && \
+git am $BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version/*patch && \
+cd -
+
 # copy soc.h to opensbi directory. Opensbi has dependency on soc.h.
 cp $SOC_H $OPENSBI_DIR/soc.h
 SOC_H=$OPENSBI_DIR/soc.h
