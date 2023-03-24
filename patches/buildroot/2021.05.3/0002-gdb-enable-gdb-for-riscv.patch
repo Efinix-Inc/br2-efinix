@@ -1,0 +1,47 @@
+From 68bd3ded2cd7c64098eae672b46c348171884e89 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Thu, 2 Mar 2023 10:30:38 +0800
+Subject: [PATCH] gdb: enable gdb for riscv
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ package/gdb/Config.in      | 3 ---
+ package/gdb/Config.in.host | 1 -
+ 2 files changed, 4 deletions(-)
+
+diff --git a/package/gdb/Config.in b/package/gdb/Config.in
+index 262740fc4c..246748131e 100644
+--- a/package/gdb/Config.in
++++ b/package/gdb/Config.in
+@@ -19,8 +19,6 @@ config BR2_PACKAGE_GDB
+ 	depends on BR2_PACKAGE_GDB_ARCH_SUPPORTS
+ 	depends on BR2_TOOLCHAIN_GCC_AT_LEAST_4_8
+ 	depends on BR2_INSTALL_LIBSTDCPP
+-	# no gdbserver on riscv
+-	select BR2_PACKAGE_GDB_DEBUGGER if BR2_riscv
+ 	# When the external toolchain gdbserver is copied to the
+ 	# target, we don't allow building a separate gdbserver. The
+ 	# one from the external toolchain should be used.
+@@ -47,7 +45,6 @@ if BR2_PACKAGE_GDB
+ config BR2_PACKAGE_GDB_SERVER
+ 	bool "gdbserver"
+ 	depends on !BR2_TOOLCHAIN_EXTERNAL_GDB_SERVER_COPY
+-	depends on !BR2_riscv
+ 	help
+ 	  Build the gdbserver stub to run on the target.
+ 	  A full gdb is needed to debug the progam.
+diff --git a/package/gdb/Config.in.host b/package/gdb/Config.in.host
+index 0f0933aed8..2e0cdee266 100644
+--- a/package/gdb/Config.in.host
++++ b/package/gdb/Config.in.host
+@@ -4,7 +4,6 @@ config BR2_PACKAGE_HOST_GDB_ARCH_SUPPORTS
+ 	depends on !((BR2_arm || BR2_armeb) && BR2_BINFMT_FLAT)
+ 	depends on !BR2_microblaze
+ 	depends on !BR2_or1k
+-	depends on !BR2_riscv
+ 	depends on !BR2_nds32
+ 
+ comment "Host GDB Options"
+-- 
+2.17.1
+
