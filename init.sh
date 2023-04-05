@@ -247,7 +247,6 @@ mv buildroot $BUILDROOT_DIR
 
 # apply out of tree patches for buildroot
 cd $BUILDROOT_DIR && \
-git apply $BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version && \
 git am $BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version/*patch && \
 cd -
 
