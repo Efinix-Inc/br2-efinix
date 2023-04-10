@@ -12,7 +12,7 @@ In this tutorial, we are going to modify the bootloader program so that it can b
 
 ### Install Efinity RISC-V Embedded Software IDE
 
-Make sure to install [Efinity RISC-V Embedded Software IDE](https://www.efinixinc.com/support/ip/riscv-sdk.php) on your development machine. The RISC-V IDE provide RISC-V toolchain, debugger and Eclipse. Refer to [RISC-V SoC Hardware and Software User Guide](https://www.efinixinc.com/docs/riscv-sapphire-ug-v5.0.pdf) to install the IDE.
+Make sure to install [Efinity RISC-V Embedded Software IDE](https://www.efinixinc.com/support/ip/riscv-sdk.php) on your development machine. The RISC-V IDE provide RISC-V toolchain, debugger and Eclipse. Refer to [RISC-V SoC Hardware and Software User Guide](https://www.efinixinc.com/support/docsdl.php?s=ef&pn=SAPPHIREUG) to install the IDE.
 
 ## Firmware Address
 

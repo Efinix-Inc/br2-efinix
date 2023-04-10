@@ -6,7 +6,7 @@ These steps also applicable for Ti60F225 with different pinout assignment for SP
 
 ## Install Efinity Software
 
-Follow the official [document](https://www.efinixinc.com/docs/efinity-installation-v2.6.pdf) for installing Efinity software.
+Follow the official [document](https://www.efinixinc.com/support/docsdl.php?s=ef&pn=UG-EFN-INSTALL) for installing Efinity software.
 
 ## Generate Custom Sapphire SoC Configuration
 

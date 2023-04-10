@@ -24,7 +24,7 @@ The table below shows the addresses of firmware to be flash into the SPI flash.
 
 Follow these steps to flash OpenSBI and U-boot.
 
-1. Download the Efinix Efinix and install it. Follow the official [documentation](https://www.efinixinc.com/docs/efinity-installation-v2.8.pdf) on installation process.
+1. Download the Efinix Efinix and install it. Follow the official [documentation](https://www.efinixinc.com/support/docsdl.php?s=ef&pn=UG-EFN-INSTALL) on installation process.
 
 2. Open the Efinity program.
    
