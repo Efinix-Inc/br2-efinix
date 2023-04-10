@@ -194,7 +194,7 @@ You might want to write you own driver or custom application but do no know how 
 ## Documentation
 
 1. [Buildroot documentation](https://buildroot.org/docs.html).  
-2. [RISCV Sapphire SoC datasheet](https://www.efinixinc.com/docs/riscv-sapphire-ds-v2.0.pdf)  
+2. [RISCV Sapphire SoC datasheet](https://www.efinixinc.com/support/docsdl.php?s=ef&pn=SAPPHIREDS)  
 3. [Others documentation](https://github.com/Efinix-Inc/br2-efinix/tree/main/docs)
 
 ## Supported Board
