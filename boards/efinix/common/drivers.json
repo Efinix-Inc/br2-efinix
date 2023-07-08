@@ -43,7 +43,11 @@
 		]
 	},
 	"i2c": {
-		"compatible": ["i2c-gpio"]
+		"compatible": ["efinix,efx-i2c"],
+		"private_data": [
+			"clock-frequency = <100000>;",
+			"clocks = <&apbA_clock 0>;"
+		]
 	},
 	"dma": {
 		"compatible": ["spinal,lib-dmasg"]

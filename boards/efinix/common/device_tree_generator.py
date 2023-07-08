@@ -693,7 +693,8 @@ def dt_create_node(cfg, peripheral):
 
         clk_freq = dt_get_clock_frequency(cfg)
         if clk_freq:
-            node.update({"clock_freq": clk_freq})
+            if not 'I2C' in peripheral:
+                node.update({"clock_freq": clk_freq})
 
         priv_data = dt_get_private_data(peripheral)
         if priv_data:
