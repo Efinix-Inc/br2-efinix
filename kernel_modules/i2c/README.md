@@ -18,24 +18,34 @@ Efinix Sapphire I2C Bus driver support the following features
 
 The I2C bus driver has compatible string of `efinix,efx-i2c`.
 
-This is an example of generated device tree file in `boards/efinix/common/dts/sapphire.dtsi`. The `clock-frequency` property is set to `100000`Hz which is the speed of I2C in standard mode. User can change the I2C speed mode by set it to `400000` Hz or `1000000` Hz respectively.
+This is an example of generated device tree file in `boards/efinix/common/dts/sapphire.dtsi`. 
+
+- `clock-frequency` 
+  
+  - Frequency of bus clock in Hz. For example, `100000` is the speed of I2C in standard mode. User can change the I2C speed mode by set it to `400000` Hz or `1000000` Hz respectively.
+
+Optional Property
+
+- efx,i2c-sampling-clock-divider
+  
+  - Controls the rate at which the I2C controller samples SCL and SDA. By default, it set to 3. FCLK is io_systemClk or io_peripheralClk.
+    
+    ```
+    sampling rate = FCLK / (sampling clock divider + 1)
+    ```
+
+Example of device tree binding
 
 ```
-
-```
-
 i2cA: i2c@17000 {
-    reg = <0x17000 0x100>;
-    compatible = "efinix,efx-i2c";
-    interrupts = <8>;
-    interrupt-parent = <&plic>;
-    clocks = <&apbA_clock 0>;
-    clock-frequency = <100000>;
-    status = "disabled";
+ reg = <0x17000 0x100>;
+ compatible = "efinix,efx-i2c";
+ interrupts = <8>;
+ interrupt-parent = <&plic>;
+ clocks = <&apbA_clock 0>;
+ clock-frequency = <100000>;
+ status = "disabled";
 };
-
-```
-
 ```
 
 Example of i2c slave binding for the on Bosch BMP280 temperature, pressure and humidity sensor. Copy the i2c slave binding to `boards/efinix/t120f324/linux/linux.dts`for testing the driver.
