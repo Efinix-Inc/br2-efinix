@@ -4,11 +4,17 @@ The default configuration of Sapphire SoC on IP Manager would not able to boot L
 
 These steps also applicable for Ti60F225 with different pinout assignment for SPI 1. Please refer to table below on pinout assignment for Ti60F225.
 
+## Prerequsite
+
+- Efinity Software
+
+- Efinity RISCV IDE
+
 ## Install Efinity Software
 
 Follow the official [document](https://www.efinixinc.com/support/docsdl.php?s=ef&pn=UG-EFN-INSTALL) for installing Efinity software.
 
-## Generate Custom Sapphire SoC Configuration
+## Part 1a: Generate Custom Sapphire SoC Configuration
 
 1. Open Efinity software.
 
@@ -39,6 +45,8 @@ Follow the official [document](https://www.efinixinc.com/support/docsdl.php?s=ef
    - enable `Linux Memory Management Unit` (compulsory)
    
    - enable `Floating-point unit` (optional)
+   
+   - enable `Compressed Extension` (optional)
 
 6. Under `Cache/Memory` tab,
    
@@ -54,19 +62,21 @@ Follow the official [document](https://www.efinixinc.com/support/docsdl.php?s=ef
      | Ti60F225  | 32 MB                        |
      | Ti180M484 | 256 MB                       |
 
-7. Under `SPI` tab, enable SPI 1 for the SD card.
+7. Under `Debug` tab,
+   
+   - enable `RISC-V standard debug`
+   
+   - set `Hardware Breakpoint` to 2
 
-8. Click `Generate` to generate the soc.
+8. Under `SPI` tab, enable SPI 1 for the SD card.
 
-9. Click `Ok` after the soc successfully generated.
+9. Click `Generate` to generate the soc.
+
+10. Click `Ok` after the soc successfully generated.
 
 > `Note:` Peripheral Clock Frequency should be set within the supported frequency of the connected peripheral.
 
-## Modify Bootloader
-
-You are require to modify the bootloader when generating a custom SoC. See [Modify fpga bootloader](modify_fpga_bootloader.md) document.
-
-## Assign Pinout for SPI 1
+## Part 1b: Assign Pinout for SPI 1
 
 Table below shows the best known configuration for assigning the pinout for SPI 1. The SPI 1 is used for SD card. Please note that `system_uart_0_io_*` also need to reassign for `T120F324`. You can use other pinout by referring to the devkit user guide and schematics at [Efinix support page](https://www.efinixinc.com/support/docs.php).
 
@@ -150,7 +160,7 @@ Table below shows the best known configuration for assigning the pinout for SPI 
 
 5. Click `Generate Efinity Constrain Files` icon.
 
-## Modify Top Level Verilog Code
+## Part 1c: Modify Top Level Verilog Code
 
 1. Open the `top_soc.v` file at Project tab on the left panel of Efinity software. The file locate in `soc -> Design -> top_soc.v`.
 
@@ -196,32 +206,12 @@ Table below shows the best known configuration for assigning the pinout for SPI 
    )
    ```
 
-## Modify Project Bitstream Generation
+## Part 2: Modify Bootloader
 
-This section only applicable for **Ti180M484** development board. You can skip this section if using other development board.
+You are require to modify the bootloader when generating a custom SoC. See [Modify fpga bootloader](modify_fpga_bootloader.md) document.
 
-1. Click `File` -> `Edit Project ...` -> `Bitstream Generation`.
+## Part 3: Compile the Efinity Project
 
-2. At `Bitstream Generation` tab,
-   
-   - `JTAG USERCODE` set to `Active`
-   
-   - `SPI Programming Clock Divider` set to `DIV8`
-   
-   - `Clock Sampling Edge` set to `Falling`
-   
-   - Disable `Use 4-Byte addressing during configuraton`
-   
-   - Set `Enable Initialized Memory In User RAMs`  to `smart`
-   
-   - Enable `Enable Bitstream Compression`
-
-3. Then, click `OK`.
-   
-   <img src="img/bitstream_generation.jpg" title="" alt="alt text" width="346">
-
-## Compile the Efinity Project
-
-1. Compile the Efinity project by clicking the `Synthesis` button. 
+1. Compile the Efinity project by clicking the `Synthesis` button. After compilation complete, check the output file in `outflow/soc.hex`. `soc.hex` file will be used to program the devkit togather with `fw_jump.bin` and `u-boot.bin`.
    
    > If the timing is not meet then use optimization setting `TIMING_2` or `TIMING_3`. Change it at `FILE -> Edit Project -> Place and Route -> Optimization Level -> TIMING_3`.
