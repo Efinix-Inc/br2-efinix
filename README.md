@@ -56,12 +56,12 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 
 ### Efinity software version version
 
-- [Efinity](https://www.efinixinc.com/support/efinity.php) 2022.2 and above
+- [Efinity](https://www.efinixinc.com/support/efinity.php) 2023.1 and above
 - Follow the official [documentation](https://www.efinixinc.com/docs/efinity-installation-v2.6.pdf) on installation process.
 
 ### Efinity RISC-V Embedded Software IDE
 
-- [v2022.2.322](https://www.efinixinc.com/support/efinity.php) and above
+- [v2023.1](https://www.efinixinc.com/support/efinity.php) and above
 
 - Follow the official [documentation](https://www.efinixinc.com/docs/efinity-riscv-ide-2022.2.3.readme.txt) on installation process
 
@@ -101,15 +101,15 @@ Preconfigure Efinity project with Linux also provided in the repository for quic
 
 - T120F324
   
-  - `boards/efinix/t120f324/hardware/1-core/soc1.zip`
+  - `boards/efinix/t120f324/hardware/singlecore/soc1.zip`
   
-  - `boards/efinix/t120f324/hardware/4-cores/soc4.zip`
+  - `boards/efinix/t120f324/hardware/multicores/soc4.zip`
 
 - Ti60F225
   
-  - `boards/efinix/ti60f225/hardware/1-core/soc1.zip`
+  - `boards/efinix/ti60f225/hardware/singlecore/soc1.zip`
   
-  - `boards/efinix/ti60f225/hardware/2-cores/soc2.zip`
+  - `boards/efinix/ti60f225/hardware/multicores/soc2.zip`
 
 - Ti180M484
   
@@ -125,7 +125,7 @@ Follow the [generate Efinix Sapphire RISC-V SoC](docs/generate_sapphire_soc_for_
 
 ## Software: Build OpenSBI, U-Boot and Linux
 
-Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 development kit. These steps will build Linux based on Buildroot 2021.05.3
+Please note that you need to generate the SoC first before proceed with this section. Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 development kit. These steps will build Linux based on Buildroot 2021.05.3.
 
 1. Clone this repository.
    
@@ -136,7 +136,7 @@ Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 develop
 
 2. Run `init.sh` script. `init.sh` require 2 arguments. First argument is board name such as `t120f324`. Second argument is `/path/to/soc.h`. You can get the `soc.h` from `Efinity` project directory. For example, `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h`.
    
-   Please note that `$EFINITY_PROJECT` is path to your Efinity project.
+   Please note that `$EFINITY_PROJECT` is path to your Efinity project. For example, `EFINITY_PROJECT=/home/user/efinity/project/soc`.
    
    ```bash
    source init.sh t120f324 $EFINITY_PROJECT/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h
