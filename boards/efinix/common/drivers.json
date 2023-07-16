@@ -4,7 +4,7 @@
     "devkits": [
 	"T120F324",
 	"Ti60F225",
-	"Ti180M484"
+	"Ti180J484"
     ],
     "memory_mapped": {
         "uImage": "0x00400000",

@@ -70,9 +70,9 @@ The Titanium Ti60 F225 Development Board has a USB-to-UART converter connected t
    
    - J8, J9, J10, J11 set to 1.8V (connect pin 1 and 2)
 
-## Setup Ti180M484
+## Setup Ti180J484
 
-1. Connect a USB cable type C to Ti180M484 development board and to your computer.
+1. Connect a USB cable type C to Ti180J484 development board and to your computer.
 
 2. Insert micro SD card into the SD card slot.
 

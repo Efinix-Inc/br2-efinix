@@ -111,11 +111,11 @@ Preconfigure Efinity project with Linux also provided in the repository for quic
   
   - `boards/efinix/ti60f225/hardware/multicores/soc2.zip`
 
-- Ti180M484
+- Ti180J484
   
-  - `boards/efinix/ti180m484/hardware/1-core/soc1.zip`
+  - `boards/efinix/ti180j484/hardware/1-core/soc1.zip`
   
-  - `boards/efinix/ti180m484/hardware/4-cores/soc4.zip`
+  - `boards/efinix/ti180j484/hardware/4-cores/soc4.zip`
 
 The compiled bitstream file also provided for quick start in `soc.zip` format. This file stored in the Efinity project file for each supported development board. By using these files, user are not require to load and compile the Efinity project. User just need to unzip the file before use.
 
@@ -203,7 +203,7 @@ Currently supported board as follows
 
 1. Trion T120F324  
 2. Titanium Ti60F225  
-3. Titanium Ti180M484
+3. Titanium Ti180J484
 
 ## License
 
