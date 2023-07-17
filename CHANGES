@@ -1,3 +1,19 @@
+br2-efinix 2021.05.7,
+
+	Update Sapphire SoC example design for supported board with Efinity 2023.1
+	Rename the board ti180m484 -> ti180j484
+	Add Efinix i2c device driver as kernel module
+	Patches: allow Buildroot to build GDB for RISCV
+	Device_tree_generator.py: get cache block size
+	Patch: backport show symbol function for when kernel crash
+	Add device tree clock-frequency property for peripheral
+	Patches: Linux: Enable Ftrace support for RV32I
+	Use Spinal Lib UART driver as primary UART
+	Earlycon and bootconsole now use Spinal Lib UART driver
+
+	Issues resolved
+	#10 Serial UART driver does not support multiple UART devices
+
 br2-efinix 2021.05.6,
 
 	Add soc example design with 1 and 4 cores for Ti180M484
