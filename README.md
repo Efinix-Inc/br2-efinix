@@ -113,11 +113,11 @@ Preconfigure Efinity project with Linux also provided in the repository for quic
 
 - Ti180J484
   
-  - `boards/efinix/ti180j484/hardware/1-core/soc1.zip`
+  - `boards/efinix/ti180j484/hardware/singlecore/soc1.zip`
   
-  - `boards/efinix/ti180j484/hardware/4-cores/soc4.zip`
+  - `boards/efinix/ti180j484/hardware/multicores/soc4.zip`
 
-The compiled bitstream file also provided for quick start in `soc.zip` format. This file stored in the Efinity project file for each supported development board. By using these files, user are not require to load and compile the Efinity project. User just need to unzip the file before use.
+The compiled bitstream file also provided for quick start in `soc.hex` format. This file stored in the Efinity project file for each supported development board. By using these files, user are not require to load and compile the Efinity project.
 
 ### 2. Generate yourself
 
@@ -189,7 +189,9 @@ Please note that you need to generate the SoC first before proceed with this sec
 
 ## What's Next?
 
-You might want to write you own driver or custom application but do no know how to integrate it with Buildroot. See [kernel module and package](docs/kernel_module_and_packages.md) tutorial.
+1. You might want to write you own driver or custom application but do no know how to integrate it with Buildroot. See [kernel module and package](docs/kernel_module_and_packages.md) tutorial.
+
+2. [Debugging Linux Kernel](docs/debugging_linux_kernel.md)
 
 ## Documentation
 
