@@ -1,0 +1,33 @@
+From 81ad4c7c37e5b40bdb3717a65d26f927c5acadac Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Sat, 13 May 2023 09:26:24 +0800
+Subject: [PATCH] ethernet: enable phy LED when link up
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/net/ethernet/efinix/efinix_tse.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/drivers/net/ethernet/efinix/efinix_tse.c b/drivers/net/ethernet/efinix/efinix_tse.c
+index 77a67a06a08e..2bec7a21ed58 100644
+--- a/drivers/net/ethernet/efinix/efinix_tse.c
++++ b/drivers/net/ethernet/efinix/efinix_tse.c
+@@ -816,6 +816,15 @@ static void tsemac_mac_link_up(struct phylink_config *config,
+ 		break;
+ 	}
+ 
++	/* Enable PHY LED */
++	phy_write(phy, 0x1f, 0x0a43);
++	phy_write(phy, 0x1b, 0x8011);
++	phy_write(phy, 0x1c, 0xd73f);
++
++	phy_write(phy, 0x1f, 0xd04);
++	phy_write(phy, 0x10, 0xe251);
++	phy_write(phy, 0x1f, 0x0a42);
++
+ 	//TODO: handle tx_pause
+ 	if (rx_pause)
+ 		cmd_cfg &= ~ETHERNET_CMD_PAUSE_IGNORE;
+-- 
+2.17.1
+
