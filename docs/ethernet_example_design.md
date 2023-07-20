@@ -33,7 +33,7 @@ Ethernet example design for Ti60F225
 Br2-efinix provide different configurtion for the ethernet. User need to provide `-e` argument when run `init.sh` script.
 
 ```bash
-source init.sh ti60 /path/to/soc.h/ -e
+source init.sh ti60 boards/efinix/ti60f225/hardware/ethernet/soc.h -e
 make -j$(nproc)
 ```
 
