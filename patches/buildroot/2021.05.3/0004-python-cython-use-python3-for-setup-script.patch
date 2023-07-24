@@ -1,0 +1,43 @@
+From 7e70b19494a07289b8d804f56fc377396c608057 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Tue, 16 May 2023 21:49:43 +0800
+Subject: [PATCH] python-cython: use python3 for setup script
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ .../0001-setup.py-use-python3.patch           | 23 +++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 package/python-cython/0001-setup.py-use-python3.patch
+
+diff --git a/package/python-cython/0001-setup.py-use-python3.patch b/package/python-cython/0001-setup.py-use-python3.patch
+new file mode 100644
+index 0000000000..fe3f7f1931
+--- /dev/null
++++ b/package/python-cython/0001-setup.py-use-python3.patch
+@@ -0,0 +1,23 @@
++From 44135c3d9807c6545da4ee1df6a81264cb2e76f8 Mon Sep 17 00:00:00 2001
++From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
++Date: Tue, 16 May 2023 21:46:23 +0800
++Subject: [PATCH] setup.py: use python3
++
++Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
++---
++ setup.py | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/setup.py b/setup.py
++index cdc3d92..9f50508 100755
++--- a/setup.py
+++++ b/setup.py
++@@ -1,4 +1,4 @@
++-#!/usr/bin/env python
+++#!/usr/bin/env python3
++ try:
++     from setuptools import setup, Extension
++ except ImportError:
++-- 
++2.17.1
++
+-- 
+2.17.1
+

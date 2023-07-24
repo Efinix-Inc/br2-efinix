@@ -1,0 +1,92 @@
+From dc6d829565860acb52ebd8877c2a8a75d15381e2 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Tue, 16 May 2023 18:48:28 +0800
+Subject: [PATCH] python-numpy: enable support for riscv32
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ ...1-numpy-core-Define-RISCV-32-support.patch | 59 +++++++++++++++++++
+ package/python-numpy/Config.in                |  1 +
+ 2 files changed, 60 insertions(+)
+ create mode 100644 package/python-numpy/0001-numpy-core-Define-RISCV-32-support.patch
+
+diff --git a/package/python-numpy/0001-numpy-core-Define-RISCV-32-support.patch b/package/python-numpy/0001-numpy-core-Define-RISCV-32-support.patch
+new file mode 100644
+index 0000000000..25b76d8209
+--- /dev/null
++++ b/package/python-numpy/0001-numpy-core-Define-RISCV-32-support.patch
+@@ -0,0 +1,59 @@
++From 8c47453e7d8a36371bd50b871492e4299e69ab4a Mon Sep 17 00:00:00 2001
++From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
++Date: Thu, 24 Feb 2022 12:50:40 +0800
++Subject: [PATCH] numpy/core: Define RISCV-32 support
++
++Helps compile on riscv32
++
++Upstream-Status: Submitted [https://github.com/numpy/numpy/pull/17780]
++Signed-off-by: Khem Raj <raj.khem@gmail.com>
++Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
++---
++ numpy/core/include/numpy/npy_cpu.h    | 9 +++++++--
++ numpy/core/include/numpy/npy_endian.h | 3 ++-
++ 2 files changed, 9 insertions(+), 3 deletions(-)
++
++diff --git a/numpy/core/include/numpy/npy_cpu.h b/numpy/core/include/numpy/npy_cpu.h
++index 5edd8f42e..685f30906 100644
++--- a/numpy/core/include/numpy/npy_cpu.h
+++++ b/numpy/core/include/numpy/npy_cpu.h
++@@ -18,6 +18,7 @@
++  *              NPY_CPU_ARCEL
++  *              NPY_CPU_ARCEB
++  *              NPY_CPU_RISCV64
+++ *              NPY_CPU_RISCV32
++  */
++ #ifndef _NPY_CPUARCH_H_
++ #define _NPY_CPUARCH_H_
++@@ -100,8 +101,12 @@
++     #define NPY_CPU_ARCEL
++ #elif defined(__arc__) && defined(__BIG_ENDIAN__)
++     #define NPY_CPU_ARCEB
++-#elif defined(__riscv) && defined(__riscv_xlen) && __riscv_xlen == 64
++-    #define NPY_CPU_RISCV64
+++#elif defined(__riscv)
+++    #if __riscv_xlen == 64
+++       #define NPY_CPU_RISCV64
+++    #elif __riscv_xlen == 32
+++       #define NPY_CPU_RISCV32
+++    #endif
++ #else
++     #error Unknown CPU, please report this to numpy maintainers with \
++     information about your platform (OS, CPU and compiler)
++diff --git a/numpy/core/include/numpy/npy_endian.h b/numpy/core/include/numpy/npy_endian.h
++index 44cdffd14..c93e7cbaf 100644
++--- a/numpy/core/include/numpy/npy_endian.h
+++++ b/numpy/core/include/numpy/npy_endian.h
++@@ -48,7 +48,8 @@
++             || defined(NPY_CPU_MIPSEL)        \
++             || defined(NPY_CPU_PPC64LE)       \
++             || defined(NPY_CPU_ARCEL)         \
++-            || defined(NPY_CPU_RISCV64)
+++            || defined(NPY_CPU_RISCV64)       \
+++	    || defined(NPY_CPU_RISCV32)
++         #define NPY_BYTE_ORDER NPY_LITTLE_ENDIAN
++     #elif defined(NPY_CPU_PPC)                \
++             || defined(NPY_CPU_SPARC)         \
++-- 
++2.17.1
++
+diff --git a/package/python-numpy/Config.in b/package/python-numpy/Config.in
+index 23dcbc7986..622c133e3d 100644
+--- a/package/python-numpy/Config.in
++++ b/package/python-numpy/Config.in
+@@ -12,6 +12,7 @@ config BR2_PACKAGE_PYTHON_NUMPY_ARCH_SUPPORTS
+ 	default y if BR2_powerpc64
+ 	default y if BR2_sh
+ 	default y if BR2_x86_64
++	default y if BR2_riscv
+ 
+ config BR2_PACKAGE_PYTHON_NUMPY
+ 	bool "python-numpy"
+-- 
+2.17.1
+
