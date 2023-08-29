@@ -1,4 +1,4 @@
-From 484869de942cfd408b6278e4c5db9d78b0dd591d Mon Sep 17 00:00:00 2001
+From 36eb37d80ee4d13f36526ac635c0e7bf76fca834 Mon Sep 17 00:00:00 2001
 From: Kenny Cheung <kenny.cheung@elitestek.com>
 Date: Thu, 30 Mar 2023 14:28:01 +0800
 Subject: [PATCH] drivers: add efinix tsemac driver
@@ -10,11 +10,11 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
  drivers/net/ethernet/Makefile                 |    1 +
  drivers/net/ethernet/efinix/Kconfig           |   18 +
  drivers/net/ethernet/efinix/Makefile          |    3 +
- drivers/net/ethernet/efinix/efinix_tse.c      | 1330 +++++++++++++++++
- drivers/net/ethernet/efinix/efinix_tse.h      |  449 ++++++
- drivers/net/ethernet/efinix/efinix_tse_dma.c  |  234 +++
+ drivers/net/ethernet/efinix/efinix_tse.c      | 1353 +++++++++++++++++
+ drivers/net/ethernet/efinix/efinix_tse.h      |  452 ++++++
+ drivers/net/ethernet/efinix/efinix_tse_dma.c  |  244 +++
  drivers/net/ethernet/efinix/efinix_tse_mdio.c |  195 +++
- 8 files changed, 2231 insertions(+)
+ 9 files changed, 2267 insertions(+)
  create mode 100644 drivers/net/ethernet/efinix/Kconfig
  create mode 100644 drivers/net/ethernet/efinix/Makefile
  create mode 100644 drivers/net/ethernet/efinix/efinix_tse.c
@@ -77,10 +77,10 @@ index 000000000000..51062131b736
 +obj-$(CONFIG_EFINIX_TSEMAC) += efinix_tsemac.o
 diff --git a/drivers/net/ethernet/efinix/efinix_tse.c b/drivers/net/ethernet/efinix/efinix_tse.c
 new file mode 100644
-index 000000000000..77a67a06a08e
+index 000000000000..a72b729ff792
 --- /dev/null
 +++ b/drivers/net/ethernet/efinix/efinix_tse.c
-@@ -0,0 +1,1330 @@
+@@ -0,0 +1,1353 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Ethernet driver for the Efinix Triple Speed Ethernet device
@@ -114,6 +114,7 @@ index 000000000000..77a67a06a08e
 +#include <linux/spinlock.h>
 +#include <linux/interrupt.h>
 +#include <linux/phylink.h>
++#include <linux/ip.h>
 +#include "efinix_tse.h"
 +
 +#define DRIVER_NAME			"efx_tsemac"
@@ -137,7 +138,6 @@ index 000000000000..77a67a06a08e
 +static int tsemac_device_reset(struct net_device *ndev);
 +static void tsemac_dma_err_handler(struct work_struct *work);
 +static int tsemac_probe(struct platform_device *pdev);
-+
 +
 +static void tsemac_set_mac_address(struct net_device *ndev, const void *address)
 +{
@@ -203,6 +203,7 @@ index 000000000000..77a67a06a08e
 +		data_cache_invalidate_address(&(cur_p->control));
 +		status = cur_p->status;
 +		completed = (status & DMASG_DESCRIPTOR_STATUS_COMPLETED) && (cur_p->control != 0);
++
 +		if (!completed)
 +			return bd;
 +		
@@ -233,10 +234,12 @@ index 000000000000..77a67a06a08e
 +	u32 ii;
 +	u32 num_frag;
 +	skb_frag_t *frag;
-+	dma_addr_t tail_p, phys;
++	dma_addr_t phys;
 +	u32 orig_tail_ptr, new_tail_ptr;
 +	struct efx_tsemac_local *lp = netdev_priv(ndev);
 +	struct dmasg_descriptor *cur_p;
++	u32 cur_head;
++	u32 head;
 +
 +	orig_tail_ptr = lp->tx_bd_tail;
 +	new_tail_ptr = orig_tail_ptr;
@@ -252,6 +255,7 @@ index 000000000000..77a67a06a08e
 +		netif_stop_queue(ndev);
 +		if (net_ratelimit())
 +			netdev_warn(ndev, "TX ring unexpectedly full\n");
++
 +		return NETDEV_TX_BUSY;
 +	}
 +
@@ -281,8 +285,10 @@ index 000000000000..77a67a06a08e
 +			return NETDEV_TX_OK;
 +		}
 +		desc_set_tx_phys_addr(lp, phys, cur_p);
-+		cur_p->control = (skb_frag_size(frag) - 1) & DMASG_DESCRIPTOR_CONTROL_BYTES;
++		cur_p->control = (skb_frag_size(frag) - 1)
++			& DMASG_DESCRIPTOR_CONTROL_BYTES;
 +		cur_p->status = 0;
++
 +	}
 +	phys = dma_map_single(lp->dev, skb->data,
 +			      skb_headlen(skb), DMA_TO_DEVICE);
@@ -296,16 +302,20 @@ index 000000000000..77a67a06a08e
 +	}
 +	desc_set_tx_phys_addr(lp, phys, &lp->tx_bd_v[orig_tail_ptr]);
 +	cur_p->skb = skb;
++
++	spin_lock(&lp->lock);
 +	if (orig_tail_ptr != new_tail_ptr) {
 +	    cur_p->control |= DMASG_DESCRIPTOR_CONTROL_END_OF_PACKET;
 +		// TODO: assignment to control & status need to be atomic
-+		lp->tx_bd_v[orig_tail_ptr].control = (skb_headlen(skb) - 1) & DMASG_DESCRIPTOR_CONTROL_BYTES;
++		lp->tx_bd_v[orig_tail_ptr].control = (skb_headlen(skb) - 1)
++			& DMASG_DESCRIPTOR_CONTROL_BYTES;
 +		lp->tx_bd_v[orig_tail_ptr].status = 0;
 +	} else {
 +		// TODO: assignment to control & status need to be atomic
 +		lp->tx_bd_v[orig_tail_ptr].control = DMASG_DESCRIPTOR_CONTROL_END_OF_PACKET | ((skb_headlen(skb) - 1) & DMASG_DESCRIPTOR_CONTROL_BYTES);
 +		lp->tx_bd_v[orig_tail_ptr].status = 0;
 +	}
++	spin_unlock(&lp->lock);
 +
 +	if (++new_tail_ptr >= lp->tx_bd_num)
 +		new_tail_ptr = 0;
@@ -313,11 +323,15 @@ index 000000000000..77a67a06a08e
 +	lp->tx_bd_v[new_tail_ptr].status = DMASG_DESCRIPTOR_STATUS_COMPLETED;
 +	dma_wmb();
 +
-+	/* Start the transfer */
++	head = tsemac_check_tx_bd_head(lp, lp->tx_bd_ci, orig_tail_ptr);
++        cur_head = lower_32_bits(lp->tx_bd_p + sizeof(*lp->tx_bd_v) * head);
++
++	// Start the transfer
 +	if (!(tsemac_dma_in32(lp, DMA_CH_STATUS, DMASG_TX_BASE) & DMA_CH_STATUS_BUSY)) {
-+		u32 head = tsemac_check_tx_bd_head(lp, lp->tx_bd_ci, orig_tail_ptr);
-+		tsemac_dma_out32(lp, DMA_CH_LINKED_LIST_HEAD, DMASG_TX_BASE, lower_32_bits(lp->tx_bd_p + sizeof(*lp->tx_bd_v) * head));
-+		tsemac_dma_out32(lp, DMA_CH_STATUS, DMASG_TX_BASE, DMA_CH_STATUS_LINKED_LIST_START);
++		tsemac_dma_out32(lp, DMA_CH_LINKED_LIST_HEAD, DMASG_TX_BASE, cur_head);
++		tsemac_dma_out32(lp, DMA_CH_STATUS, DMASG_TX_BASE,
++				DMA_CH_STATUS_LINKED_LIST_START);
++
 +	}
 +
 +	/* Stop queue if next transmit may not have space */
@@ -347,9 +361,6 @@ index 000000000000..77a67a06a08e
 +	if (!(status & DMASG_IRQ_ALL_MASK))
 +		return IRQ_NONE;
 +
-+	/* Disable further TX completion interrupts and schedule
-+		* NAPI to handle the completions.
-+		*/
 +	cr = lp->tx_dma_cr;
 +	cr &= ~(DMASG_IRQ_ALL_MASK);
 +	tsemac_dma_out32(lp, DMA_CH_INTERRUPT_ENABLE, DMASG_TX_BASE, cr);
@@ -429,7 +440,10 @@ index 000000000000..77a67a06a08e
 +		goto err_rx_irq;
 +	tsemac_out32(lp, ETHERNET_CTRL_DMA_RX_RESET, 0);
 +	tsemac_set_32bit(lp, TSEMAC_COMMAND_CONFIG, 
-+		ETHERNET_CMD_TX_ENA | ETHERNET_CMD_RX_ENA | ETHERNET_CMD_CRC_FWD);
++		ETHERNET_CMD_TX_ENA | ETHERNET_CMD_RX_ENA);
++
++	if (lp->csum_offload_on_rx_path == TSEMAC_NO_CSUM_OFFLOAD)
++		tsemac_set_32bit(lp, TSEMAC_COMMAND_CONFIG, ETHERNET_CMD_CRC_FWD);
 +
 +	return 0;
 +
@@ -566,12 +580,7 @@ index 000000000000..77a67a06a08e
 +	int packets;
 +
 +	packets = tsemac_free_tx_chain(lp, lp->tx_bd_ci, budget, false, &size, budget);
-+
 +	if (packets) {
-+		lp->tx_bd_ci += packets;
-+		if (lp->tx_bd_ci >= lp->tx_bd_num)
-+			lp->tx_bd_ci %= lp->tx_bd_num;
-+
 +		ndev->stats.tx_packets += packets;
 +		ndev->stats.tx_bytes += size;
 +		err = tsemac_in32(lp, TSEMAC_IF_OUT_ERRORS);
@@ -586,9 +595,10 @@ index 000000000000..77a67a06a08e
 +			netif_wake_queue(ndev);
 +	}
 +
-+	if (packets < budget && napi_complete_done(napi, packets)) {
-+		tsemac_dma_out32(lp, DMA_CH_INTERRUPT_ENABLE, DMASG_TX_BASE, lp->tx_dma_cr);
-+	}
++	if (packets < budget && napi_complete_done(napi, packets))
++		tsemac_dma_out32(lp, DMA_CH_INTERRUPT_ENABLE, DMASG_TX_BASE,
++				lp->tx_dma_cr);
++
 +	return packets;
 +}
 +
@@ -597,14 +607,12 @@ index 000000000000..77a67a06a08e
 +	u32 length;
 +	u32 size = 0;
 +	int packets = 0;
-+	dma_addr_t tail_p = 0;
 +	struct dmasg_descriptor *cur_p;
 +	struct sk_buff *skb, *new_skb;
 +	struct efx_tsemac_local *lp = container_of(napi, struct efx_tsemac_local, napi_rx);
-+	unsigned long val;
 +	u32 err;
-+	data_cache_invalidate_all();
 +
++	data_cache_invalidate_all();
 +	cur_p = &lp->rx_bd_v[lp->rx_bd_ci];
 +
 +	while (packets < budget && (cur_p->status & DMASG_DESCRIPTOR_STATUS_COMPLETED)) {
@@ -636,6 +644,7 @@ index 000000000000..77a67a06a08e
 +			skb->ip_summed = CHECKSUM_NONE;
 +
 +			//TODO: return when invalid features are used
++			/*
 +			if (lp->features & TSEMAC_FEATURE_FULL_RX_CSUM) {
 +				netdev_err(lp->ndev, "unexpected FULL_RX_CSUM flag");
 +			} else if ((lp->features & TSEMAC_FEATURE_PARTIAL_RX_CSUM) != 0 &&
@@ -643,6 +652,7 @@ index 000000000000..77a67a06a08e
 +				   skb->len > 64) {
 +				netdev_err(lp->ndev, "unexpected PARTIAL_RX_CSUM flag");
 +			}
++			*/
 +
 +			napi_gro_receive(napi, skb);
 +
@@ -679,13 +689,14 @@ index 000000000000..77a67a06a08e
 +	lp->ndev->stats.rx_bytes += size;
 +	err = tsemac_in32(lp, TSEMAC_IF_IN_ERRORS);
 +	if (err > lp->prev_rx_err) {
-+		int err_kind;
++		/*int err_kind;
 +		err_kind = tsemac_in32(lp, TSEMAC_IF_IN_ERRORS);
 +		netdev_err(lp->ndev, "RX error occurred, having %d error\n", err_kind);
 +		err_kind = tsemac_in32(lp, TSEMAC_CRC_ERRORS);
 +		netdev_err(lp->ndev, "RX error occurred, having %d CRC error\n", err_kind);
 +		err_kind = tsemac_in32(lp, TSEMAC_ETHER_STATS_UNDER_SIZE_PKTS);
 +		netdev_err(lp->ndev, "RX error occurred, having %d undersize error\n", err_kind);
++		*/
 +		lp->ndev->stats.rx_errors += err - lp->prev_rx_err;
 +	}
 +	lp->prev_rx_err = err;
@@ -828,7 +839,7 @@ index 000000000000..77a67a06a08e
 +{
 +	struct net_device *ndev = to_net_dev(config->dev);
 +	struct efx_tsemac_local *lp = netdev_priv(ndev);
-+	u32 cmd_cfg, fcc_reg;
++	u32 cmd_cfg;
 +
 +	state->interface = lp->phy_mode;
 +
@@ -898,6 +909,15 @@ index 000000000000..77a67a06a08e
 +			"Speed other than 10, 100 or 1Gbps is not supported\n");
 +		break;
 +	}
++
++	/* Enable PHY LED */
++	phy_write(phy, 0x1f, 0x0a43);
++	phy_write(phy, 0x1b, 0x8011);
++	phy_write(phy, 0x1c, 0xd73f);
++
++	phy_write(phy, 0x1f, 0xd04);
++	phy_write(phy, 0x10, 0xe251);
++	phy_write(phy, 0x1f, 0x0a42);
 +
 +	//TODO: handle tx_pause
 +	if (rx_pause)
@@ -969,6 +989,7 @@ index 000000000000..77a67a06a08e
 +	struct efx_tsemac_local *lp = container_of(work, struct efx_tsemac_local,
 +						dma_err_task);
 +	struct net_device *ndev = lp->ndev;
++
 +	data_cache_invalidate_all();
 +
 +	napi_disable(&lp->napi_tx);
@@ -1188,6 +1209,7 @@ index 000000000000..77a67a06a08e
 +	lp->rx_bd_num = RX_BD_NUM_DEFAULT;
 +	lp->tx_bd_num = TX_BD_NUM_DEFAULT;
 +
++	spin_lock_init(&lp->lock);
 +	netif_napi_add(ndev, &lp->napi_rx, tsemac_rx_poll, NAPI_POLL_WEIGHT);
 +	netif_napi_add(ndev, &lp->napi_tx, tsemac_tx_poll, NAPI_POLL_WEIGHT);
 +
@@ -1389,6 +1411,7 @@ index 000000000000..77a67a06a08e
 +		dev_err(lp->dev, "register_netdev() error (%i)\n", ret);
 +		goto cleanup_phylink;
 +	}
++
 +	return 0;
 +
 +cleanup_phylink:
@@ -1413,10 +1436,10 @@ index 000000000000..77a67a06a08e
 +MODULE_LICENSE("GPL v2");
 diff --git a/drivers/net/ethernet/efinix/efinix_tse.h b/drivers/net/ethernet/efinix/efinix_tse.h
 new file mode 100644
-index 000000000000..a3122720c704
+index 000000000000..f27bd8266719
 --- /dev/null
 +++ b/drivers/net/ethernet/efinix/efinix_tse.h
-@@ -0,0 +1,449 @@
+@@ -0,0 +1,452 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (c) 2023 Efinix, Inc. All rights reserved.
@@ -1430,7 +1453,7 @@ index 000000000000..a3122720c704
 +#include <linux/interrupt.h>
 +#include <linux/if_vlan.h>
 +#include <linux/phylink.h>
-+
++#include <linux/completion.h>
 +
 +#define ETHERNET_HDR_SIZE				14 	/* Size of Ethernet header */
 +#define ETHERNET_TRL_SIZE			 	4 	/* Size of Ethernet trailer (FCS) */
@@ -1773,6 +1796,8 @@ index 000000000000..a3122720c704
 +	/*	statistics	*/
 +	u64 prev_tx_err;
 +	u64 prev_rx_err;
++
++	spinlock_t lock;
 +};
 +
 +static inline void tsemac_lock_mii(struct efx_tsemac_local *lp)
@@ -1865,13 +1890,14 @@ index 000000000000..a3122720c704
 +void tsemac_mdio_teardown(struct efx_tsemac_local *lp);
 +
 +int tsemac_mdio_setup(struct efx_tsemac_local *lp);
++
 +#endif
 diff --git a/drivers/net/ethernet/efinix/efinix_tse_dma.c b/drivers/net/ethernet/efinix/efinix_tse_dma.c
 new file mode 100644
-index 000000000000..bd1c45d9d40c
+index 000000000000..bf4fd7293d68
 --- /dev/null
 +++ b/drivers/net/ethernet/efinix/efinix_tse_dma.c
-@@ -0,0 +1,234 @@
+@@ -0,0 +1,244 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * DMA driver for the Efinix Triple Speed Ethernet device
@@ -1906,13 +1932,20 @@ index 000000000000..bd1c45d9d40c
 +	dma_addr_t phys;
 +	int i;
 +	u32 completed;
++	u32 num;
 +
 +	for (i = 0; i < nr_bds; i++) {
-+		cur_p = &lp->tx_bd_v[(first_bd + i) % lp->tx_bd_num];
++		num = (first_bd + i) % lp->tx_bd_num;
++		cur_p = &lp->tx_bd_v[num];
++
++		spin_lock(&lp->lock);
 +		data_cache_invalidate_address(&(cur_p->status));
 +		data_cache_invalidate_address(&(cur_p->control));
 +		status = cur_p->status;
-+		completed = (status & DMASG_DESCRIPTOR_STATUS_COMPLETED) && (cur_p->control != 0);
++
++		completed = (status & DMASG_DESCRIPTOR_STATUS_COMPLETED)
++				&& (cur_p->control != 0);
++		spin_unlock(&lp->lock);
 +
 +		/* If force is not specified, clean up only descriptors
 +		 * that have been completed by the MAC.
@@ -1933,12 +1966,15 @@ index 000000000000..bd1c45d9d40c
 +
 +		if (sizep)
 +			*sizep += (cur_p->control & DMASG_DESCRIPTOR_CONTROL_BYTES) + 1;
-+			
 +		cur_p->skb = NULL;
 +		/* ensure our transmit path and device don't prematurely see status cleared */
 +		wmb();
 +		cur_p->control = 0;
 +		cur_p->status = DMASG_DESCRIPTOR_STATUS_COMPLETED;
++
++		 lp->tx_bd_ci += 1;
++		 if (lp->tx_bd_ci >= lp->tx_bd_num)
++			 lp->tx_bd_ci %= lp->tx_bd_num;
 +
 +	}
 +
