@@ -1,5 +1,15 @@
 # Ethernet Example Design
 
+### Supported Board
+
+- Ti180J484
+
+- Ti60F225
+
+Ethernet example design for Ti180J484
+
+- `boards/efinix/ti180j484/hardware/ethernet/ti180-tsemac-linux.zip`
+
 Ethernet example design for Ti60F225
 
 - `boards/efinix/ti60f225/hardware/ethernet/ti60-tsemac-linux.zip`
@@ -10,6 +20,7 @@ Ethernet example design for Ti60F225
 
 - Development kits
   
+  - Ti180J484
   - Ti60F225
 
 - [Ethernet daughter card](https://www.efinixinc.com/support/docsdl.php?s=ef&pn=ETHERNET-DC-UG)
@@ -19,6 +30,14 @@ Ethernet example design for Ti60F225
 - MicroSD card
 
 **Steps**
+
+**Ti180M484**
+
+1. Connect the FMC-to-QSE adapter card to Ti180J484 devkit
+
+2. Connect the Ethernet daughter to J1 header of the FMC-to-QSE adapter card
+
+**Ti60F225**
 
 1. Conenct the Ethernet daughter card to P1 header of the Ti60 development board.
 2. Set J8, J9, J10, J11 headers to 1.8V.
@@ -56,5 +75,3 @@ make -j$(nproc)
    ```
    
    > If you are using Windows and ping is not responding, try to disable the firewall and ping again.
-
-
