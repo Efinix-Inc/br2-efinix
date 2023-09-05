@@ -1,4 +1,4 @@
-From 36eb37d80ee4d13f36526ac635c0e7bf76fca834 Mon Sep 17 00:00:00 2001
+From 8a9da0c01583e11f45809d98f9b6aebc1d4d3e88 Mon Sep 17 00:00:00 2001
 From: Kenny Cheung <kenny.cheung@elitestek.com>
 Date: Thu, 30 Mar 2023 14:28:01 +0800
 Subject: [PATCH] drivers: add efinix tsemac driver
@@ -10,11 +10,11 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
  drivers/net/ethernet/Makefile                 |    1 +
  drivers/net/ethernet/efinix/Kconfig           |   18 +
  drivers/net/ethernet/efinix/Makefile          |    3 +
- drivers/net/ethernet/efinix/efinix_tse.c      | 1353 +++++++++++++++++
+ drivers/net/ethernet/efinix/efinix_tse.c      | 1348 +++++++++++++++++
  drivers/net/ethernet/efinix/efinix_tse.h      |  452 ++++++
  drivers/net/ethernet/efinix/efinix_tse_dma.c  |  244 +++
  drivers/net/ethernet/efinix/efinix_tse_mdio.c |  195 +++
- 9 files changed, 2267 insertions(+)
+ 8 files changed, 2262 insertions(+)
  create mode 100644 drivers/net/ethernet/efinix/Kconfig
  create mode 100644 drivers/net/ethernet/efinix/Makefile
  create mode 100644 drivers/net/ethernet/efinix/efinix_tse.c
@@ -77,10 +77,10 @@ index 000000000000..51062131b736
 +obj-$(CONFIG_EFINIX_TSEMAC) += efinix_tsemac.o
 diff --git a/drivers/net/ethernet/efinix/efinix_tse.c b/drivers/net/ethernet/efinix/efinix_tse.c
 new file mode 100644
-index 000000000000..a72b729ff792
+index 000000000000..566455b662c2
 --- /dev/null
 +++ b/drivers/net/ethernet/efinix/efinix_tse.c
-@@ -0,0 +1,1353 @@
+@@ -0,0 +1,1348 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Ethernet driver for the Efinix Triple Speed Ethernet device
@@ -440,10 +440,7 @@ index 000000000000..a72b729ff792
 +		goto err_rx_irq;
 +	tsemac_out32(lp, ETHERNET_CTRL_DMA_RX_RESET, 0);
 +	tsemac_set_32bit(lp, TSEMAC_COMMAND_CONFIG, 
-+		ETHERNET_CMD_TX_ENA | ETHERNET_CMD_RX_ENA);
-+
-+	if (lp->csum_offload_on_rx_path == TSEMAC_NO_CSUM_OFFLOAD)
-+		tsemac_set_32bit(lp, TSEMAC_COMMAND_CONFIG, ETHERNET_CMD_CRC_FWD);
++		ETHERNET_CMD_TX_ENA | ETHERNET_CMD_RX_ENA | ETHERNET_CMD_CRC_FWD);
 +
 +	return 0;
 +
@@ -644,7 +641,6 @@ index 000000000000..a72b729ff792
 +			skb->ip_summed = CHECKSUM_NONE;
 +
 +			//TODO: return when invalid features are used
-+			/*
 +			if (lp->features & TSEMAC_FEATURE_FULL_RX_CSUM) {
 +				netdev_err(lp->ndev, "unexpected FULL_RX_CSUM flag");
 +			} else if ((lp->features & TSEMAC_FEATURE_PARTIAL_RX_CSUM) != 0 &&
@@ -652,7 +648,6 @@ index 000000000000..a72b729ff792
 +				   skb->len > 64) {
 +				netdev_err(lp->ndev, "unexpected PARTIAL_RX_CSUM flag");
 +			}
-+			*/
 +
 +			napi_gro_receive(napi, skb);
 +
