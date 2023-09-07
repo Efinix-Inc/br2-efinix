@@ -1,5 +1,9 @@
 # Ethernet Example Design
 
+### Prerequsite
+
+Efinity 2023.1 with patch 3 or later
+
 ### Supported Board
 
 - Ti180J484
@@ -51,12 +55,25 @@ Ethernet example design for Ti60F225
 
 Br2-efinix provide different configurtion for the ethernet. User need to provide `-e` argument when run `init.sh` script.
 
-```bash
-source init.sh ti60 boards/efinix/ti60f225/hardware/ethernet/soc.h -e
-make -j$(nproc)
-```
+For example to build Linux kernel with ethernet support for the following board
 
-### Configure the IP Address for the devkit
+- **Ti60F225**
+  
+  ```bash
+  source init.sh ti60 boards/efinix/ti60f225/hardware/ethernet/soc.h -e
+  make -j$(nproc)
+  ```
+
+- **Ti180J484**
+  
+  ```bash
+  source init.sh ti180 boards/efinix/ti180j484/hardware/ethernet/soc.h -e
+  make -j$(nproc)
+  ```
+
+### Assigning IP Address for the Devkit
+
+If the devkit connected to existing local network, DHCP server would assign the IP address for the devkit. Below are the steps to assign the static IP address.
 
 1. Boot up the devkit with Linux
 
@@ -74,4 +91,4 @@ make -j$(nproc)
    ping 192.168.5.3
    ```
    
-   > If you are using Windows and ping is not responding, try to disable the firewall and ping again.
+   > If you are using Windows and ping is not responding, try to disable the firewall then retry.
