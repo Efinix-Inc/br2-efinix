@@ -53,7 +53,6 @@ fi
 source $EFINITY_HOME/setup.sh
 
 DEVKIT=$(echo $DEVKIT | tr '[:upper:]' '[:lower:]')
-DEVKIT_L=$DEVKIT
 
 found=false
 for devkit in ${DEVKITS[@]}; do
@@ -99,14 +98,6 @@ SMP=$(cat $SOC_H | grep SYSTEM_PLIC_SYSTEM_CORES_1_EXTERNAL_INTERRUPT)
 if [[ ! -z $SMP ]]; then
     # enable SMP flag
     sed -i 's/^#CFLAGS+=-DSMP/CFLAGS+=-DSMP/g' $EfxSapphireSoc_DIR/include/soc.mk
-fi
-
-# Ti180 require 3 bytes addressing mode for SPI flash
-if [[ $DEVKIT_L =~ "ti180" ]]; then
-	cat $EfxSapphireSoc_DIR/include/soc.mk | grep DEFAULT_ADDRESS_BYTE >> /dev/null
-	if [[ ! $? -eq 0 ]]; then
-		echo CFLAGS += -DDEFAULT_ADDRESS_BYTE >> $EfxSapphireSoc_DIR/include/soc.mk
-	fi
 fi
 
 # compile bootloader program
