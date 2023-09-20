@@ -7,6 +7,7 @@ OPTIND=1
 unset RECONFIGURE
 unset RECONFIGURE_ALL
 unset OPT_DIR
+unset ETHERNET
 
 BOARD=$1
 SOC_H=$2
@@ -24,6 +25,10 @@ PROJ_DIR=$PWD
 BR2_EXTERNAL_DIR=$PROJ_DIR
 BUILDROOT_DEFCONFIG=""
 
+EFINIX_DIR="$BR2_EXTERNAL_DIR/boards/efinix"
+COMMON_DIR="$EFINIX_DIR/common"
+DT_DIR="$COMMON_DIR/sapphire-soc-dt-generator"
+
 function usage()
 {
 	echo "Usage: $0 [board <t120f324|ti60f225>] [path/to/soc.h <string> ] [-d build directory <string>] [-r reconfigure]"
@@ -39,6 +44,7 @@ function usage()
 	echo "				Example, if board is ti60f225 then name of build directory is ti60f225_build"
 	echo "	-r			Reconfigure the Buildroot configuration"
 	echo "	-a			Reconfigure the Buildroot configuration and regenerate Linux device tree"
+	echo "	-e                      Generate Linux configuration with ethernet support"
 
 	echo "Example usage,"
 	echo "$0 t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
@@ -68,7 +74,7 @@ function sanity_check()
 
 	if [[ $found == false ]]; then
 		echo Error: board $BOARD is not supported
-		return
+		return 1
 	fi
 
 	# check for SPI1. SPI1 is used by the SD card to store Linux image
@@ -106,7 +112,14 @@ function modify_soc_h()
 function generate_device_tree()
 {
 	# generate device tree
-	python3 boards/efinix/common/device_tree_generator.py $SOC_H $BOARD
+	if [ $ETHERNET ]; then
+		python3 $DT_DIR/device_tree_generator.py -s $DT_DIR/config/linux_slaves.json -c $DT_DIR/config/ethernet.json $SOC_H $BOARD linux
+	else
+		python3 $DT_DIR/device_tree_generator.py -s $DT_DIR/config/linux_slaves.json $SOC_H $BOARD linux
+	fi
+
+	mv $DT_DIR/dts/sapphire.dtsi $COMMON_DIR/dts/sapphire.dtsi
+	mv $DT_DIR/dts/linux.dts $EFINIX_DIR/$BOARD/linux/linux.dts
 }
 
 function prepare_buildroot_env()
@@ -152,7 +165,7 @@ do
 	shift
 done
 
-while getopts ":d:rah" o; do
+while getopts ":d:raeh" o; do
 	case "${o}" in
 		:)
                         echo "ERROR: Option -$OPTARG requires an argument"
@@ -166,6 +179,9 @@ while getopts ":d:rah" o; do
 			;;
 		r)
 			RECONFIGURE=1
+			;;
+		e)
+			ETHERNET=1
 			;;
 		h)
 			usage
@@ -191,6 +207,9 @@ fi
 
 sanity_check
 
+if [[ $? -gt 0 ]]; then
+       return
+fi
 WORKSPACE="build_$BOARD"
 
 if [[ ! -z $OPT_DIR ]]; then
