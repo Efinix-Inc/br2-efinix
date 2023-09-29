@@ -28,6 +28,7 @@ BUILDROOT_DEFCONFIG=""
 EFINIX_DIR="$BR2_EXTERNAL_DIR/boards/efinix"
 COMMON_DIR="$EFINIX_DIR/common"
 DT_DIR="$COMMON_DIR/sapphire-soc-dt-generator"
+DT_REPO="https://github.com/Efinix-Inc/sapphire-soc-dt-generator.git"
 
 function usage()
 {
@@ -272,6 +273,11 @@ cd -
 # copy soc.h to opensbi directory. Opensbi has dependency on soc.h.
 cp $SOC_H $OPENSBI_DIR/soc.h
 SOC_H=$OPENSBI_DIR/soc.h
+
+# clone sapphire-soc-dt-generator repository
+if [ ! -d $DT_DIR ]; then
+	git clone $DT_REPO $DT_DIR
+fi
 
 check_smp
 modify_soc_h
