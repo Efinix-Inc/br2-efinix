@@ -56,7 +56,7 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 
 ### Efinity software version version
 
-- [Efinity](https://www.efinixinc.com/support/efinity.php) 2023.1 and above
+- [Efinity](https://www.efinixinc.com/support/efinity.php) 2023.1 with patch 4 and above
 - Follow the official [documentation](https://www.efinixinc.com/docs/efinity-installation-v2.6.pdf) on installation process.
 
 ### Efinity RISC-V Embedded Software IDE
@@ -192,6 +192,8 @@ Please note that you need to generate the SoC first before proceed with this sec
 1. You might want to write you own driver or custom application but do no know how to integrate it with Buildroot. See [kernel module and package](docs/kernel_module_and_packages.md) tutorial.
 
 2. [Debugging Linux Kernel](docs/debugging_linux_kernel.md)
+
+3. [Linux ethernet support](docs/ethernet_example_design.md)
 
 ## Documentation
 
