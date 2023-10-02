@@ -1,0 +1,5 @@
+config BR2_PACKAGE_SOCKET_HELLO_WORLD
+	bool "socket hello world"
+	default n
+	help
+	  A simple client/server application of socket programming.
