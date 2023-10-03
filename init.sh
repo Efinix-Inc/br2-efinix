@@ -123,13 +123,20 @@ function generate_device_tree()
 {
 	# generate device tree
 	if [ $ETHERNET ]; then
-		python3 $DT_DIR/device_tree_generator.py -s $DT_DIR/config/linux_slaves.json -c $DT_DIR/config/ethernet.json $SOC_H $BOARD linux
+		python3 $DT_DIR/device_tree_generator.py \
+			-s $DT_DIR/config/linux_slaves.json \
+			-c $DT_DIR/config/linux_spi.json \
+			-c $DT_DIR/config/ethernet.json \
+			$SOC_H $BOARD linux
 	else
-		python3 $DT_DIR/device_tree_generator.py -s $DT_DIR/config/linux_slaves.json $SOC_H $BOARD linux
+		python3 $DT_DIR/device_tree_generator.py \
+			-s $DT_DIR/config/linux_slaves.json \
+			-c $DT_DIR/config/linux_spi.json \
+			$SOC_H $BOARD linux
 	fi
 
-	mv $DT_DIR/dts/sapphire.dtsi $COMMON_DIR/dts/sapphire.dtsi
-	mv $DT_DIR/dts/linux.dts $EFINIX_DIR/$BOARD/linux/linux.dts
+	cp $DT_DIR/dts/sapphire.dtsi $COMMON_DIR/dts/sapphire.dtsi
+	cp $DT_DIR/dts/linux.dts $EFINIX_DIR/$BOARD/linux/linux.dts
 }
 
 function prepare_buildroot_env()
