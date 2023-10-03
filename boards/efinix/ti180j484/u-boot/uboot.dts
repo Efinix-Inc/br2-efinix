@@ -8,9 +8,9 @@
 	model = "spinal,vexriscv_saxon";
 
 	aliases {
-                serial0 = &uartA;
-                spi0 = &spiA;
-                spi1 = &spiB;
+                serial0 = &uart0;
+                spi0 = &spi0;
+                spi1 = &spi1;
         };
 
 	chosen {
@@ -24,13 +24,13 @@
 	};
 };
 
-&uartA {
+&uart0 {
 	status = "okay";
 	device_type = "serial";
 	compatible = "riscv_sbi,uart";
 };
 
-&spiA {
+&spi0 {
 	status = "okay";
 	compatible = "vexriscv,spi";
 	flash: flash@0 {
@@ -42,7 +42,7 @@
         };
 };
 
-&spiB {
+&spi1 {
 	status = "okay";
 	compatible = "vexriscv,spi";
 	mmc0: mmc@0 {
