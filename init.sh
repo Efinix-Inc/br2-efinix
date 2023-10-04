@@ -16,8 +16,7 @@ INPUT_FILE="VERSION"
 JSON_FILE="boards/efinix/common/drivers.json"
 devkits=$(jq '.devkits | .[]' $JSON_FILE)
 
-arr=()
-substr="buildroot"
+substr=""
 buildroot_version=''
 BUILDROOT_REPO="https://github.com/buildroot/buildroot.git"
 
@@ -173,6 +172,20 @@ function check_smp()
 	fi
 }
 
+function get_version()
+{
+	# Read the VERSION file to get version
+
+	local arr=()
+	while IFS= read -r line; do
+		if [[ $line == *$substr* ]]; then
+			IFS=' ' read -r -a arr <<< "$line"
+		fi
+	done < $INPUT_FILE
+
+	version=${arr[1]}
+}
+
 while [ $# -gt 0 ]
 do
 	case $1 in
@@ -260,15 +273,9 @@ fi
 
 mkdir -p $WORKSPACE_DIR
 
-# Read the VERSION file to get buildroot version
-while IFS= read -r line; do
-	if [[ $line == *$substr* ]];
-	then
-		IFS=' ' read -r -a arr <<< "$line"
-	fi
-done < $INPUT_FILE
-
-buildroot_version=${arr[1]}
+substr="buildroot"
+get_version $substr
+buildroot_version=$version
 
 # clone buildroot repository
 if [[ ! -z $buildroot_version ]]; then
@@ -292,7 +299,15 @@ SOC_H=$OPENSBI_DIR/soc.h
 
 # clone sapphire-soc-dt-generator repository
 if [ ! -d $DT_DIR ]; then
-	git clone $DT_REPO $DT_DIR
+	substr="sapphire-soc-dt-generator"
+	get_version $substr
+	dt_version=$version
+
+	if [ ! -z $dt_version ]; then
+		git clone $DT_REPO -b $dt_version $DT_DIR
+	else
+		git clone $DT_REPO $DT_DIR
+	fi
 fi
 
 check_smp
