@@ -5,3 +5,4 @@ u-boot 2021.04
 opensbi 0.9
 Linux kernel 5.10
 gcc 8.4
+sapphire-soc-dt-generator v1.0
