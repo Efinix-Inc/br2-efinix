@@ -1,3 +1,18 @@
+br2-efinix 2021.05.8,
+
+	Add step to enable RISCV compresssed extension
+	Add example socket programming application
+	Device tree generator split to standalone project
+	Update Sapphire SoC example design for all supported board
+	with Efinity 2023.1 patch 4
+	Add Linux ethernet driver and ethernet example design for Ti180J484 and Ti60F225
+	Remove 3 bytes addressing mode for Ti180 SPI
+	Add spi flash loader for Ti180J484
+	patch: enable support for compiling python-numpy for riscv32
+
+	Issues resolved
+	NA
+
 br2-efinix 2021.05.7,
 
 	Update Sapphire SoC example design for supported board with Efinity 2023.1
