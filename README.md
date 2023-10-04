@@ -130,7 +130,7 @@ Please note that you need to generate the SoC first before proceed with this sec
 1. Clone this repository.
    
    ```bash
-   git clone https://github.com/Efinix-Inc/br2-efinix -b 2021.05.7
+   git clone https://github.com/Efinix-Inc/br2-efinix -b 2021.05.8
    cd br2-efinix
    ```
 
