@@ -199,7 +199,8 @@ Please note that you need to generate the SoC first before proceed with this sec
 
 1. [Buildroot documentation](https://buildroot.org/docs.html).  
 2. [RISCV Sapphire SoC datasheet](https://www.efinixinc.com/support/docsdl.php?s=ef&pn=SAPPHIREDS)  
-3. [Others documentation](https://github.com/Efinix-Inc/br2-efinix/tree/main/docs)
+3. [Sapphire SoC Device Tree Generator](https://github.com/Efinix-Inc/sapphire-soc-dt-generator)
+4. [Others documentation](https://github.com/Efinix-Inc/br2-efinix/tree/main/docs)
 
 ## Supported Board
 
