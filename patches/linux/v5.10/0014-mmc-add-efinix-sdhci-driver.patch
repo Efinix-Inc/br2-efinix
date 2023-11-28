@@ -1,0 +1,381 @@
+From 4477318c5838faec1f5bc193d672561d2c58c539 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Tue, 10 Oct 2023 14:56:37 +0800
+Subject: [PATCH 1/2] mmc: add efinix sdhci driver
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/mmc/host/Kconfig     |   8 +
+ drivers/mmc/host/Makefile    |   3 +-
+ drivers/mmc/host/sdhci-efx.c | 327 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 337 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/mmc/host/sdhci-efx.c
+
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 31481c9fcc2e..c81d5977e3ba 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -1099,5 +1099,13 @@ config MMC_OWL
+ 	  This selects support for the SD/MMC Host Controller on
+ 	  Actions Semi Owl SoCs.
+ 
++config MMC_SDHCI_EFX
++	tristate "EFX SDHCI Controller support"
++	depends on MMC_SDHCI_PLTFM && OF
++	select MMC_SDHCI_IO_ACCESSORS
++	help
++	  This selects the support for SD host controller on
++	  Efinix SoCs.
++
+ config MMC_SDHCI_EXTERNAL_DMA
+ 	bool
+diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+index 451c25fc2c69..5da2ebc89eec 100644
+--- a/drivers/mmc/host/Makefile
++++ b/drivers/mmc/host/Makefile
+@@ -105,7 +105,8 @@ obj-$(CONFIG_MMC_SDHCI_OMAP)		+= sdhci-omap.o
+ obj-$(CONFIG_MMC_SDHCI_SPRD)		+= sdhci-sprd.o
+ obj-$(CONFIG_MMC_CQHCI)			+= cqhci.o
+ obj-$(CONFIG_MMC_HSQ)			+= mmc_hsq.o
+-
++obj-$(CONFIG_MMC_SDHCI_EFX)		+= sdhci-efx.o
++CFLAGS_sdhci.o += -DDEBUG
+ ifeq ($(CONFIG_CB710_DEBUG),y)
+ 	CFLAGS-cb710-mmc	+= -DDEBUG
+ endif
+diff --git a/drivers/mmc/host/sdhci-efx.c b/drivers/mmc/host/sdhci-efx.c
+new file mode 100644
+index 000000000000..7f751bade83a
+--- /dev/null
++++ b/drivers/mmc/host/sdhci-efx.c
+@@ -0,0 +1,327 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Support for SDHIC on Efinix Inc SoC
++ *
++ * Copyright (C) 2023 Efinix Inc
++ */
++
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/mmc/host.h>
++#include <linux/platform_device.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/io.h>
++
++#include <linux/swiotlb.h>
++#include <linux/dma-mapping.h>
++#include <linux/mmc/mmc.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/card.h>
++#include <linux/delay.h>
++#include "sdhci-pltfm.h"
++
++/* Efinix SD Host controller register offset */
++#define EFX_SDHCI_VERSION		0x0
++#define EFX_SDHCI_BASE_REG_0		0x4
++#define EFX_SDHCI_STATUS_REG_0		0x8
++#define EFX_SDHCI_REG_OFFSET		0x100
++
++/* Base register 0 */
++#define EFX_CLK_EN			BIT(16)
++
++#undef pr_fmt
++#define pr_fmt(fmt) "%s: " fmt, __func__
++
++struct efx_sdhci_priv {
++	struct platform_device *pdev;
++};
++
++static u32 efx_readl(struct sdhci_host *host, int reg)
++{
++	u32 val;
++	u32 offset = reg + EFX_SDHCI_REG_OFFSET;
++	struct mmc_command *data_cmd = host->data_cmd;
++
++	val = readl(host->ioaddr + offset);
++
++	/* We need to do byte swap on the output of ACMD51 */
++	if (data_cmd && (reg == SDHCI_BUFFER) && data_cmd->opcode == 51) {
++		val = be32_to_cpu(val);
++	}
++
++	//pr_info("[0x%x] = 0x%x\n", reg, val);
++	return val;
++}
++
++static u16 efx_readw(struct sdhci_host *host, int reg)
++{
++	u16 val;
++
++	reg += EFX_SDHCI_REG_OFFSET;
++	val = readw(host->ioaddr + reg);
++	//pr_info("[0x%x] = 0x%x\n", reg, val);
++	return val;
++}
++
++static u8 efx_readb(struct sdhci_host *host, int reg)
++{
++	u8 val;
++	reg += EFX_SDHCI_REG_OFFSET;
++	val =  readb(host->ioaddr + reg);
++	//pr_info("[0x%x] = 0x%x\n", reg, val);
++	return val;
++}
++
++static void efx_writel(struct sdhci_host *host, u32 val, int reg)
++{
++	reg += EFX_SDHCI_REG_OFFSET;
++	//pr_info("[0x%x] = 0x%x\n", reg, val);
++	writel(val, host->ioaddr + reg);
++}
++
++static void efx_writew(struct sdhci_host *host, u16 val, int reg)
++{
++	reg += EFX_SDHCI_REG_OFFSET;
++	//pr_info("[0x%x] = 0x%x\n", reg, val);
++	writew(val, host->ioaddr + reg);
++}
++
++static void efx_writeb(struct sdhci_host *host, u8 val, int reg)
++{
++	reg += EFX_SDHCI_REG_OFFSET;
++	//pr_info("[0x%x] = 0x%x\n", reg, val);
++	writeb(val, host->ioaddr + reg);
++}
++
++static int efx_sdhci_enable_dma(struct sdhci_host *host)
++{
++	pr_info("\n");
++	efx_writew(host, 1, SDHCI_TRANSFER_MODE);
++
++	return 0;
++}
++
++static void efx_sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
++{
++	// set clock divider
++	// enable clock
++	int div = 0;
++	int real_div = div;
++	int actual_clock;
++	u32 val;
++
++	pr_info("clock = %d Hz\n", clock);
++	pr_info("host->max_clk = %d Hz\n", host->max_clk);
++	pr_info("host->clock = %d Hz\n", host->clock);
++	pr_info("host->mmc->actual_clock = %d Hz\n", host->mmc->actual_clock);
++
++	host->mmc->actual_clock = 0;
++	writel(0, host->ioaddr + EFX_SDHCI_BASE_REG_0);
++
++	if (clock == 0) {
++		//writel(0, host->ioaddr + EFX_SDHCI_BASE_REG_0);
++		val = readl(host->ioaddr + EFX_SDHCI_BASE_REG_0);
++		pr_info("return base reg 0 = 0x%x\n", val);
++		return;
++	}
++
++	for (div = 1; div < SDHCI_MAX_DIV_SPEC_200; div *=2) {
++		if ((host->max_clk / div ) <= clock)
++			break;
++	}
++	real_div = div;
++
++	pr_info("read_div = %d\n", real_div);
++
++	if (real_div) {
++		actual_clock = host->max_clk / real_div;
++		host->mmc->actual_clock = actual_clock;
++		pr_info("actual_clock = %d\n", actual_clock);
++	}
++
++	writel((EFX_CLK_EN | real_div), host->ioaddr + EFX_SDHCI_BASE_REG_0);
++	udelay(10);
++	val = readl(host->ioaddr + EFX_SDHCI_BASE_REG_0);
++	pr_info("base reg 0 = 0x%x\n", val);
++}
++
++static void efx_sdhci_set_power(struct sdhci_host *host, unsigned char mode,
++				unsigned short vdd)
++{
++	u8 pwr = 0;
++
++	pr_info("\n");
++
++	/* Efinix SD host controller does not support power on or power switching. */
++	if (mode != MMC_POWER_OFF) {
++		pwr = SDHCI_POWER_330;
++		host->pwr |= pwr;
++		pr_info("SD HOST POWER ON\n");
++	} else {
++		pr_info("SD HOST POWER OFF\n");
++	}
++
++}
++
++static unsigned int efx_sdhci_get_timeout_clock(struct sdhci_host *host)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++
++	unsigned int timeout_clock;
++	timeout_clock = pltfm_host->clock / 1000;
++
++	pr_info("pltfm_host->clock = %d Hz\n", pltfm_host->clock);
++	pr_info("timeout_clock = %d Hz\n", timeout_clock);
++
++	return timeout_clock;
++}
++static unsigned int efx_sdhci_get_max_clock(struct sdhci_host *host)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++
++	pr_info("pltfm_host->clock = %d Hz\n", pltfm_host->clock);
++
++	return pltfm_host->clock;
++}
++
++static unsigned int efx_sdhci_get_min_clock(struct sdhci_host *host)
++{
++	unsigned int f_min;
++
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++
++	pr_info("pltfm_host->clock = %d\n", pltfm_host->clock);
++	f_min = pltfm_host->clock / 4;
++	pr_info("f_min = %d Hz\n", f_min);
++	return f_min;
++}
++
++static int efx_sdhci_get_cd(struct mmc_host *host)
++{
++	// Efinix sd host controller does not have capability to detect
++	// the card. Thus, set the card always detected.
++	return 1;
++}
++
++static void efx_sdhci_card_event(struct sdhci_host *host)
++{
++	pr_info("\n");
++}
++
++static unsigned int efx_sdhci_get_ro(struct sdhci_host *host)
++{
++	pr_info("\n");
++	/* The card is not write protected. */
++	return 0;
++}
++
++static const struct sdhci_ops efx_sdhci_ops = {
++	.read_l = efx_readl,
++	.read_w = efx_readw,
++	.read_b = efx_readb,
++	.write_l = efx_writel,
++	.write_w = efx_writew,
++	.write_b = efx_writeb,
++	.enable_dma = efx_sdhci_enable_dma,
++	.reset = sdhci_reset,
++	.set_clock = efx_sdhci_set_clock,
++	.set_power = efx_sdhci_set_power,
++	.set_bus_width = sdhci_set_bus_width,
++	.get_max_clock = efx_sdhci_get_max_clock,
++	.get_timeout_clock = efx_sdhci_get_timeout_clock,
++	.get_min_clock = efx_sdhci_get_min_clock,
++	.card_event = efx_sdhci_card_event,
++	.get_ro = efx_sdhci_get_ro,
++};
++
++static const struct sdhci_pltfm_data efx_sdhci_pdata = {
++	.ops = &efx_sdhci_ops,
++	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL
++			| SDHCI_QUIRK_NO_HISPD_BIT
++			| SDHCI_QUIRK_BROKEN_ADMA
++                        | SDHCI_QUIRK_NO_LED,
++        .quirks2 = SDHCI_QUIRK2_NO_1_8_V
++                        | SDHCI_QUIRK2_BROKEN_HS200
++                        | SDHCI_QUIRK2_BROKEN_DDR50
++			| SDHCI_QUIRK2_BROKEN_64_BIT_DMA
++			| SDHCI_QUIRK2_SUPPORT_SINGLE
++			| SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
++};
++
++static int efx_sdhci_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct sdhci_host *host;
++	struct sdhci_pltfm_host *pltfm_host;
++	struct efx_sdhci_priv *sdhci_pdata;
++	int ret;
++	u32 val;
++
++	pr_info("\n");
++
++	host = sdhci_pltfm_init(pdev, &efx_sdhci_pdata, sizeof(struct efx_sdhci_priv));
++	if (IS_ERR(host)) {
++		ret = PTR_ERR(host);
++		goto err;
++	}
++
++	pltfm_host = sdhci_priv(host);
++	sdhci_pdata = sdhci_pltfm_priv(pltfm_host);
++
++	device_property_read_u32(dev, "max-frequency", &pltfm_host->clock);
++
++	host->mmc_host_ops.get_cd = efx_sdhci_get_cd;
++
++	ret = mmc_of_parse(host->mmc);
++	if (ret)
++		goto err;
++
++	ret = sdhci_add_host(host);
++	if (ret)
++		goto err;
++
++	dev_info(dev, "Successfully added Efinix SDHCI host controller\n");
++
++	return 0;
++
++err:
++	sdhci_pltfm_free(pdev);
++	dev_err(&pdev->dev, "Efinix SDHCI host controller probe failed: %d\n", ret);
++	return ret;
++}
++
++static int efx_sdhci_remove(struct platform_device *pdev)
++{
++	struct sdhci_host *host = platform_get_drvdata(pdev);
++	u32 scratch;
++
++	scratch = readl(host->ioaddr + SDHCI_INT_STATUS);
++	sdhci_remove_host(host, scratch == (u32)~0);
++	sdhci_pltfm_free(pdev);
++
++	return 0;
++}
++
++static const struct of_device_id efx_sdhci_match[] = {
++	{ .compatible = "efx,sdhci" },
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, efx_sdhci_match);
++
++static struct platform_driver efx_sdhci_driver = {
++	.probe = efx_sdhci_probe,
++	.remove = efx_sdhci_remove,
++	.driver = {
++		.name = "efx-sdhci",
++		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
++		.of_match_table = of_match_ptr(efx_sdhci_match),
++	},
++};
++
++module_platform_driver(efx_sdhci_driver);
++
++MODULE_DESCRIPTION("Efinix SDHCI driver");
++MODULE_AUTHOR("mnalim@efinixinc.com");
++MODULE_LICENSE("GPL v2");
+-- 
+2.17.1
+
