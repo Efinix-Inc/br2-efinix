@@ -1,14 +1,14 @@
-From 4477318c5838faec1f5bc193d672561d2c58c539 Mon Sep 17 00:00:00 2001
+From 09e2f78cdcf15294008921981064d02ed2db43f3 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Tue, 10 Oct 2023 14:56:37 +0800
-Subject: [PATCH 1/2] mmc: add efinix sdhci driver
+Subject: [PATCH] mmc: add efinix sdhci driver
 
 Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
  drivers/mmc/host/Kconfig     |   8 +
  drivers/mmc/host/Makefile    |   3 +-
- drivers/mmc/host/sdhci-efx.c | 327 +++++++++++++++++++++++++++++++++++
- 3 files changed, 337 insertions(+), 1 deletion(-)
+ drivers/mmc/host/sdhci-efx.c | 329 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 339 insertions(+), 1 deletion(-)
  create mode 100644 drivers/mmc/host/sdhci-efx.c
 
 diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
@@ -45,10 +45,10 @@ index 451c25fc2c69..5da2ebc89eec 100644
  endif
 diff --git a/drivers/mmc/host/sdhci-efx.c b/drivers/mmc/host/sdhci-efx.c
 new file mode 100644
-index 000000000000..7f751bade83a
+index 000000000000..6666cb152dae
 --- /dev/null
 +++ b/drivers/mmc/host/sdhci-efx.c
-@@ -0,0 +1,327 @@
+@@ -0,0 +1,329 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Support for SDHIC on Efinix Inc SoC
@@ -96,12 +96,6 @@ index 000000000000..7f751bade83a
 +
 +	val = readl(host->ioaddr + offset);
 +
-+	/* We need to do byte swap on the output of ACMD51 */
-+	if (data_cmd && (reg == SDHCI_BUFFER) && data_cmd->opcode == 51) {
-+		val = be32_to_cpu(val);
-+	}
-+
-+	//pr_info("[0x%x] = 0x%x\n", reg, val);
 +	return val;
 +}
 +
@@ -111,7 +105,7 @@ index 000000000000..7f751bade83a
 +
 +	reg += EFX_SDHCI_REG_OFFSET;
 +	val = readw(host->ioaddr + reg);
-+	//pr_info("[0x%x] = 0x%x\n", reg, val);
++
 +	return val;
 +}
 +
@@ -120,35 +114,67 @@ index 000000000000..7f751bade83a
 +	u8 val;
 +	reg += EFX_SDHCI_REG_OFFSET;
 +	val =  readb(host->ioaddr + reg);
-+	//pr_info("[0x%x] = 0x%x\n", reg, val);
++
 +	return val;
 +}
 +
 +static void efx_writel(struct sdhci_host *host, u32 val, int reg)
 +{
 +	reg += EFX_SDHCI_REG_OFFSET;
-+	//pr_info("[0x%x] = 0x%x\n", reg, val);
 +	writel(val, host->ioaddr + reg);
 +}
 +
 +static void efx_writew(struct sdhci_host *host, u16 val, int reg)
 +{
++	u16 cmd_index;
 +	reg += EFX_SDHCI_REG_OFFSET;
-+	//pr_info("[0x%x] = 0x%x\n", reg, val);
++
++	// clear cache for read and write single/multi blocks
++	if (reg == SDHCI_COMMAND) {
++		// check for opcode CMD17, CMD18, CMD24 and CMD25
++		cmd_index = (val & 0x3F00) >> 8;
++		switch (cmd_index) {
++			case 17:
++			case 18:
++			case 24:
++			case 25:
++					asm(".word(0x500F)");
++					break;
++		}
++	}
++
 +	writew(val, host->ioaddr + reg);
 +}
 +
 +static void efx_writeb(struct sdhci_host *host, u8 val, int reg)
 +{
 +	reg += EFX_SDHCI_REG_OFFSET;
-+	//pr_info("[0x%x] = 0x%x\n", reg, val);
 +	writeb(val, host->ioaddr + reg);
 +}
 +
 +static int efx_sdhci_enable_dma(struct sdhci_host *host)
 +{
-+	pr_info("\n");
-+	efx_writew(host, 1, SDHCI_TRANSFER_MODE);
++	u32 val;
++
++	val = efx_readw(host, SDHCI_TRANSFER_MODE);
++	efx_writew(host, val | SDHCI_TRNS_DMA, SDHCI_TRANSFER_MODE);
++
++	sdhci_reset(host, SDHCI_RESET_CMD);
++	sdhci_reset(host, SDHCI_RESET_DATA);
++
++	return 0;
++}
++
++static int efx_sdhci_set_dma_mask(struct sdhci_host *host)
++{
++	struct device *dev = mmc_dev(host->mmc);
++	int ret;
++
++	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
++	if (ret) {
++		pr_err("Failed to set 32-bit DMA mask.\n");
++		return ret;
++	}
 +
 +	return 0;
 +}
@@ -160,20 +186,13 @@ index 000000000000..7f751bade83a
 +	int div = 0;
 +	int real_div = div;
 +	int actual_clock;
-+	u32 val;
-+
-+	pr_info("clock = %d Hz\n", clock);
-+	pr_info("host->max_clk = %d Hz\n", host->max_clk);
-+	pr_info("host->clock = %d Hz\n", host->clock);
-+	pr_info("host->mmc->actual_clock = %d Hz\n", host->mmc->actual_clock);
 +
 +	host->mmc->actual_clock = 0;
 +	writel(0, host->ioaddr + EFX_SDHCI_BASE_REG_0);
 +
 +	if (clock == 0) {
-+		//writel(0, host->ioaddr + EFX_SDHCI_BASE_REG_0);
-+		val = readl(host->ioaddr + EFX_SDHCI_BASE_REG_0);
-+		pr_info("return base reg 0 = 0x%x\n", val);
++		writel(0, host->ioaddr + EFX_SDHCI_BASE_REG_0);
++
 +		return;
 +	}
 +
@@ -183,18 +202,14 @@ index 000000000000..7f751bade83a
 +	}
 +	real_div = div;
 +
-+	pr_info("read_div = %d\n", real_div);
-+
 +	if (real_div) {
 +		actual_clock = host->max_clk / real_div;
 +		host->mmc->actual_clock = actual_clock;
-+		pr_info("actual_clock = %d\n", actual_clock);
 +	}
 +
 +	writel((EFX_CLK_EN | real_div), host->ioaddr + EFX_SDHCI_BASE_REG_0);
 +	udelay(10);
-+	val = readl(host->ioaddr + EFX_SDHCI_BASE_REG_0);
-+	pr_info("base reg 0 = 0x%x\n", val);
++
 +}
 +
 +static void efx_sdhci_set_power(struct sdhci_host *host, unsigned char mode,
@@ -202,15 +217,10 @@ index 000000000000..7f751bade83a
 +{
 +	u8 pwr = 0;
 +
-+	pr_info("\n");
-+
 +	/* Efinix SD host controller does not support power on or power switching. */
 +	if (mode != MMC_POWER_OFF) {
 +		pwr = SDHCI_POWER_330;
 +		host->pwr |= pwr;
-+		pr_info("SD HOST POWER ON\n");
-+	} else {
-+		pr_info("SD HOST POWER OFF\n");
 +	}
 +
 +}
@@ -222,16 +232,11 @@ index 000000000000..7f751bade83a
 +	unsigned int timeout_clock;
 +	timeout_clock = pltfm_host->clock / 1000;
 +
-+	pr_info("pltfm_host->clock = %d Hz\n", pltfm_host->clock);
-+	pr_info("timeout_clock = %d Hz\n", timeout_clock);
-+
 +	return timeout_clock;
 +}
 +static unsigned int efx_sdhci_get_max_clock(struct sdhci_host *host)
 +{
 +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+
-+	pr_info("pltfm_host->clock = %d Hz\n", pltfm_host->clock);
 +
 +	return pltfm_host->clock;
 +}
@@ -239,12 +244,10 @@ index 000000000000..7f751bade83a
 +static unsigned int efx_sdhci_get_min_clock(struct sdhci_host *host)
 +{
 +	unsigned int f_min;
-+
 +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 +
-+	pr_info("pltfm_host->clock = %d\n", pltfm_host->clock);
 +	f_min = pltfm_host->clock / 4;
-+	pr_info("f_min = %d Hz\n", f_min);
++
 +	return f_min;
 +}
 +
@@ -257,12 +260,11 @@ index 000000000000..7f751bade83a
 +
 +static void efx_sdhci_card_event(struct sdhci_host *host)
 +{
-+	pr_info("\n");
++
 +}
 +
 +static unsigned int efx_sdhci_get_ro(struct sdhci_host *host)
 +{
-+	pr_info("\n");
 +	/* The card is not write protected. */
 +	return 0;
 +}
@@ -275,6 +277,7 @@ index 000000000000..7f751bade83a
 +	.write_w = efx_writew,
 +	.write_b = efx_writeb,
 +	.enable_dma = efx_sdhci_enable_dma,
++	.set_dma_mask = efx_sdhci_set_dma_mask,
 +	.reset = sdhci_reset,
 +	.set_clock = efx_sdhci_set_clock,
 +	.set_power = efx_sdhci_set_power,
@@ -290,7 +293,8 @@ index 000000000000..7f751bade83a
 +	.ops = &efx_sdhci_ops,
 +	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL
 +			| SDHCI_QUIRK_NO_HISPD_BIT
-+			| SDHCI_QUIRK_BROKEN_ADMA
++			| SDHCI_QUIRK_32BIT_ADMA_SIZE
++			| SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC
 +                        | SDHCI_QUIRK_NO_LED,
 +        .quirks2 = SDHCI_QUIRK2_NO_1_8_V
 +                        | SDHCI_QUIRK2_BROKEN_HS200
@@ -308,8 +312,6 @@ index 000000000000..7f751bade83a
 +	struct efx_sdhci_priv *sdhci_pdata;
 +	int ret;
 +	u32 val;
-+
-+	pr_info("\n");
 +
 +	host = sdhci_pltfm_init(pdev, &efx_sdhci_pdata, sizeof(struct efx_sdhci_priv));
 +	if (IS_ERR(host)) {
