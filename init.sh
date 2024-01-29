@@ -8,6 +8,7 @@ unset RECONFIGURE
 unset RECONFIGURE_ALL
 unset OPT_DIR
 unset ETHERNET
+unset HARDEN_SOC
 
 BOARD=$1
 SOC_H=$2
@@ -44,6 +45,7 @@ function usage()
 	echo "	-r			Reconfigure the Buildroot configuration"
 	echo "	-a			Reconfigure the Buildroot configuration and regenerate Linux device tree"
 	echo "	-e                      Generate Linux configuration with ethernet support"
+	echo "  -p                      Generate Linux device tree for Sapphire High Performance SoC"
 
 	echo "Example usage,"
 	echo "$0 t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
@@ -128,6 +130,12 @@ function generate_device_tree()
 			-c $DT_DIR/config/linux_spi.json \
 			-c $DT_DIR/config/ethernet.json \
 			$SOC_H $BOARD linux
+	elif [ $HARDEN_SOC ]; then
+		python3 $DT_DIR/device_tree_generator.py \
+			-b $DT_DIR/config/dual_bus.json \
+			-s $DT_DIR/config/linux_slaves.json \
+			-c $DT_DIR/config/linux_spi.json \
+			$SOC_H $BOARD linux
 	else
 		python3 $DT_DIR/device_tree_generator.py \
 			-s $DT_DIR/config/linux_slaves.json \
@@ -196,7 +204,7 @@ do
 	shift
 done
 
-while getopts ":d:raeh" o; do
+while getopts ":d:raeph" o; do
 	case "${o}" in
 		:)
                         echo "ERROR: Option -$OPTARG requires an argument"
@@ -213,6 +221,9 @@ while getopts ":d:raeh" o; do
 			;;
 		e)
 			ETHERNET=1
+			;;
+		p)
+			HARDEN_SOC=1
 			;;
 		h)
 			usage
