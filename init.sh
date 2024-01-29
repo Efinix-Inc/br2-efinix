@@ -13,8 +13,7 @@ BOARD=$1
 SOC_H=$2
 
 INPUT_FILE="VERSION"
-JSON_FILE="boards/efinix/common/drivers.json"
-devkits=$(jq '.devkits | .[]' $JSON_FILE)
+JSON_FILE="boards/efinix/common/sapphire-soc-dt-generator/config/drivers.json"
 
 substr=""
 buildroot_version=''
@@ -61,6 +60,8 @@ function sanity_check()
 	local found=false
 	local devkit_l
 	BOARD=$(echo $BOARD | tr '[:upper:]' '[:lower:]')
+
+	devkits=$(jq '.devkits | .[]' $JSON_FILE)
 
 	for devkit in ${devkits[@]}; do
 		devkit_l=$(echo $devkit | tr '[:upper:]' '[:lower:]')
@@ -235,6 +236,19 @@ if [[ -z $SOC_H ]]; then
 	return
 fi
 
+# clone sapphire-soc-dt-generator repository
+if [ ! -d $DT_DIR ]; then
+        substr="sapphire-soc-dt-generator"
+        get_version $substr
+        dt_version=$version
+
+        if [ ! -z $dt_version ]; then
+                git clone $DT_REPO -b $dt_version $DT_DIR
+        else
+                git clone $DT_REPO $DT_DIR
+        fi
+fi
+
 sanity_check
 
 if [[ $? -gt 0 ]]; then
@@ -296,19 +310,6 @@ cd -
 # copy soc.h to opensbi directory. Opensbi has dependency on soc.h.
 cp $SOC_H $OPENSBI_DIR/soc.h
 SOC_H=$OPENSBI_DIR/soc.h
-
-# clone sapphire-soc-dt-generator repository
-if [ ! -d $DT_DIR ]; then
-	substr="sapphire-soc-dt-generator"
-	get_version $substr
-	dt_version=$version
-
-	if [ ! -z $dt_version ]; then
-		git clone $DT_REPO -b $dt_version $DT_DIR
-	else
-		git clone $DT_REPO $DT_DIR
-	fi
-fi
 
 check_smp
 modify_soc_h
