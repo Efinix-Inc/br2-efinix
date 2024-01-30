@@ -1,0 +1,228 @@
+/dts-v1/;
+/include/ "sapphire.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	model = "efinix,sapphire";
+	#address-cells = <1>;
+        #size-cells = <1>;
+	
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs = "rootwait console=ttySL0 earlycon root=/dev/mmcblk0p2 init=/sbin/init mmc_core.use_spi_crc=0";
+	};
+	
+	aliases {
+		serial0 = &uart0;
+	};
+
+	
+	memory@400000 {
+		device_type = "memory";
+		reg = <0x00400000 0xe7bff000>;
+	};
+
+	
+	reserved-memory {
+		#address-cells = <1>;
+                #size-cells = <1>;
+		ranges;
+		opensbi: sbi@1000000 {
+			reg = <0x1000000 0x80000>;
+		};
+	};
+
+	
+        efx_gpio_devs {
+        	#address-cells = <1>;
+        	#size-cells = <0>;
+        	compatible = "efinix,efx-gpio";
+        	status = "okay";
+		
+		
+                switch@0 {
+                	#address-cells = <1>;
+                	#size-cells = <0>;
+                	label = "SW";
+                	efx-gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
+		};
+		
+                led1@1 {
+                	#address-cells = <1>;
+                	#size-cells = <0>;
+                	label = "LED1";
+                	efx-gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+		};
+		
+                led2@2 {
+                	#address-cells = <1>;
+                	#size-cells = <0>;
+                	label = "LED2";
+                	efx-gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+		};
+		
+                led3@3 {
+                	#address-cells = <1>;
+                	#size-cells = <0>;
+                	label = "LED3";
+                	efx-gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
+		};
+	};
+};
+
+&i2c0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	clock-frequency = <100000>;
+	status = "okay";
+	
+};
+
+&i2c1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	clock-frequency = <100000>;
+	status = "okay";
+	
+};
+
+&i2c2 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	clock-frequency = <100000>;
+	status = "okay";
+	
+};
+
+&uart0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	current-speed = <115200>;
+	status = "okay";
+	
+};
+
+&uart1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	current-speed = <115200>;
+	status = "okay";
+	
+};
+
+&uart2 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	current-speed = <115200>;
+	status = "okay";
+	
+};
+
+&spi0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	cmd_fifo_depth = <256>;
+	rsp_fifo_depth = <256>;
+	num-cs = <1>;
+	status = "okay";
+	
+        flash: flash@0 {
+        	#address-cells = <1>;
+        	#size-cells = <1>;
+        	reg = <0>;
+        	compatible = "spi-nor";
+        	spi-max-frequency = <6000000>;
+                
+                
+                partition@0 {
+                	#address-cells = <1>;
+                	#size-cells = <0>;
+                	reg = <0x000000 0x400000>;
+                	label = "fpga_bitstream";
+                };
+                
+                partition@1 {
+                	#address-cells = <1>;
+                	#size-cells = <0>;
+                	reg = <0x400000 0x080000>;
+                	label = "opensbi";
+                };
+                
+                partition@2 {
+                	#address-cells = <1>;
+                	#size-cells = <0>;
+                	reg = <0x480000 0x080000>;
+                	label = "u-boot";
+                };
+                
+                partition@3 {
+                	#address-cells = <1>;
+                	#size-cells = <0>;
+                	reg = <0x500000 0x300000>;
+                	label = "user";
+                };
+        };
+	
+};
+
+&spi1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	cmd_fifo_depth = <256>;
+	rsp_fifo_depth = <256>;
+	num-cs = <1>;
+	status = "okay";
+	
+        mmc-slot@0 {
+        	#address-cells = <1>;
+        	#size-cells = <0>;
+        	reg = <0>;
+        	compatible = "mmc-spi-slot";
+        	voltage-ranges = <3300 3300>;
+        	spi-max-frequency = <10000000>;
+        	status = "okay";
+        };
+	
+};
+
+&spi2 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	cmd_fifo_depth = <256>;
+	rsp_fifo_depth = <256>;
+	num-cs = <1>;
+	status = "okay";
+	
+};
+
+&apb_slave0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+	
+};
+
+&apb_slave1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+	
+};
+
+&apb_slave2 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+	
+};
+
+&gpio0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	ngpio = <4>;
+	gpio-controller;
+	#gpio-cells = <2>;
+	#interrupt-cells = <2>;
+	status = "okay";
+	
+};
