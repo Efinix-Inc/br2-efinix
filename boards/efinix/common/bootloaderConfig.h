@@ -17,8 +17,24 @@
 #define UBOOT_SBI_FLASH   0x00480000
 #define UBOOT_SIZE        0x0C0000
 
+#define UART_0_SAMPLE_PER_BAUD  8
+#define UART_0_BAUD_RATE        115200
+
+void configure_uart()
+{
+    Uart_Config uart0;
+    uart0.dataLength = BITS_8;
+    uart0.parity = NONE;
+    uart0.stop = ONE;
+    uart0.clockDivider = BSP_CLINT_HZ/(UART_0_BAUD_RATE * UART_0_SAMPLE_PER_BAUD) - 1;
+    uart_applyConfig(BSP_UART_TERMINAL, &uart0);
+}
+
+
 void bspMain()
 {
+    configure_uart();
+
 #ifndef SPINAL_SIM
     spiFlash_init(SPI, SPI_CS);
     spiFlash_wake(SPI, SPI_CS);
