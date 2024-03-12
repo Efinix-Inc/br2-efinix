@@ -1,0 +1,30 @@
+From d5cef7ed0dfc952d35af295b39bd455e0bc708c4 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Tue, 12 Mar 2024 00:30:43 +0800
+Subject: [PATCH] sdhci-efx: fix getting value for ACMD51 by clearing the cache
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/mmc/host/sdhci-efx.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/mmc/host/sdhci-efx.c b/drivers/mmc/host/sdhci-efx.c
+index 6666cb152dae..ebb9cb779e64 100644
+--- a/drivers/mmc/host/sdhci-efx.c
++++ b/drivers/mmc/host/sdhci-efx.c
+@@ -43,6 +43,12 @@ static u32 efx_readl(struct sdhci_host *host, int reg)
+ 	u32 offset = reg + EFX_SDHCI_REG_OFFSET;
+ 	struct mmc_command *data_cmd = host->data_cmd;
+ 
++	// clear cache for ACMD51
++	if (data_cmd) {
++                if (data_cmd->opcode == 51)
++                        asm(".word(0x500F)");
++        }
++
+ 	val = readl(host->ioaddr + offset);
+ 
+ 	return val;
+-- 
+2.17.1
+
