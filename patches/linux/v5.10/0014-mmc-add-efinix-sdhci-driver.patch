@@ -39,7 +39,7 @@ index 451c25fc2c69..5da2ebc89eec 100644
  obj-$(CONFIG_MMC_HSQ)			+= mmc_hsq.o
 -
 +obj-$(CONFIG_MMC_SDHCI_EFX)		+= sdhci-efx.o
-+CFLAGS_sdhci.o += -DDEBUG
++
  ifeq ($(CONFIG_CB710_DEBUG),y)
  	CFLAGS-cb710-mmc	+= -DDEBUG
  endif
