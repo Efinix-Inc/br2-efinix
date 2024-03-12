@@ -1,0 +1,26 @@
+From b6d6e1da9471c2701c1af39b0093d14cf89d99d9 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Tue, 12 Mar 2024 11:42:17 +0800
+Subject: [PATCH] libopenh264: add RISCV support
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ package/libopenh264/Config.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/package/libopenh264/Config.in b/package/libopenh264/Config.in
+index 2b77578a83..79ad1b999d 100644
+--- a/package/libopenh264/Config.in
++++ b/package/libopenh264/Config.in
+@@ -2,7 +2,7 @@ config BR2_PACKAGE_LIBOPENH264_ARCH_SUPPORTS
+ 	bool
+ 	default y if BR2_arm || BR2_armeb || BR2_aarch64 || BR2_i386 || \
+ 		BR2_mips || BR2_mipsel || BR2_mips64 || BR2_mips64el || \
+-		BR2_x86_64
++		BR2_x86_64 || BR2_riscv
+ 
+ config BR2_PACKAGE_LIBOPENH264
+ 	bool "libopenh264"
+-- 
+2.17.1
+
