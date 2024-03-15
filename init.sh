@@ -63,7 +63,7 @@ function sanity_check()
 	local devkit_l
 	BOARD=$(echo $BOARD | tr '[:upper:]' '[:lower:]')
 
-	devkits=$(jq '.devkits | .[]' $JSON_FILE)
+	devkits=$(jq '.devkits.Titanium, .devkits.Trion | .[]' $JSON_FILE)
 
 	for devkit in ${devkits[@]}; do
 		devkit_l=$(echo $devkit | tr '[:upper:]' '[:lower:]')
