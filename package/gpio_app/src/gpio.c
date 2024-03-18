@@ -10,7 +10,7 @@ int gpio_configure_dir(char *gpio_label, uint8_t dir_value)
 	/* open sysfs attribute 'direction' */
 	fd = open(buf, O_WRONLY | O_SYNC);
 	if (fd < 0) {
-		printf("GPIO %s configure as %s\n", gpio_label, dir_value);
+		printf("GPIO %s configure as %d\n", gpio_label, dir_value);
 		return fd;
 	}
 
@@ -33,7 +33,7 @@ int gpio_set_value(char *gpio_label, uint8_t value)
 
 	fd = open(buf, O_WRONLY | O_SYNC);
         if (fd < 0) {
-                printf("GPIO %s configure as %s\n", gpio_label, value);
+                printf("GPIO %s configure as %d\n", gpio_label, value);
                 return fd;
         }
 
