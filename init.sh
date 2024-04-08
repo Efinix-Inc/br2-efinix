@@ -123,25 +123,30 @@ function modify_soc_h()
 
 function generate_device_tree()
 {
-	# generate device tree
-	if [ $ETHERNET ]; then
-		python3 $DT_DIR/device_tree_generator.py \
-			-s $DT_DIR/config/linux_slaves.json \
-			-c $DT_DIR/config/linux_spi.json \
-			-c $DT_DIR/config/ethernet.json \
-			$SOC_H $BOARD linux
-	elif [ $HARDEN_SOC ]; then
-		python3 $DT_DIR/device_tree_generator.py \
-			-b $DT_DIR/config/dual_bus.json \
-			-s $DT_DIR/config/linux_slaves.json \
-			-c $DT_DIR/config/linux_spi.json \
-			$SOC_H $BOARD linux
-	else
-		python3 $DT_DIR/device_tree_generator.py \
-			-s $DT_DIR/config/linux_slaves.json \
-			-c $DT_DIR/config/linux_spi.json \
-			$SOC_H $BOARD linux
+	local base_cmd="python3 $DT_DIR/device_tree_generator.py -s $DT_DIR/config/linux_slaves.json "
+	local end_cmd="$SOC_H $BOARD linux"
+	local harden_soc="-b $DT_DIR/config/dual_bus.json "
+	local spi="-c $DT_DIR/config/linux_spi.json "
+	local ethernet="-c $DT_DIR/config/ethernet.json "
+	local sdhc="-c $DT_DIR/config/sdhc.json "
+
+	if [ $HARDEN_SOC ]; then
+		base_cmd+=$harden_soc
 	fi
+
+	if [ $ETHERNET ]; then
+		base_cmd+=$ethernet
+	fi
+
+	if [ $SDHC ]; then
+		base_cmd+=$sdhc
+	else
+		base_cmd+=$spi
+	fi
+
+	base_cmd+=$end_cmd
+	echo DEBUG: device tree cmd: $base_cmd
+	eval $base_cmd
 
 	cp $DT_DIR/dts/sapphire.dtsi $COMMON_DIR/dts/sapphire.dtsi
 	cp $DT_DIR/dts/linux.dts $EFINIX_DIR/$BOARD/linux/linux.dts
