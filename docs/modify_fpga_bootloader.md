@@ -1,18 +1,18 @@
 # Modify FPGA Bootloader
 
-You are require to modify the bootloader if generate your own custom Sapphire SoC.
+> You are require to modify the bootloader if generate your own custom Sapphire SoC configuration.
 
-The bootloader is the first program get executed when the FPGA board power on. For the Sapphire SoC, the bootloader will load the program at designated location as specify in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/bsp/efinix/EfxSapphireSoc/app/bootloaderConfig.h`. By default, the bootloader will load user software binary from address `0x00380000` in  the SPI flash memory. Then it will copy the user software binary to RAM at address `0x00001000`.
+The bootloader is the first program get executed when the FPGA board power on. The default bootloader would not able to boot Linux kernel. 
 
 In this tutorial, we are going to modify the bootloader program so that it can boot Linux. OpenSBI and U-Boot will be loaded first by this bootloader program before it can boot Linux.
 
-> `$EFINITY_PROJECT` is the path to the current Efinity project. You may either replace the `$EFINITY_PROJECT` with the absolute path to your current Efinity Project (i.e. /home/<username>/efinity/2022.M/project/linux_test/soc/ip/soc1)
+> `$EFINITY_PROJECT` is the path to the current Efinity project. You may either replace the `$EFINITY_PROJECT` with the absolute path to your current Efinity Project (i.e. /home/<username>/efinity/2022.M/project/linux_test/soc/ip/soc1).
 
 ## Prerequsite
 
 ### Install Efinity RISC-V Embedded Software IDE
 
-Make sure to install [Efinity RISC-V Embedded Software IDE](https://www.efinixinc.com/support/ip/riscv-sdk.php) on your development machine. The RISC-V IDE provide RISC-V toolchain, debugger and Eclipse. Refer to [RISC-V SoC Hardware and Software User Guide](https://www.efinixinc.com/support/docsdl.php?s=ef&pn=SAPPHIREUG) to install the IDE.
+Make sure to install [Efinity RISC-V Embedded Software IDE](https://www.efinixinc.com/support/ip/riscv-sdk.php) on your development machine. The RISC-V IDE provide RISC-V toolchain, debugger and Eclipse IDE. Refer to [RISC-V SoC Hardware and Software User Guide](https://www.efinixinc.com/support/docsdl.php?s=ef&pn=SAPPHIREUG) to install the IDE.
 
 ## Firmware Address
 
@@ -23,7 +23,7 @@ The table below shows the SPI flash address and corresponding RAM address for ea
 | OpenSBI  | 0x00400000        | 0x01000000  |
 | U-Boot   | 0x00480000        | 0x01040000  |
 
-## Modified Bootloader Program
+## Part 1: Modified Bootloader Program
 
 ### Using script
 
@@ -50,64 +50,23 @@ t120f324 \
 
 ### Modify manually
 
-This is an example of modified `bootloaderConfig.h` for booting Linux. This file is located in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/bsp/efinix/EfxSapphireSoc/app/bootloaderConfig.h`. You may copy and replace it.
+1. Create a Efinity project in `/home/user/efinity_projects` as `EFINITY_PROJECT`. See [Generate Sapphire SoC for Linux](generate_sapphire_soc_for_linux.md) guide to generate a Sapphire SoC.
 
-```c
-#pragma once
+2. Copy and replace [bootloaderConfig.h](board/efinix/common/bootloaderConfig.h) to your project path. For example, `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/bsp/efinix/EfxSapphireSoc/app/bootloaderConfig.h`.
 
-#include "bsp.h"
-#include "io.h"
-#include "spiFlash.h"
-#include "riscv.h"
+3. If the target SoC is multicore, then enable SMP flag in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/bsp/efinix/EfxSapphireSoc/include/soc.mk` . Just append it in `soc.mk`.
+   
+   ```makefile
+   CFLAGS += -DSMP
+   ```
 
-#define SPI SYSTEM_SPI_0_IO_CTRL
-#define SPI_CS 0
+4. Compile the bootloader program. See secton Part 2: Compile Bootloader Program.
 
-#define OPENSBI_MEMORY    0x01000000
-#define OPENSBI_FLASH     0x00400000
-#define OPENSBI_SIZE      0x040000
-
-#define UBOOT_MEMORY      0x01040000
-#define UBOOT_SBI_FLASH   0x00480000
-#define UBOOT_SIZE        0x0C0000
-
-void bspMain()
-{
-#ifndef SPINAL_SIM
-    spiFlash_init(SPI, SPI_CS);
-    spiFlash_wake(SPI, SPI_CS);
-    bsp_putString("OpenSBI copy\r\n");
-    spiFlash_f2m(SPI, SPI_CS, OPENSBI_FLASH, OPENSBI_MEMORY, OPENSBI_SIZE);
-    bsp_putString("U-Boot copy\r\n");
-    spiFlash_f2m(SPI, SPI_CS, UBOOT_SBI_FLASH, UBOOT_MEMORY, UBOOT_SIZE);
-#endif
-
-    bsp_putString("Payload boot\r\n");
-    void (*userMain)(u32, u32, u32) = (void (*)(u32, u32, u32))OPENSBI_MEMORY;
-    #ifdef SMP
-    smp_unlock(userMain);
-    #endif
-    userMain(0, 0, 0);
-}
-```
-
-If the target SoC is multicore, then enable SMP flag in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw//bsp/efinix/EfxSapphireSoc/include/soc.mk` . Just append it in `soc.mk`.
-
-```makefile
-CFLAGS += -DSMP
-```
-
-If the target devkit is **Ti180**, then enable `DEFAULT_ADDRESS_BYTE` flag in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw//bsp/efinix/EfxSapphireSoc/include/soc.mk`. Just append it in`soc.mk`.
-
-```makefile
-CFLAGS += -DDEFAULT_ADDRESS_BYTE
-```
-
-## Compile Bootloader Program
+## Part 2: Compile Bootloader Program
 
 Bootloader program is located in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/software/standalone/bootloader`. There are **TWO** ways to compile the bootloader program.
 
-### Using Efinity RISC-V Embedded Software IDE
+### Method 1: Using Efinity RISC-V Embedded Software IDE
 
 1. Run Efinity RISC-V Embedded Software IDE from terminal.
    
@@ -128,7 +87,7 @@ Bootloader program is located in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<
 
 6. Right click on the `bootloader` on the `Project Explorer` and select `Build Project`.
 
-### Using Command Line in Linux
+### Method 2: Using Command Line in Linux
 
 ```bash
 export PATH=</path/to/efinity/efinity-riscv-ide-2022.2.3/toolchain/bin:$PATH
@@ -136,31 +95,40 @@ cd $EFINITY_PROJECT/T120F324_devkit/embedded_sw/<Project Name>/software/standalo
 BSP_PATH=$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/bsp/efinix/EfxSapphireSoc make
 ```
 
-## Generate Memory Initialization Files
+## Part 3: Compile Efinity Project
 
-The memory initialization binary files are named as  `EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin`. These files automatically generated during the soc generation. These files need to be regenerated when the bootloader program gets modified. 
+1. Open the existing Efinity project using Efinity software.
 
-1. Use `binGen.py` script to regenerate the files which can be found in `$EFINITY_PROJECT/embedded_sw/<project name>/tool/binGen.py`.
+2. Regenerate the Sapphire SoC configuration if the project already exitst.
    
-   Example command.
+   a) For **Sapphire SoC**
    
-   ```bash
-   cd $EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/tool
-   python3 binGen.py -f 1 -s 4096 -b ../software/standalone/bootloader/build/bootloader.bin
-   ```
+   - Right click on the `Sapphire IP -> configure`.
+     
+     ![](img/sapphire_configure.png)
    
-   ```
-   where,
-    -f, fpu. If enable set to 1. Else set to 0
-    -s, On-Chip RAM size. You can get this value at parameter "--onChipRamSize"
-    in $EFINITY_PROJECT/source/soc_config. The value must be in decimal. By default
-    the value is 4096(0x1000 in hexadecimal).
-    -b, path of bootloader.bin
-   ```
-
-2. Copy the generated memory initialization bin files
+   - On the IP configuration of Sapphire SoC, goto `Cache/Memory` tab.
+     
+     ![](img/on-chip-ram.png)
+     
+     - Enable `Custom On-Chip RAM Application`.
+     
+     - Give the full path to the `bootloader.hex` at `User Application Path`.
    
-   ```bash
-   cp -r $EFINITY_PROJECT/T120F324_devkit/embedded_sw/<Project Name>/tool/rom/*.bin \
-   $EFINITY_PROJECT/T120F324_devkit
-   ```
+   - Click `Generate` button to regenerate the SoC configuration with modified bootloader.
+   
+   - Compile the Efinity project.
+   
+   b) For **Ti375C529 with Harden RISC-V Sapphire SoC**
+   
+   - Open `Efinity Interface Designer`.
+     
+     ![](img/on-chip-ram-harden-soc.png)
+   
+   - At `Design Explorer`, select `Quad-Core RISC-V`.
+   
+   - Go to `Base` tab on the `Block Editor`, then browse the `bootloader.hex` at the `On-Chip Ram Configuration File`. Click `Design -> Check Design` and click `Design -> Generate Efinity Constraint File`.
+   
+   - Then, click `Generate` bitstream.
+     
+     > Please note that you are not require to compile the whole project after modify the bootloader.
