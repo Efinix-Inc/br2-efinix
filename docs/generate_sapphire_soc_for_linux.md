@@ -2,13 +2,13 @@
 
 The default configuration of Sapphire SoC on IP Manager would not able to boot Linux. In this tutorial we are going to generate a custom Sapphire SoC which can boot Linux on Trion T120F324 development board.
 
-These steps also applicable for Ti60F225 with different pinout assignment for SPI 1. Please refer to table below on pinout assignment for Ti60F225.
+These steps also applicable for Ti60F225 and Ti180J484 with different pinout assignment for SPI 1. Please refer to table below on pinout assignment.
 
 ## Prerequsite
 
-- Efinity Software
+- Efinity Software 2023.2 or later
 
-- Efinity RISCV IDE
+- Efinity RISCV IDE 2023.2 or later
 
 ## Install Efinity Software
 
