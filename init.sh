@@ -119,6 +119,11 @@ function modify_soc_h()
 		sed -i 's/BR2_RISCV_ISA_CUSTOM_RVC=n/BR2_RISCV_ISA_CUSTOM_RVC=y/g' $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG
 		sed -i 's/CONFIG_RISCV_ISA_C=n/CONFIG_RISCV_ISA_C=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
 	fi
+
+	# change the size of DDR to 1024MB due to limitation of physical DDR.
+	if [ $HARDEN_SOC ]; then
+		sed -i 's/0xe7fff000/0x40000000/g' $SOC_H
+	fi
 }
 
 function generate_device_tree()
