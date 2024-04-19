@@ -927,11 +927,11 @@ index 000000000000..566455b662c2
 +{
 +	tsemac_out32(lp, ETHERNET_CTRL_PHY_RST, 1);
 +	tsemac_out32(lp, ETHERNET_CTRL_MAC_RST, 1);
-+	mdelay(10);
++	mdelay(100);
 +	tsemac_out32(lp, ETHERNET_CTRL_MAC_RST, 0);
-+	mdelay(10);
++	mdelay(100);
 +	tsemac_out32(lp, ETHERNET_CTRL_PHY_RST, 0);
-+	mdelay(10);
++	mdelay(100);
 +	return 0;
 +}
 +
