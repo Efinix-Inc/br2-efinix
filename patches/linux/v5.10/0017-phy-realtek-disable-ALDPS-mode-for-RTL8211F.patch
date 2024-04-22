@@ -1,0 +1,32 @@
+From bf31e1bb3412ab9e3bfe97ba3c8cba3a0f1c9f0f Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Mon, 22 Apr 2024 14:26:27 +0800
+Subject: [PATCH 1/2] phy/realtek: disable ALDPS mode for RTL8211F
+
+The ALDPS mode will stop the pll to save the power.
+This cause the kernel crash whenever it tried to read
+or write to the phy due to phy is power off state.
+Disable this mode to let the phy keep alive.
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/net/phy/realtek.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/net/phy/realtek.c b/drivers/net/phy/realtek.c
+index 575580d3ffe0..a5f1df18a65d 100644
+--- a/drivers/net/phy/realtek.c
++++ b/drivers/net/phy/realtek.c
+@@ -185,9 +185,6 @@ static int rtl8211f_config_init(struct phy_device *phydev)
+ 	u16 val;
+ 	int ret;
+ 
+-	val = RTL8211F_ALDPS_ENABLE | RTL8211F_ALDPS_PLL_OFF | RTL8211F_ALDPS_XTAL_OFF;
+-	phy_modify_paged_changed(phydev, 0xa43, RTL8211F_PHYCR1, val, val);
+-
+ 	switch (phydev->interface) {
+ 	case PHY_INTERFACE_MODE_RGMII:
+ 		val_txdly = 0;
+-- 
+2.17.1
+
