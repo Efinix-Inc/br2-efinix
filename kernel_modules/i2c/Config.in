@@ -1,4 +1,4 @@
-config BR2_MODULE_I2C
+config BR2_PACKAGE_I2C
 	bool "I2C bus driver kernel module"
 	depends on BR2_LINUX_KERNEL
 	default n

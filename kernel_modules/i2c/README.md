@@ -79,7 +79,7 @@ CONFIG_I2C_SLAVE_EEPROM=y
 1. Enable I2C bus driver in buildroot defconfig. For `T120F324` board the buildroot defconfig is in `configs/efinix_t120f324_defconfig`. You also need to install `i2c-tools` for detecting i2c bus number.
    
    ```
-   BR2_MODULE_I2C=y
+   BR2_PACKAGE_I2C=y
    BR2_PACKAGE_I2C_TOOLS=y
    ```
 
