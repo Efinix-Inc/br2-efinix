@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>EvSoC Camera Stream</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      #container { margin-right: auto; margin-left: auto; max-width: 1000px; }
+      #info { background: #e0f0f0; border-radius: .5em; padding: 2em;  }
+      img { width: 100%; margin-top: 1em; border: 1px solid #ccc; }
+
+    </style>
+  </head>
+  <body>
+    <div id="container">
+      <div id="info">
+        EvSoC live camera stream
+        <br/>
+      </div>
+      <img src="/api/camera" alt="stream camera"/>
+	</script>
+	</br>
+
+	<button id="btn_erosion">Grayscale</button>
+
+	<script>
+	document.getElementById('btn_erosion').addEventListener('click', function() {
+	    fetch('/btn_erosion', {
+		method: 'POST',
+		headers: {
+		    'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({ myData: 'enable erosion custom instruction' })
+	    })
+	    .then(response => response.json())
+	    .then(data => console.log(data))
+	    .catch((error) => {
+	      console.error('Error:', error);
+	    });
+	});
+	</script>
+
+	<button id="btn_sw_grayscale">Canny</button>
+	<script>
+	document.getElementById('btn_sw_grayscale').addEventListener('click', function() {
+            fetch('/btn_sw_grayscale', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ myData: 'enable software grayscale' })
+            })
+            .then(response => response.json())
+            .then(data => console.log(data))
+            .catch((error) => {
+              console.error('Error:', error);
+            });
+        });
+	</script>
+
+	<button id="btn_reset">Reset</button>
+
+        <script>
+        document.getElementById('btn_reset').addEventListener('click', function() {
+            fetch('/btn_reset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ myData: 'reset' })
+            })
+            .then(response => response.json())
+            .then(data => console.log(data))
+            .catch((error) => {
+              console.error('Error:', error);
+            });
+        });
+        </script>
+
+	<button id="btn_capture">Capture Photo</button>
+	<script>
+        document.getElementById('btn_capture').addEventListener('click', function() {
+            fetch('/btn_capture', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ myData: 'reset' })
+            })
+            .then(response => response.json())
+            .then(data => console.log(data))
+            .catch((error) => {
+              console.error('Error:', error);
+            });
+        });
+        </script>
+    </div>
+  </body>
+</html>

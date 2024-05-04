@@ -1,0 +1,10 @@
+config BR2_PACKAGE_EVSOC_CAMERA
+	bool "EVSoC camera stream"
+	default n
+	depends on BR2_PACKAGE_EVSOC
+	depends on BR2_GCC_ENABLE_OPENMP
+	select BR2_PACKAGE_OPENCV3
+	select BR2_PACKAGE_OPENCV3_LIB_HIGHGUI
+	help
+	  A simple http server which serve camera stream output using mjpeg format for
+	  Edge Vision SoC (EVSoC).
