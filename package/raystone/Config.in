@@ -1,0 +1,5 @@
+config BR2_PACKAGE_RAYSTONE
+	bool "raystone"
+	default n
+	help
+	  Sample program which use raytracer 

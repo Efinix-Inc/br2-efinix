@@ -1,0 +1,81 @@
+
+Example c-ray-f/c-ray-mt compile lines for various SGIs:
+
+
+R10000/R12000 SGI O2:
+
+cc -O3 -mips4 -IPA -LNO -TARG:platform=ip32_10k -Ofast=ip32_10k c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -IPA -TARG:platform=ip32_10k -Ofast=ip32_10k c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -LNO -TARG:platform=ip32_10k -Ofast=ip32_10k c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -TARG:platform=ip32_10k -Ofast=ip32_10k c-ray-mt.c -o c-ray-mt -lm -lpthread
+
+cc -O3 -mips4 -IPA -LNO -TARG:platform=ip32_10k -Ofast=ip32_10k c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -IPA -TARG:platform=ip32_10k -Ofast=ip32_10k c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -LNO -TARG:platform=ip32_10k -Ofast=ip32_10k c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -TARG:platform=ip32_10k -Ofast=ip32_10k c-ray-f.c -o c-ray-f -lm
+
+
+R5000/R7000 SGI O2:
+
+cc -O3 -mips4 -IPA -LNO -TARG:platform=ip32_5k -Ofast=ip32_5k c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -IPA -TARG:platform=ip32_5k -Ofast=ip32_5k c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -LNO -TARG:platform=ip32_5k -Ofast=ip32_5k c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -TARG:platform=ip32_5k -Ofast=ip32_5k c-ray-mt.c -o c-ray-mt -lm -lpthread
+
+cc -O3 -mips4 -IPA -LNO -TARG:platform=ip32_5k -Ofast=ip32_5k c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -IPA -TARG:platform=ip32_5k -Ofast=ip32_5k c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -LNO -TARG:platform=ip32_5k -Ofast=ip32_5k c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -TARG:platform=ip32_5k -Ofast=ip32_5k c-ray-f.c -o c-ray-f -lm
+
+
+R10K/R12K/R14K SGI Octane/Octane2:
+
+cc -O3 -mips4 -TARG:platform=ip30 -Ofast=ip30 c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -IPA -TARG:platform=ip30 -Ofast=ip30 c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -LNO -TARG:platform=ip30 -Ofast=ip30 c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -IPA -LNO -TARG:platform=ip30 -Ofast=ip30 c-ray-f.c -o c-ray-f -lm
+
+cc -O3 -mips4 -TARG:platform=ip30 -Ofast=ip30 c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -IPA -TARG:platform=ip30 -Ofast=ip30 c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -LNO -TARG:platform=ip30 -Ofast=ip30 c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -IPA -LNO -TARG:platform=ip30 -Ofast=ip30 c-ray-mt.c -o c-ray-mt -lm -lpthread
+
+
+R4K Onyx1/Challenge:
+
+cc -O3 -mips3 -TARG:platform=ip19 -Ofast=ip19 c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips3 -IPA -TARG:platform=ip19 -Ofast=ip19 c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips3 -LNO -TARG:platform=ip19 -Ofast=ip19 c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips3 -IPA -LNO -TARG:platform=ip19 -Ofast=ip19 c-ray-f.c -o c-ray-f -lm
+
+cc -O3 -mips3 -TARG:platform=ip19 -Ofast=ip19 c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips3 -IPA -TARG:platform=ip19 -Ofast=ip19 c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips3 -LNO -TARG:platform=ip19 -Ofast=ip19 c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips3 -IPA -LNO -TARG:platform=ip19 -Ofast=ip19 c-ray-mt.c -o c-ray-mt -lm -lpthread
+
+
+R10K Onyx1/Challenge:
+
+cc -O3 -mips4 -TARG:platform=ip25 -Ofast=ip25 c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -IPA -TARG:platform=ip25 -Ofast=ip25 c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -LNO -TARG:platform=ip25 -Ofast=ip25 c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -IPA -LNO -TARG:platform=ip25 -Ofast=ip25 c-ray-f.c -o c-ray-f -lm
+
+cc -O3 -mips4 -TARG:platform=ip25 -Ofast=ip25 c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -IPA -TARG:platform=ip25 -Ofast=ip25 c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -LNO -TARG:platform=ip25 -Ofast=ip25 c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -IPA -LNO -TARG:platform=ip25 -Ofast=ip25 c-ray-mt.c -o c-ray-mt -lm -lpthread
+
+
+R10K Indigo2:
+
+cc -O3 -mips4 -TARG:platform=ip28 -Ofast=ip28 c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -IPA -TARG:platform=ip28 -Ofast=ip28 c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -LNO -TARG:platform=ip28 -Ofast=ip28 c-ray-f.c -o c-ray-f -lm
+cc -O3 -mips4 -IPA -LNO -TARG:platform=ip28 -Ofast=ip28 c-ray-f.c -o c-ray-f -lm
+
+cc -O3 -mips4 -TARG:platform=ip28 -Ofast=ip28 c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -IPA -TARG:platform=ip28 -Ofast=ip28 c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -LNO -TARG:platform=ip28 -Ofast=ip28 c-ray-mt.c -o c-ray-mt -lm -lpthread
+cc -O3 -mips4 -IPA -LNO -TARG:platform=ip28 -Ofast=ip28 c-ray-mt.c -o c-ray-mt -lm -lpthread
+

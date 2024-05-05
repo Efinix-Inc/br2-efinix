@@ -1,0 +1,9 @@
+#!/bin/sh
+cat scene | ./c-ray-f > foo.ppm
+cat scene | ./c-ray-mt -t 32 > foo.ppm
+cat sphfract | ./c-ray-f > foo.ppm
+cat sphfract | ./c-ray-mt -t 32 > foo.ppm
+cat sphfract | ./c-ray-f -s 1024x768 -r 8 > foo.ppm
+cat sphfract | ./c-ray-mt -t 32 -s 1024x768 -r 8 > foo.ppm
+cat scene | ./c-ray-f -s 7500x3500 > foo.ppm
+cat scene | ./c-ray-mt -t 32 -s 7500x3500 > foo.ppm

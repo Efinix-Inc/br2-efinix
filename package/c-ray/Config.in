@@ -1,0 +1,4 @@
+config BR2_PACKAGE_C_RAY
+	bool "c-ray"
+	help
+	  Raytracer

@@ -1,0 +1,4 @@
+config BR2_PACKAGE_TCP
+	bool "tcp"
+	help
+	  Simple tcp client/server application

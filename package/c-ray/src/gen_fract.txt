@@ -1,0 +1,32 @@
+
+From: "John Tsiombikas" <nuclear@siggraph.org>
+To: "Ian Mapleson" <mapesdhs@yahoo.com>
+Date: Tue, 9 May 2006 07:30:19 +0300
+
+Hello again, you wanted a benchmark that would take some time huh?
+Well, take a look at this :) Keeping in mind that the raytracer is
+dead-simple, brute-force, etc etc. Increasing the object count is
+a good way to make this much more complicated...
+
+I've made a small scheme program to generate the regular sphere-fractal
+recursively (mainly because I wanted something to do to learn scheme
+actually :) So you might as well try it out if you happen to have a
+scheme interpreter (like guile).
+
+here it is:
+http://nuclear.dnsalias.com/tmp/sfract/gen_fract.scm
+
+and here are a few pics:
+http://nuclear.dnsalias.com/tmp/sfract/
+
+I run it as:
+$ ./guile -s gen_fract.scm | ./c-ray-f -s 1024x768 -r 5 >out.ppm
+
+and with 5 iterations (change the 2nd argument to the (generate ...)
+call near the bottom if you wish to change them) it took about 14
+minutes on my Athlon64 :)
+
+-- 
+John Tsiombikas (Nuclear / Mindlapse)
+nuclear@siggraph.org
+http://nuclear.demoscene.gr/
