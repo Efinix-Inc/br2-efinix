@@ -1,0 +1,7 @@
+config BR2_PACKAGE_EVSOC_APP
+	bool "Evsoc Application"
+	default n
+	depends on BR2_PACKAGE_EVSOC
+	help
+	  A sample program that use evsoc char driver
+
