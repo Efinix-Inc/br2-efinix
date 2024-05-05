@@ -9,6 +9,7 @@ unset RECONFIGURE_ALL
 unset OPT_DIR
 unset ETHERNET
 unset HARDEN_SOC
+unset UNIFIED_HW
 
 BOARD=$1
 SOC_H=$2
@@ -46,9 +47,12 @@ function usage()
 	echo "	-a			Reconfigure the Buildroot configuration and regenerate Linux device tree"
 	echo "	-e                      Generate Linux configuration with ethernet support"
 	echo "  -p                      Generate Linux device tree for Sapphire High Performance SoC"
+	echo "	-u			Generate Linux device tree for unified hardware design"
 
 	echo "Example usage,"
 	echo "$0 t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
+	echo "Demo Ti375C529 with unified hardware design"
+	echo "$ source init.sh ti375c529 /path/to/soc.h -p -u"
 }
 
 function sanity_check()
@@ -134,6 +138,7 @@ function generate_device_tree()
 	local spi="-c $DT_DIR/config/linux_spi.json "
 	local ethernet="-c $DT_DIR/config/ethernet.json "
 	local sdhc="-c $DT_DIR/config/sdhc.json "
+	local unified_hw="-c $DT_DIR/config/unified_hw.json "
 
 	if [ $HARDEN_SOC ]; then
 		base_cmd+=$harden_soc
@@ -147,6 +152,10 @@ function generate_device_tree()
 		base_cmd+=$sdhc
 	else
 		base_cmd+=$spi
+	fi
+
+	if [ $UNIFIED_HW ]; then
+		base_cmd+=$unified_hw
 	fi
 
 	base_cmd+=$end_cmd
@@ -214,7 +223,7 @@ do
 	shift
 done
 
-while getopts ":d:raeph" o; do
+while getopts ":d:raephu" o; do
 	case "${o}" in
 		:)
                         echo "ERROR: Option -$OPTARG requires an argument"
@@ -234,6 +243,9 @@ while getopts ":d:raeph" o; do
 			;;
 		p)
 			HARDEN_SOC=1
+			;;
+		u)
+			UNIFIED_HW=1
 			;;
 		h)
 			usage
