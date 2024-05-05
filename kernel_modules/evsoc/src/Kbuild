@@ -1,0 +1,2 @@
+obj-m += evsoc.o
+evsoc-y := evsoc_main.o common.o PiCamDriver.o evsoc_init.o my_imp.o PiCamV3Driver.o

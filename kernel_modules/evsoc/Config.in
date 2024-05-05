@@ -1,0 +1,6 @@
+config BR2_PACKAGE_EVSOC
+	bool "simple EVSOC kernel module"
+	depends on BR2_LINUX_KERNEL
+	help
+	  simple EVSOC kernenl module sample
+
