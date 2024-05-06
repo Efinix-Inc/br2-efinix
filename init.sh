@@ -46,11 +46,12 @@ function usage()
 	echo "	-r			Reconfigure the Buildroot configuration"
 	echo "	-a			Reconfigure the Buildroot configuration and regenerate Linux device tree"
 	echo "	-e                      Generate Linux configuration with ethernet support"
-	echo "  -p                      Generate Linux device tree for Sapphire High Performance SoC"
+	echo "	-p                      Generate Linux device tree for Sapphire High Performance SoC"
 	echo "	-u			Generate Linux device tree for unified hardware design"
-
+	echo
 	echo "Example usage,"
 	echo "$0 t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
+	echo
 	echo "Demo Ti375C529 with unified hardware design"
 	echo "$ source init.sh ti375c529 /path/to/soc.h -p -u"
 }
