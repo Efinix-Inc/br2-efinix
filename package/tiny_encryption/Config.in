@@ -1,0 +1,4 @@
+config BR2_PACKAGE_TINY_ENCRYPTION
+	bool "tiny encryption"
+	help
+	  Tiny encryption demo using RISC-V custom instruction
