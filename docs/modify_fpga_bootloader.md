@@ -20,8 +20,8 @@ The table below shows the SPI flash address and corresponding RAM address for ea
 
 | Firmware | SPI Flash Address | RAM Address |
 | -------- | ----------------- | ----------- |
-| OpenSBI  | 0x00400000        | 0x01000000  |
-| U-Boot   | 0x00480000        | 0x01040000  |
+| OpenSBI  | 0x00600000        | 0x01000000  |
+| U-Boot   | 0x00680000        | 0x01040000  |
 
 ## Part 1: Modified Bootloader Program
 

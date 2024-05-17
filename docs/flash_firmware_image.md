@@ -17,8 +17,8 @@ The table below shows the addresses of firmware to be flash into the SPI flash.
 | Name                        | Binary name | SPI flash address |
 | --------------------------- | ----------- | ----------------- |
 | Sapphire SoC FPGA bitstream | soc.hex     | 0x0               |
-| OpenSBI                     | fw_jump.bin | 0x00400000        |
-| U-boot                      | u-boot.bin  | 0x00480000        |
+| OpenSBI                     | fw_jump.bin | 0x00600000        |
+| U-boot                      | u-boot.bin  | 0x00680000        |
 
 ## Flash Firmware
 
