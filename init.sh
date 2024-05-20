@@ -85,12 +85,6 @@ function sanity_check()
 		return 1
 	fi
 
-	# check for SPI1. SPI1 is used by the SD card to store Linux image
-	if [[ -z $(cat $SOC_H | grep SYSTEM_SPI_1_IO_CTRL) ]]; then
-		echo Error: The generated SoC does not enable SPI1.
-		echo        Please regenerate the SoC with SPI1.
-		return
-	fi
 }
 
 function modify_soc_h()
