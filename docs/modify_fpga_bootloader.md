@@ -6,7 +6,7 @@ The bootloader is the first program get executed when the FPGA board power on. T
 
 In this tutorial, we are going to modify the bootloader program so that it can boot Linux. OpenSBI and U-Boot will be loaded first by this bootloader program before it can boot Linux.
 
-> `$EFINITY_PROJECT` is the path to the current Efinity project. You may either replace the `$EFINITY_PROJECT` with the absolute path to your current Efinity Project (i.e. /home/<username>/efinity/2022.M/project/linux_test/soc/ip/soc1).
+> `$EFINITY_PROJECT` is the path to the current Efinity project. You may either replace the `$EFINITY_PROJECT` with the absolute path to your current Efinity Project (i.e. /home/<username>/efinity/2023.2/project/my_projects/soc/).
 
 ## Prerequsite
 
@@ -27,25 +27,28 @@ The table below shows the SPI flash address and corresponding RAM address for ea
 
 ### Using script
 
-Modifying bootloader program can be challenging for beginner. You can use `modify_bootloader.sh` script to simplify the steps for modifying bootloader program. The script will handle compiling bootloader and generating the memory initialization files. The `modify_bootloader.sh`  script located in `br2-efinix/boards/efinix/common`.
+Modifying bootloader program can be challenging for beginner. You can use `modify_bootloader.sh` script to simplify the steps for modifying bootloader program. The script will modify and compile the bootloader. The `modify_bootloader.sh`  script located in `br2-efinix/boards/efinix/common/modify_bootloader.sh`. The compiled bootloader is store in `EFINITY_PROJECT/linux_bootloader`.
 
 ```bash
-This script used to modify bootloader program for booting Linux.
+This script used to modify and compile the first stage bootloader program for booting Linux.
 
-command
-./modify_bootloader.sh <devkit> <efinity project directory> <RISCV IDE directory> <Efinity installation directory>
+usage: ./modify_bootloader.sh Devkit Project IDE [ -e][-d]
+Positional arguments:
+	Devkit		Supported devkits are t120f324, ti60f225, ti180j484, ti375c529
+	Project		Efinity project directory. For example, /home/mnalim/soc
+	IDE		    RISCV IDE installation directory. For example,
+			    /home/mnalim/efinity/efinity-riscv-ide-2022.2.3
 
-supported <devkit> are t120f324, ti60f225
-<Efinity project directory> can be /home/<user>/soc/ip/soc1
-<RISCV IDE> can be /home/<user>/efinity/efinity-riscv-ide-2022.2.3
-<Efinity installation directory> can be /home/<user>/efinity/2022.1/bin
+Optional arguments:
+	-d		Show debug message
+	-e		Use example design project of Sapphire SoC.
+			It will use the Efinity project from
+			Project/ip/<sapphire soc>/<Devkit>_devkit/
+	-h		Show this message
 
-Example command for t120f324 devkit
-./modify_bootloader.sh \
-t120f324 \
-/home/<user>/soc/ip/soc1 \
-/home/<user>/efinity/efinity-riscv-ide-2022.2.3 \
-/home/<user>/efinity/2022.1/bin
+Example,
+Modify bootloader example design of T120F324
+./modify_bootloader.sh t120f324 /home/user/soc /home/user/efinity/efinity-riscv-ide-2022.2.3 -e
 ```
 
 ### Modify manually
