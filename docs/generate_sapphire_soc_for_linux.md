@@ -61,6 +61,8 @@ Follow the official [document](https://www.efinixinc.com/support/docsdl.php?s=ef
      | T120F324  | 256 MB                       |
      | Ti60F225  | 32 MB                        |
      | Ti180J484 | 256 MB                       |
+   
+   - At On-Chip RAM Size. set to `8KB`.
 
 7. Under `Debug` tab,
    
