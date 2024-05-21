@@ -157,6 +157,11 @@ function generate_device_tree()
 	echo DEBUG: device tree cmd: $base_cmd
 	eval $base_cmd
 
+	if [ ! $? -eq 0 ]; then
+		echo "Error: Failed to generate device tree."
+		return 1
+	fi
+
 	cp $DT_DIR/dts/sapphire.dtsi $COMMON_DIR/dts/sapphire.dtsi
 	cp $DT_DIR/dts/linux.dts $EFINIX_DIR/$BOARD/linux/linux.dts
 }
@@ -304,6 +309,9 @@ if [[ $RECONFIGURE == 1 ]]; then
 			check_smp
 			modify_soc_h
 			generate_device_tree
+			if [ ! $? -eq 0 ]; then
+				return $?
+			fi
 		fi
 		cd $BUILD_DIR && \
 		make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BUILDROOT_DEFCONFIG 
@@ -319,21 +327,24 @@ substr="buildroot"
 get_version $substr
 buildroot_version=$version
 
-# clone buildroot repository
-if [[ ! -z $buildroot_version ]]; then
-	echo Using Buildroot $buildroot_version
-	git clone $BUILDROOT_REPO -b $buildroot_version
-else
-	echo Using Buildroot master/main branch
-	git clone $BUILDROOT_REPO
+if [ ! -d $BUILDROOT_DIR ]; then
+	# clone buildroot repository
+	if [[ ! -z $buildroot_version ]]; then
+		echo Using Buildroot $buildroot_version
+		git clone $BUILDROOT_REPO -b $buildroot_version
+	else
+		echo Using Buildroot master/main branch
+		git clone $BUILDROOT_REPO
+	fi
+
+	mv buildroot $BUILDROOT_DIR
+
+	# apply out of tree patches for buildroot
+	cd $BUILDROOT_DIR && \
+	git reset --hard $buildroot_version && \
+	git am $BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version/*patch && \
+	cd -
 fi
-
-mv buildroot $BUILDROOT_DIR
-
-# apply out of tree patches for buildroot
-cd $BUILDROOT_DIR && \
-git am $BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version/*patch && \
-cd -
 
 # copy soc.h to opensbi directory. Opensbi has dependency on soc.h.
 cp $SOC_H $OPENSBI_DIR/soc.h
@@ -342,4 +353,7 @@ SOC_H=$OPENSBI_DIR/soc.h
 check_smp
 modify_soc_h
 generate_device_tree
+if [ ! $? -eq 0 ]; then
+	return $?
+fi
 prepare_buildroot_env
