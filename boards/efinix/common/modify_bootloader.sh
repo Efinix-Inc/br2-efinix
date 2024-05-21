@@ -11,6 +11,8 @@ RISCV_IDE=$3
 unset EXAMPLE_DESIGN
 unset DEBUG
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 function usage()
 {
 	echo
@@ -19,7 +21,7 @@ function usage()
 	echo "usage: $0 Devkit Project IDE [ -e][-d]"
 	echo "Positional arguments:"
 	echo "	Devkit		Supported devkits are t120f324, ti60f225, ti180j484, ti375c529"
-	echo "	Project		Efinity project directory. For example, $HOME/soc"
+	echo "	Project		Full path of Efinity project directory. For example, $HOME/soc"
 	echo "	IDE		RISCV IDE installation directory. For example,"
 	echo "			$HOME/efinity/efinity-riscv-ide-2022.2.3"
 	echo
@@ -130,8 +132,9 @@ if [[ $EXAMPLE_DESIGN ]];then
 else
 	DEVKIT_DIR=
 	EXAMPLE_DESIGN_DIR=""
-	tmp=$(find $EFINITY_PROJECT -type d -name bsp)
 	embedded_sw="$EFINITY_PROJECT/embedded_sw/"
+	tmp=$(find $embedded_sw -type d -name bsp)
+	echo tmp = $tmp
 	ip_name=${tmp//"/bsp"}
 	ip_name=${ip_name//$embedded_sw}
 	SAPPHIRE_IP=$ip_name
@@ -173,12 +176,11 @@ else
 fi
 
 BOOTLOADER_DIR=$EFINITY_PROJECT_PATH/software/standalone/bootloader
-echo BOOTLOADER_DIR=$BOOTLOADER_DIR
 if [[ "Ti375C529_devkit" == *$DEVKIT* ]]; then
-	cp bootloaderConfig.h $BOOTLOADER/src
+	cp $SCRIPT_DIR/bootloaderConfig.h $BOOTLOADER/src
 	echo $BOOTLOADER_SRC
 else
-	cp bootloaderConfig.h $APP_DIR
+	cp $SCRIPT_DIR/bootloaderConfig.h $APP_DIR
 fi
 
 # check for SMP
