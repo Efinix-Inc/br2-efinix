@@ -208,8 +208,7 @@ fi
 
 BOOTLOADER_DIR=$EFINITY_PROJECT_PATH/software/standalone/bootloader
 if [[ "Ti375C529_devkit" == *$DEVKIT* ]]; then
-	cp $SCRIPT_DIR/bootloaderConfig.h $BOOTLOADER/src
-	echo $BOOTLOADER_SRC
+	cp $SCRIPT_DIR/bootloaderConfig.h $BOOTLOADER_DIR/src
 else
 	cp $SCRIPT_DIR/bootloaderConfig.h $APP_DIR
 fi
