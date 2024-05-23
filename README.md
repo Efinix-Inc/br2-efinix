@@ -56,7 +56,7 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 
 ### Efinity software version version
 
-- [Efinity](https://www.efinixinc.com/support/efinity.php) 2023.1 with patch 4 and above
+- [Efinity](https://www.efinixinc.com/support/efinity.php) 2023.2 with patch 5 and above
 - Follow the official [documentation](https://www.efinixinc.com/docs/efinity-installation-v2.6.pdf) on installation process.
 
 ### Efinity RISC-V Embedded Software IDE
@@ -110,22 +110,36 @@ Preconfigure Efinity project with Linux also provided in the repository for quic
   - `boards/efinix/ti60f225/hardware/singlecore/soc1.zip`
   
   - `boards/efinix/ti60f225/hardware/multicores/soc2.zip`
+  
+  - `boards/efinix/ti60f225/hardware/ethernet/ti60-tsemac-linux.zip`
 
 - Ti180J484
   
   - `boards/efinix/ti180j484/hardware/singlecore/soc1.zip`
   
   - `boards/efinix/ti180j484/hardware/multicores/soc4.zip`
+  
+  - `boards/efinix/ti180j484/hardware/ethernet/ti180-tsemac-linux.zip`
 
-The compiled bitstream file also provided for quick start in `soc.hex` format. This file stored in the Efinity project file for each supported development board. By using these files, user are not require to load and compile the Efinity project.
 
-### 2. Generate yourself
 
-Follow the [generate Efinix Sapphire RISC-V SoC](docs/generate_sapphire_soc_for_linux.md) document to generate the custom soc that can boot Linux.
+The precompiled bitstream file also provided for quick start in `soc.hex` format. This file stored in the Efinity project file for each supported development board. By using these files, user are not require to load and compile the Efinity project.
+
+### 2. Generate Custom SoC
+
+Follow these documents to generate the custom soc.
+
+- For Sapphire High Performance SoC on Ti375C529
+  
+  - [generate Efinix Sapphire High Performance SoC](docs/generate_sapphirehpsoc.md)
+
+- For Sapphire SoC on T120F324, Ti60F225 and Ti180J484
+  
+  - [generate Efinix Sapphire RISC-V SoC](docs/generate_sapphire_soc_for_linux.md)
 
 ## Software: Build OpenSBI, U-Boot and Linux
 
-Please note that you need to generate the SoC first before proceed with this section. Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 development kit. These steps will build Linux based on Buildroot 2021.05.3.
+Please note that you need to generate the SoC first before proceed with this section. Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 development kit. These steps are applicable for all supported devices.
 
 1. Clone this repository.
    
