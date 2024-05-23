@@ -4,9 +4,9 @@
 
 The bootloader is the first program get executed when the FPGA board power on. The default bootloader would not able to boot Linux kernel. 
 
-In this tutorial, we are going to modify the bootloader program so that it can boot Linux. OpenSBI and U-Boot will be loaded first by this bootloader program before it can boot Linux.
+In this tutorial, we are going to modify the bootloader program so that it can boot Linux. OpenSBI and U-Boot will be loaded first by this bootloader program before it can boot Linux. Make sure the Efinity project already created. If not exists then create a new project. See [Generate Sapphire SoC for Linux](generate_sapphire_soc_for_linux.md) guide to generate a Sapphire SoC.
 
-> `$EFINITY_PROJECT` is the path to the current Efinity project. You may either replace the `$EFINITY_PROJECT` with the absolute path to your current Efinity Project (i.e. /home/<username>/efinity/2023.2/project/my_projects/soc/).
+The `EFINITY_PROJECT` is set as `/home/user/my_proj` targeting Ti375C529 for this tutorial.
 
 ## Prerequsite
 
@@ -25,80 +25,90 @@ The table below shows the SPI flash address and corresponding RAM address for ea
 
 ## Part 1: Modified Bootloader Program
 
-### Using script
+Modifying bootloader program can be challenging for beginner. There are **TWO** ways to modify and compile the bootloader program.
 
-Modifying bootloader program can be challenging for beginner. You can use `modify_bootloader.sh` script to simplify the steps for modifying bootloader program. The script will modify and compile the bootloader. The `modify_bootloader.sh`  script located in `br2-efinix/boards/efinix/common/modify_bootloader.sh`. The compiled bootloader is store in `EFINITY_PROJECT/linux_bootloader`.
+1. Using `modify_bootloader.sh` script. (Recommended for beginner)
+
+2. Modify manually.
+
+### 1a: Using modify_bootloader.sh script
+
+The `modify_bootloader.sh` script simplify the steps for modifying bootloader program and compilation. The `modify_bootloader.sh`  script located in [modify_bootloader.sh](br2-efinix/boards/efinix/common/modify_bootloader.sh). The compiled bootloader is store in `EFINITY_PROJECT/linux_bootloader`.
 
 ```bash
 This script used to modify and compile the first stage bootloader program for booting Linux.
 
 usage: ./modify_bootloader.sh Devkit Project IDE [ -e][-d]
 Positional arguments:
-	Devkit		Supported devkits are t120f324, ti60f225, ti180j484, ti375c529
-	Project		Efinity project directory. For example, /home/mnalim/soc
-	IDE		    RISCV IDE installation directory. For example,
-			    /home/mnalim/efinity/efinity-riscv-ide-2022.2.3
+    Devkit         Supported devkits are t120f324, ti60f225, ti180j484, ti375c529
+    Project        Efinity project directory. For example, /home/mnalim/soc
+    IDE            RISCV IDE installation directory. For example,
+                   /home/mnalim/efinity/efinity-riscv-ide-2022.2.3
 
 Optional arguments:
-	-d		Show debug message
-	-e		Use example design project of Sapphire SoC.
-			It will use the Efinity project from
-			Project/ip/<sapphire soc>/<Devkit>_devkit/
-	-h		Show this message
+    -d        Show debug message
+    -e        Use example design project of Sapphire SoC.
+              It will use the Efinity project from
+              Project/ip/<sapphire soc>/<Devkit>_devkit/
+    -h        Show this message
 
 Example,
 Modify bootloader example design of T120F324
 ./modify_bootloader.sh t120f324 /home/user/soc /home/user/efinity/efinity-riscv-ide-2022.2.3 -e
 ```
 
-### Modify manually
+To modify the bootloader and compile using this script
 
-1. Create a Efinity project in `/home/user/efinity_projects` as `EFINITY_PROJECT`. See [Generate Sapphire SoC for Linux](generate_sapphire_soc_for_linux.md) guide to generate a Sapphire SoC.
+```bash
+./modify_bootloader.sh ti375c529 /home/user/my_proj /home/user/efinity/efinity-riscv-ide-2022.2.3 -e
+```
 
-2. Copy and replace [bootloaderConfig.h](board/efinix/common/bootloaderConfig.h) to your project path. For example, `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/bsp/efinix/EfxSapphireSoc/app/bootloaderConfig.h`.
+### 1b: Modify manually
 
-3. If the target SoC is multicore, then enable SMP flag in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/bsp/efinix/EfxSapphireSoc/include/soc.mk` . Just append it in `soc.mk`.
+1. Copy and replace [bootloaderConfig.h](board/efinix/common/bootloaderConfig.h) to your project path.
+   
+   - For Ti375C529
+     
+     - `$EFINITY_PROJECT/ip/EfxSapphireHpSoc_slb/Ti375C529_devkit/embedded_sw/efx_hard_soc/software/standalone/bootloader/src/bootloaderConfig.h`
+   
+   - Other than Ti375C529
+     
+     - `$EFINITY_PROJECT/ip/<sapphiresoc>/Ti180J484_devkit/embedded_sw/bsp/efinix/EfxSapphireSoc/app/bootloaderConfig.h`.
+
+2. If the target SoC is multicore, then enable SMP flag in
+   
+   - For Ti375C529
+     
+     - `$EFINITY_PROJECT/ip/EfxSapphireHpSoc_slb/Ti375C529_devkit/embedded_sw/efx_hard_soc/software/standalone/bootloader/src/makefile`
+   
+   - Other than Ti375C529
+     
+     - `$EFINITY_PROJECT/ip/<sapphiresoc>/Ti180J484_devkit/embedded_sw/bsp/efinix/EfxSapphireSoc/include/soc.mk`. Just append it in`soc.mk`.
    
    ```makefile
    CFLAGS += -DSMP
    ```
 
-4. Compile the bootloader program. See secton Part 2: Compile Bootloader Program.
-
-## Part 2: Compile Bootloader Program
-
-Bootloader program is located in `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/software/standalone/bootloader`. There are **TWO** ways to compile the bootloader program.
-
-### Method 1: Using Efinity RISC-V Embedded Software IDE
-
-1. Run Efinity RISC-V Embedded Software IDE from terminal.
+3. Launch Efinity RISC-V Embedded Software IDE from terminal to compile the bootloader program.
    
    ```bash
-   cd </path/to/efinity/efinity-riscv-ide-2022.2.3
+   cd /home/user/efinity/efinity-riscv-ide-2022.2.3
    ./efinity-riscv-ide
    ```
 
-2. At the Efinity RISC-V IDE Launcher, click `Browse` button. Select the folder, `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>` as the workspace.
+4. At the Efinity RISC-V IDE Launcher, click `Browse` button. Select the folder, `$EFINITY_PROJECT/ip/EfxSapphireHpSoc_slb/Ti375C529_devkit/embedded_sw/efx_hard_soc` as the workspace.
    
    > The workspace must be placed in this directory in order for the Efinity RISC-V IDE toolchain to use the correct bsp files.
 
-3. Click on `File` -> `Import` -> `Efinix Projects`->`Efinix Makefile Project` then click `Next`.
+5. Click on `File` -> `Import` -> `Efinix Projects`->`Efinix Makefile Project` then click `Next`.
 
-4. Put the `BSP Location`. The location could be `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/bsp` then click `Next`.
+6. Put the `BSP Location`. The location could be `$EFINITY_PROJECT/ip/EfxSapphireHpSoc_slb/Ti375C529_devkit/embedded_sw/efx_hard_soc/bsp` then click `Next`.
 
-5. Select `bootloader` then click `Finish`.
+7. Select `bootloader` then click `Finish`.
 
-6. Right click on the `bootloader` on the `Project Explorer` and select `Build Project`.
+8. Right click on the `bootloader` on the `Project Explorer` and select `Build Project`.
 
-### Method 2: Using Command Line in Linux
-
-```bash
-export PATH=</path/to/efinity/efinity-riscv-ide-2022.2.3/toolchain/bin:$PATH
-cd $EFINITY_PROJECT/T120F324_devkit/embedded_sw/<Project Name>/software/standalone/bootloader
-BSP_PATH=$EFINITY_PROJECT/T120F324_devkit/embedded_sw/<project name>/bsp/efinix/EfxSapphireSoc make
-```
-
-## Part 3: Compile Efinity Project
+## Part 2: Compile Efinity Project
 
 1. Open the existing Efinity project using Efinity software.
 
