@@ -74,10 +74,12 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 - PMOD microSD card module*
 - UART module*
 - 3x male-to-female jumper cable*
-- 1x MIPI and LVDS extension daughter card*
+- 1x MIPI and LVDS extension daughter card
 - 2x USB micro cable*
+- USB C cable
 - External SD Card reader (if integrated SD Card Reader unavailable)
 - MicroSD Adapter to adapt MicroSD to SD Card Reader (if MicroSD Card Reader unavailable)
+- Ethernet cable
 
 `Note: * only required for Trion T120F324.`
 
@@ -121,9 +123,13 @@ Preconfigure Efinity project with Linux also provided in the repository for quic
   
   - `boards/efinix/ti180j484/hardware/ethernet/ti180-tsemac-linux.zip`
 
+- Ti375C529
+  
+  - `boards/efinix/ti375c529/hardware/soc/soc.zip`
+  
+  - `boards/efinix/ti375c529/hardware/unified_hw/unified_hw.zip`
 
-
-The precompiled bitstream file also provided for quick start in `soc.hex` format. This file stored in the Efinity project file for each supported development board. By using these files, user are not require to load and compile the Efinity project.
+The precompiled bitstream file also provided for quick start in the `hex` format. This file stored in the Efinity project file for each supported development board. By using these files, user are not require to load and compile the Efinity project.
 
 ### 2. Generate Custom SoC
 
@@ -139,27 +145,23 @@ Follow these documents to generate the custom soc.
 
 ## Software: Build OpenSBI, U-Boot and Linux
 
-Please note that you need to generate the SoC first before proceed with this section. Follow these steps to build Linux image, OpenSBI and U-boot for T120F324 development kit. These steps are applicable for all supported devices.
+Please note that you need to generate the SoC first before proceed with this section. Follow these steps to build Linux image, OpenSBI and U-boot for Ti375C529 development kit using precompile bitstream of unified hardware at `boards/efinix/ti375c529/hardware/soc/soc.zip`
+
+To build Linux image on other supported devices see [Build Linux Image](docs/build_linux_image.md) document.
 
 1. Clone this repository.
    
    ```bash
-   git clone https://github.com/Efinix-Inc/br2-efinix -b 2021.05.8
+   git clone https://github.com/Efinix-Inc/br2-efinix -b 2021.05.9
    cd br2-efinix
    ```
 
-2. Run `init.sh` script. `init.sh` require 2 arguments. First argument is board name such as `t120f324`. Second argument is `/path/to/soc.h`. You can get the `soc.h` from `Efinity` project directory. For example, `$EFINITY_PROJECT/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h`.
-   
-   Please note that `$EFINITY_PROJECT` is path to your Efinity project. For example, `EFINITY_PROJECT=/home/user/efinity/project/soc`.
+2. Run `init.sh` script. Please note that we need to pass the argument `-p` and `-e` for generating Linux device tree with ethernet support.
    
    ```bash
-   source init.sh t120f324 $EFINITY_PROJECT/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h
-   ```
-   
-   If you are using preconfigure Efinity project for T120F324 with 4 cores, then point the path to `soc.h` as follows
-   
-   ```bash
-   source init.sh t120f324 boards/efinix/t120f324/hardware/4-cores/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h
+   source init.sh ti375c529 \
+   boards/efinix/ti375c529/hardware/soc/soc.h \
+   -p -e
    ```
 
 3. Build the Linux.
@@ -168,7 +170,7 @@ Please note that you need to generate the SoC first before proceed with this sec
    make -j$(nproc)
    ```
 
-4. The output images are located in `<path/to/br2-efinix/../build_t120f324/build/images`.
+4. The output images are located in `<path/to/br2-efinix/../build_ti375c529/build/images`.
    
    - `sdcard.img` is a Linux image
    
@@ -178,7 +180,7 @@ Please note that you need to generate the SoC first before proceed with this sec
 
 5. Flash firmware images.
    
-   - Follow [Flash firmware image](docs/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the T120F324 devkit.
+   - Follow [Flash firmware image](docs/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the Ti375C529 devkit.
 
 6. Flash Linux image `sdcard.img` in to SD card.
    
@@ -193,13 +195,6 @@ Please note that you need to generate the SoC first before proceed with this sec
    ![alt text](docs/img/boot_linux_smp.gif)
 
 9. Use the login prompt as `root` at linux prompt.
-
-10. Try run gpio demo application. See [gpio](kernel_modules/gpio/README.md) for more info. Observe the LEDs blinking on the T120F324 board.
-    
-    ```bash
-    modprobe gpio
-    gpio_app
-    ```
 
 ## What's Next?
 
@@ -223,6 +218,7 @@ Currently supported board as follows
 1. Trion T120F324  
 2. Titanium Ti60F225  
 3. Titanium Ti180J484
+4. Titanium Ti375C529
 
 ## License
 
