@@ -129,15 +129,10 @@ function generate_device_tree()
 {
 	local base_cmd="python3 $DT_DIR/device_tree_generator.py -s $DT_DIR/config/linux_slaves.json "
 	local end_cmd="$SOC_H $BOARD linux"
-	local harden_soc="-b $DT_DIR/config/dual_bus.json "
 	local spi="-c $DT_DIR/config/linux_spi.json "
 	local ethernet="-c $DT_DIR/config/ethernet.json "
 	local sdhc="-c $DT_DIR/config/sdhc.json "
 	local unified_hw="-c $DT_DIR/config/unified_hw.json "
-
-	if [ $HARDEN_SOC ]; then
-		base_cmd+=$harden_soc
-	fi
 
 	if [ $ETHERNET ]; then
 		base_cmd+=$ethernet
