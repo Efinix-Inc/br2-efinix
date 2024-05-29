@@ -33,7 +33,7 @@ Modifying bootloader program can be challenging for beginner. There are **TWO** 
 
 ### 1a: Using modify_bootloader.sh script
 
-The `modify_bootloader.sh` script simplify the steps for modifying bootloader program and compilation. The `modify_bootloader.sh`  script located in [modify_bootloader.sh](br2-efinix/boards/efinix/common/modify_bootloader.sh). The compiled bootloader is store in `EFINITY_PROJECT/linux_bootloader`.
+The `modify_bootloader.sh` script simplify the steps for modifying bootloader program and compilation. The `modify_bootloader.sh`  script located in [modify_bootloader.sh](../boards/efinix/common/modify_bootloader.sh). The compiled bootloader is store in `EFINITY_PROJECT/linux_bootloader`.
 
 ```bash
 This script used to modify and compile the first stage bootloader program for booting Linux.
