@@ -131,11 +131,16 @@ function generate_device_tree()
 	local end_cmd="$SOC_H $BOARD linux"
 	local spi="-c $DT_DIR/config/linux_spi.json "
 	local ethernet="-c $DT_DIR/config/ethernet.json "
+	local ethernet_ed="-c $DT_DIR/config/ed_ti375c529.json "
 	local sdhc="-c $DT_DIR/config/sdhc.json "
 	local unified_hw="-c $DT_DIR/config/unified_hw.json "
 
 	if [ $ETHERNET ]; then
-		base_cmd+=$ethernet
+		if [ $HARDEN_SOC ]; then
+			base_cmd+=$ethernet_ed
+		else
+			base_cmd+=$ethernet
+		fi
 	fi
 
 	if [ $SDHC ]; then
@@ -144,8 +149,24 @@ function generate_device_tree()
 		base_cmd+=$spi
 	fi
 
+	if [ $HARDEN_SOC ]; then
+		if [ ! -f "$EFINIX_DIR/$BOARD/u-boot/uboot.dts.spi" ]; then
+			cp $EFINIX_DIR/$BOARD/u-boot/uboot.dts $EFINIX_DIR/$BOARD/u-boot/uboot.dts.spi
+			cp $EFINIX_DIR/$BOARD/u-boot/uboot.dts.mmc $EFINIX_DIR/$BOARD/u-boot/uboot.dts
+		fi
+	else
+		if [ -f "$EFINIX_DIR/$BOARD/u-boot/uboot.dts.spi" ]; then
+			mv $EFINIX_DIR/$BOARD/u-boot/uboot.dts.spi $EFINIX_DIR/$BOARD/u-boot/uboot.dts
+		fi
+	fi
+
 	if [ $UNIFIED_HW ]; then
-		base_cmd+=$unified_hw
+		if [ $HARDEN_SOC ]; then
+			base_cmd+=$unified_hw
+		else
+			echo Error: Unified hardware not support for $BOARD
+			exit 1
+		fi
 	fi
 
 	base_cmd+=$end_cmd
