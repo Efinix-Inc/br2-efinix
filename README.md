@@ -101,33 +101,33 @@ Efinity software is required to generate the Sapphire RISC-V SoC. There are two 
 
 Preconfigure Efinity project with Linux also provided in the repository for quick start. User just need to unzip the project and load the `soc.xml` project file in the Efinity software and click `Synthesize` button to generate the fpga bitstream.
 
-- T120F324
+- **T120F324**
   
-  - `boards/efinix/t120f324/hardware/singlecore/soc1.zip`
+  - [boards/efinix/t120f324/hardware/singlecore](boards/efinix/t120f324/hardware/singlecore/)
   
-  - `boards/efinix/t120f324/hardware/multicores/soc4.zip`
+  - [boards/efinix/t120f324/hardware/multicores](boards/efinix/t120f324/hardware/multicores/)
 
-- Ti60F225
+- **Ti60F225**
   
-  - `boards/efinix/ti60f225/hardware/singlecore/soc1.zip`
+  - [boards/efinix/ti60f225/hardware/singlecore](boards/efinix/ti60f225/hardware/singlecore/)
   
-  - `boards/efinix/ti60f225/hardware/multicores/soc2.zip`
+  - [boards/efinix/ti60f225/hardware/multicores](boards/efinix/ti60f225/hardware/multicores/)
   
-  - `boards/efinix/ti60f225/hardware/ethernet/ti60-tsemac-linux.zip`
+  - [boards/efinix/ti60f225/hardware/ethernet](boards/efinix/ti60f225/hardware/ethernet/)
 
-- Ti180J484
+- **Ti180J484**
   
-  - `boards/efinix/ti180j484/hardware/singlecore/soc1.zip`
+  - [boards/efinix/ti180j484/hardware/singlecore](boards/efinix/ti180j484/hardware/singlecore/)
   
-  - `boards/efinix/ti180j484/hardware/multicores/soc4.zip`
+  - [boards/efinix/ti180j484/hardware/multicores](boards/efinix/ti180j484/hardware/multicores/)
   
-  - `boards/efinix/ti180j484/hardware/ethernet/ti180-tsemac-linux.zip`
+  - [boards/efinix/ti180j484/hardware/ethernet](boards/efinix/ti180j484/hardware/ethernet/)
 
-- Ti375C529
+- **Ti375C529**
   
-  - `boards/efinix/ti375c529/hardware/soc/soc.zip`
+  - [boards/efinix/ti375c529/hardware/soc](boards/efinix/ti375c529/hardware/soc/)
   
-  - `boards/efinix/ti375c529/hardware/unified_hw/unified_hw.zip`
+  - [boards/efinix/ti375c529/hardware/unified_hw](boards/efinix/ti375c529/hardware/unified_hw)
 
 The precompiled bitstream file also provided for quick start in the `hex` format. This file stored in the Efinity project file for each supported development board. By using these files, user are not require to load and compile the Efinity project.
 
@@ -200,9 +200,11 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
 
 1. You might want to write you own driver or custom application but do no know how to integrate it with Buildroot. See [kernel module and package](docs/kernel_module_and_packages.md) tutorial.
 
-2. [Debugging Linux Kernel](docs/debugging_linux_kernel.md)
+2. [Debugging application using GDB/GDBserver](docs/debugging/linux_application_debugging.md)
 
-3. [Linux ethernet support](docs/ethernet_example_design.md)
+3. [Debugging Linux Kernel](docs/debugging_linux_kernel.md)
+
+4. [Linux ethernet support](docs/ethernet_example_design.md)
 
 ## Documentation
 
@@ -213,11 +215,11 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
 
 ## Supported Board
 
-Currently supported board as follows  
+Currently supported development board
 
-1. Trion T120F324  
-2. Titanium Ti60F225  
-3. Titanium Ti180J484
+1. [Trion T120F324 ](https://www.efinixinc.com/products-devkits-triont120bga324.html)
+2. [Titanium Ti60F225 ](https://www.efinixinc.com/products-devkits-titaniumti60f225.html)
+3. [Titanium Ti180J484](https://www.efinixinc.com/products-devkits-titaniumti180j484.html)
 4. Titanium Ti375C529
 
 ## License
