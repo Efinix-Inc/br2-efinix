@@ -35,7 +35,7 @@ Ethernet example design for Ti60F225
 
 **Steps**
 
-**Ti180M484**
+**Ti180J484**
 
 1. Connect the FMC-to-QSE adapter card to Ti180J484 devkit
 
@@ -71,24 +71,4 @@ For example to build Linux kernel with ethernet support for the following board
   make -j$(nproc)
   ```
 
-### Assigning IP Address for the Devkit
-
-If the devkit connected to existing local network, DHCP server would assign the IP address for the devkit. Below are the steps to assign the static IP address.
-
-1. Boot up the devkit with Linux
-
-2. Set the IP address
-   
-   ```bash
-   ifconfig eth0 192.168.5.2 up
-   ```
-
-3. On host, set the IP address such as `192.168.5.3`
-
-4. Run `ping` command to test the connection on devkit
-   
-   ```bash
-   ping 192.168.5.3
-   ```
-   
-   > If you are using Windows and ping is not responding, try to disable the firewall then retry.
+See the [document](configure_the_board.md) to configure the board.
