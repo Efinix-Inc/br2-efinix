@@ -2,6 +2,20 @@
 
 This is an example design to showcase the Efinix Sapphire High Performance SoC integrate with triple speed ethernet, SD host controller, MIPI camera and HDMI.
 
+| Address    | Bus          | Peripheral                      | Interrupt number |
+| ---------- | ------------ | ------------------------------- | ---------------- |
+| 0xe8000000 | axi slave 0  |                                 |                  |
+| 0xe8010000 |              | uart0                           | 9                |
+| 0xe8020000 |              | i2c0                            | 10               |
+| 0xe8030000 |              | spi0                            | 11               |
+| 0xe8040000 |              | gpio0                           | 13, 14           |
+| 0xe8100000 | apb3 slave 0 | dma0                            | 7, 8             |
+| 0xe8200000 | apb3 slave 1 | camera & display registers      | -                |
+| 0xe8300000 | apb3 slave 2 | hardware accelerator dma_vision | 2                |
+| 0xe9000000 | axi slave 1  | sd host controller              | 6                |
+| 0xe9100000 | axi slave 2  | triple speed ethernet           | -                |
+| 0xe9200000 | axi slave 3  | hdmi                            | -                |
+
 ## Additional Hardware Requirements
 
 - Raspberry Pi Camera V3 Module
