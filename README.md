@@ -145,7 +145,7 @@ Follow these documents to generate the custom soc.
 
 ## Software: Build OpenSBI, U-Boot and Linux
 
-Please note that you need to generate the SoC first before proceed with this section. Follow these steps to build Linux image, OpenSBI and U-boot for Ti375C529 development kit using precompile bitstream of unified hardware at `boards/efinix/ti375c529/hardware/soc/soc.zip`
+Please note that you need to generate the SoC first before proceed with this section. Follow these steps to build Linux image, OpenSBI and U-boot for Ti375C529 development kit using precompile bitstream of Efinity project at [boards/efinix/ti375c529/hardware/soc/soc.zip](boards/efinix/ti375c529/hardware/soc/soc.zip).
 
 To build Linux image on other supported devices see [Build Linux Image](docs/build_linux_image.md) document.
 
@@ -196,6 +196,8 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
 
 9. Use the login prompt as `root` at linux prompt.
 
+10. Run the [demo](docs/demo.md) applications.
+
 ## What's Next?
 
 1. You might want to write you own driver or custom application but do no know how to integrate it with Buildroot. See [kernel module and package](docs/kernel_module_and_packages.md) tutorial.
@@ -220,7 +222,7 @@ Currently supported development board
 1. [Trion T120F324 ](https://www.efinixinc.com/products-devkits-triont120bga324.html)
 2. [Titanium Ti60F225 ](https://www.efinixinc.com/products-devkits-titaniumti60f225.html)
 3. [Titanium Ti180J484](https://www.efinixinc.com/products-devkits-titaniumti180j484.html)
-4. Titanium Ti375C529
+4. [Titanium Ti375C529](https://www.efinixinc.com/products-devkits-titaniumti375c529.html)
 
 ## License
 
