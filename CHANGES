@@ -1,3 +1,25 @@
+br2-efinix 2021.05.9,
+
+	Add support for Ti375C529 development board
+	Use v2.1 for sapphire-soc-dt-generator repository
+	Update the steps to modify the first stage bootloader
+	Ti375C529: add unified hardware and hard soc example design
+	Update all example design for supported board
+	Change the start addresses for OpenSBI and U-boot
+	Add new packages such as evsoc_app, evsoc_camera, tiny_encryption and benchmark tools
+	Add kernel_module for evsoc driver
+	Enable master mode configuration for RTL8211F
+	Enable ADMA support for Linux SD host controller driver
+	Add SD host driver for Linux and U-boot
+
+	Issues resolved
+	modify_bootloader.sh: fix copy bootloader file to bootloader src directory
+	patch: fix kernel crash due to phy reset
+	patches: opensbi: fix crash when unalign access using GET_F64_REG function
+	package: fix compiler warning for gpio_app
+	init.sh: fix query device name using jq
+	patches: linux: fix sd host controller initialization
+
 br2-efinix 2021.05.8,
 
 	Add step to enable RISCV compresssed extension
