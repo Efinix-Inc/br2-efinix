@@ -322,12 +322,9 @@ if [[ $RECONFIGURE == 1 ]]; then
 			cp $SOC_H $OPENSBI_DIR/soc.h
 			SOC_H=$OPENSBI_DIR/soc.h
 
-			check_smp
-			modify_soc_h
-			generate_device_tree
-			if [ ! $? -eq 0 ]; then
-				return $?
-			fi
+			check_smp || return 1
+			modify_soc_h || return 1
+			generate_device_tree || return 1
 		fi
 		cd $BUILD_DIR && \
 		make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BUILDROOT_DEFCONFIG 
@@ -356,20 +353,15 @@ if [ ! -d $BUILDROOT_DIR ]; then
 	mv buildroot $BUILDROOT_DIR
 
 	# apply out of tree patches for buildroot
-	cd $BUILDROOT_DIR && \
-	git reset --hard $buildroot_version && \
-	git am $BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version/*patch && \
-	cd -
-fi
+	git -C $BUILDROOT_DIR reset --hard $buildroot_version
+	git -C $BUILDROOT_DIR am $BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version/*patch
+fi || return 1
 
 # copy soc.h to opensbi directory. Opensbi has dependency on soc.h.
-cp $SOC_H $OPENSBI_DIR/soc.h
+cp $PROJ_DIR/$SOC_H $OPENSBI_DIR/soc.h
 SOC_H=$OPENSBI_DIR/soc.h
 
-check_smp
-modify_soc_h
-generate_device_tree
-if [ ! $? -eq 0 ]; then
-	return $?
-fi
-prepare_buildroot_env
+check_smp || return 1
+modify_soc_h || return 1
+generate_device_tree || return 1
+prepare_buildroot_env || return 1
