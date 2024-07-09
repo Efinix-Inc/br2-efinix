@@ -151,14 +151,21 @@ Please note that you need to generate the SoC first before proceed with this sec
 
 To build Linux image on other supported devices see [Build Linux Image](docs/build_linux_image.md) document.
 
-1. Clone this repository.
+1. Set the username and email address on gitconfig
+
+   ```bash
+   git config --global user.name "Your Name"
+   git config --global user.email "your@email.com"
+   ```
+
+2. Clone this repository.
    
    ```bash
    git clone https://github.com/Efinix-Inc/br2-efinix -b 2021.05.9
    cd br2-efinix
    ```
 
-2. Run `init.sh` script. Please note that we need to pass the argument `-p` and `-e` for generating Linux device tree with ethernet support.
+3. Run `init.sh` script. Please note that we need to pass the argument `-p` and `-e` for generating Linux device tree with ethernet support.
    
    ```bash
    source init.sh ti375c529 \
@@ -166,13 +173,13 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
    -p -e
    ```
 
-3. Build the Linux.
+4. Build the Linux.
    
    ```bash
    make -j$(nproc)
    ```
 
-4. The output images are located in `<path/to/br2-efinix/../build_ti375c529/build/images`.
+5. The output images are located in `<path/to/br2-efinix/../build_ti375c529/build/images`.
    
    - `sdcard.img` is a Linux image
    
@@ -180,25 +187,25 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
    
    - `u-boot` is an U-boot image
 
-5. Flash firmware images.
+6. Flash firmware images.
    
    - Follow [Flash firmware image](docs/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the Ti375C529 devkit.
 
-6. Flash Linux image `sdcard.img` in to SD card.
+7. Flash Linux image `sdcard.img` in to SD card.
    
    - you can use [Etcher](https://www.balena.io/etcher/) for Linux
    
    - or, Linux command line to flash the Linux image into SD card. See [flash linux](docs/flash_linux.md) document.
 
-7. Access the board serial console over USB UART. See [accessing uart terminal](docs/accessing_uart_terminal.md) document.
+8. Access the board serial console over USB UART. See [accessing uart terminal](docs/accessing_uart_terminal.md) document.
 
-8. Example of Linux boot.
+9. Example of Linux boot.
    
    ![alt text](docs/img/boot_linux_smp.gif)
 
-9. Use the login prompt as `root` at linux prompt.
+10. Use the login prompt as `root` at linux prompt.
 
-10. Run the [demo](docs/demo.md) applications.
+11. Run the [demo](docs/demo.md) applications.
 
 ## What's Next?
 
