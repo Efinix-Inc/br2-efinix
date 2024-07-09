@@ -1,0 +1,135 @@
+.row {
+    display: flex;
+    /*
+    margin: 1px;
+    padding: 1px;
+    box-sizing: border-box;
+    */
+}
+
+hr {
+    border: none;
+    border-top: 2px solid #777;
+    margin: 50px 0;
+}
+
+.column1 {
+    flex: 70%;
+    padding: 2px;
+    margin: 2px;
+    box-sizing: border-box;
+}
+
+.column2 {
+    flex: 30%;
+    margin: 2px;
+    padding: 15px;
+    box-sizing: border-box;
+    background-color: #f2f2f2;
+    height: 100vh;
+}
+
+
+.camera_output {
+    height: 600px;
+    width: auto;
+    background-color: #3e3e3e;
+}
+
+@keyframes blink {
+    0% {opacity: 1;}
+    50% {opacity: 0;}
+    100% {opacity: 1;}
+}
+
+.blink {
+    animation: blink 1s linear;
+    height: 600px;
+    width: auto;
+}
+
+.button, .button-click {
+    border: none;
+    color: white;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.button {
+    background-color: #04AA6D; /* Green */
+}
+
+.button-click {
+    background-color: #038e5b; /* Darker Green */
+}
+
+.slider {
+    width: 100%;
+}
+
+div.gallery {
+    border: 1px solid #ccc;
+}
+  
+div.gallery:hover {
+    border: 1px solid #777;
+}
+
+.responsive {
+    padding: 0 6px;
+    float: left;
+    width: 24.99999%;
+}
+
+div.gallery img {
+    width: 100%;
+    height: auto;
+}
+
+@media only screen and (max-width: 700px) {
+    .responsive {
+      width: 49.99999%;
+      margin: 6px 0;
+    }
+}
+  
+@media only screen and (max-width: 500px) {
+    .responsive {
+      width: 100%;
+    }
+}
+  
+.clearfix:after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+.div-center {
+    display: flex;
+    /*align-items: center;*/
+    justify-content: center;
+    padding: 6px;
+}
+
+#pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+}
+
+#pagination button {
+    padding: 10px 20px;
+    margin: 0 10px;
+}
+
+#pagination .btn_prev:disabled,
+#pagination .btn_next:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

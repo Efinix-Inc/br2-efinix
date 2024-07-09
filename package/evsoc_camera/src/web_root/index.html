@@ -1,100 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <link rel="icon" href="data:,">
     <title>EvSoC Camera Stream</title>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <style>
-      #container { margin-right: auto; margin-left: auto; max-width: 1000px; }
-      #info { background: #e0f0f0; border-radius: .5em; padding: 2em;  }
-      img { width: 100%; margin-top: 1em; border: 1px solid #ccc; }
+</head>
+<body>
+    <div class="row">
+        <div class="column1">
+            <div class="camera_output div-center">
+                <img id="camera_output" src="/api/camera" alt="stream camera" class="camera_output"/>
+            </div>
+            <div>
+                <div>
+                    <h4>Gallery</h4>
+                </div>
+                <div id="div-gallery">
+                    <div id="gallery" class="div-center"></div>
+                </div>
 
-    </style>
-  </head>
-  <body>
-    <div id="container">
-      <div id="info">
-        EvSoC live camera stream
-        <br/>
-      </div>
-      <img src="/api/camera" alt="stream camera"/>
-	</script>
-	</br>
+            </div>
+            <div class="clearfix"></div>
+            <div style="padding:6px;"></div>
+            <div class="div-center">
+                <div id="pagination">
+                    <button class="btn_prev button" disabled>Prev</button>
+                    <span id="page-num"></span>
+                    <button class="btn_next button">Next</button>
+                </div>
+            </div>
+        </div>
 
-	<button id="btn_erosion">Grayscale</button>
+        <div class="column2">
+            <div>
+                <h4>Camera Settings</h4>
+                <div>
+                <p>Digital Gain: <span id="p_digital_gain"></span></p>
+                <input type="range" min="0" max="20" value="4" class="slider" id="slider_digital_gain">
+                <p>Exposure: <span id="p_exposure"></span></p>
+                <input type="range" min="0" max="20" value="4" class="slider" id="slider_exposure">
+                </div>
+            </div>
+            <hr>
+            <div>
+                <h4>Effect</h4>
+                <div>
+                    <div class="div-center">
+                        <button id="btn_normal" class="button">Normal</button>
+                        <button id="btn_sw_grayscale" class="button">Edge Detection</button>
+                        <button id="btn_erosion" class="button">Grayscale</button>
+                    </div>
 
-	<script>
-	document.getElementById('btn_erosion').addEventListener('click', function() {
-	    fetch('/btn_erosion', {
-		method: 'POST',
-		headers: {
-		    'Content-Type': 'application/json'
-		},
-		body: JSON.stringify({ myData: 'enable erosion custom instruction' })
-	    })
-	    .then(response => response.json())
-	    .then(data => console.log(data))
-	    .catch((error) => {
-	      console.error('Error:', error);
-	    });
-	});
-	</script>
-
-	<button id="btn_sw_grayscale">Canny</button>
-	<script>
-	document.getElementById('btn_sw_grayscale').addEventListener('click', function() {
-            fetch('/btn_sw_grayscale', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ myData: 'enable software grayscale' })
-            })
-            .then(response => response.json())
-            .then(data => console.log(data))
-            .catch((error) => {
-              console.error('Error:', error);
-            });
-        });
-	</script>
-
-	<button id="btn_reset">Reset</button>
-
-        <script>
-        document.getElementById('btn_reset').addEventListener('click', function() {
-            fetch('/btn_reset', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ myData: 'reset' })
-            })
-            .then(response => response.json())
-            .then(data => console.log(data))
-            .catch((error) => {
-              console.error('Error:', error);
-            });
-        });
-        </script>
-
-	<button id="btn_capture">Capture Photo</button>
-	<script>
-        document.getElementById('btn_capture').addEventListener('click', function() {
-            fetch('/btn_capture', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ myData: 'reset' })
-            })
-            .then(response => response.json())
-            .then(data => console.log(data))
-            .catch((error) => {
-              console.error('Error:', error);
-            });
-        });
-        </script>
+                    <div class="div-center">
+                        <button id="btn_capture" class="button">Capture Photo</button>
+                    </div>
+                    <div>
+                        <p id="msg"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-  </body>
+    <script src="script.js"></script>
+</body>
 </html>

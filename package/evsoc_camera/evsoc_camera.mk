@@ -4,7 +4,7 @@
 #
 ##############################################
 
-EVSOC_CAMERA_VERSION = 1.0
+EVSOC_CAMERA_VERSION = 2.0
 EVSOC_CAMERA_SITE = $(BR2_EXTERNAL_EFINIX_PATH)/package/evsoc_camera/src
 EVSOC_CAMERA_SITE_METHOD = local
 
