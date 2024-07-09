@@ -1,0 +1,35 @@
+From d67f36e394be43aa4422e17b69d6393a9cfcbe2f Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Tue, 9 Jul 2024 14:42:49 +0800
+Subject: [PATCH] patch: fix SD host driver require delay during read operation
+
+The SD host driver is using polling mode with PIO data transfer.
+It failed to read the data during read operation. When SD host
+try to read/write from non-sequential address, the data will be
+slower back to SD host controller and cause read_buffer_ready signal
+asserted in the middle in the transfer. This will not impact the
+current transfer but it will cause driver thought the read data
+already available in very beginning of the read stage for the next
+transfer which is not the case. Ths solution is clear the
+read_buffer_ready interrupt register whenever the read stage is end.
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/mmc/efx_sdhost.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/mmc/efx_sdhost.c b/drivers/mmc/efx_sdhost.c
+index 6ed045e6a3..47f31a6585 100644
+--- a/drivers/mmc/efx_sdhost.c
++++ b/drivers/mmc/efx_sdhost.c
+@@ -222,6 +222,7 @@ static void efx_sdhost_read_block_pio(struct efx_sd_host *host)
+ 			buf += 4;
+ 		}
+ 	}
++	writel(0x20, host->ioaddr + EFX_SDHCI_NORMAL_INT);
+ }
+ 
+ static void efx_sdhost_write_block_pio(struct efx_sd_host *host)
+-- 
+2.17.1
+
