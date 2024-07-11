@@ -22,6 +22,8 @@ define EVSOC_CAMERA_INSTALL_TARGET_CMDS
 	mkdir -p $(TARGET_DIR)/usr/share/evsoc_camera
         $(INSTALL) -m 0755 -D $(@D)/evsoc_camera $(TARGET_DIR)/usr/bin/evsoc_camera
 	$(INSTALL) -m 0644 -D $(@D)/web_root/index.html $(TARGET_DIR)/usr/share/evsoc_camera/web_root/index.html
+	$(INSTALL) -m 0644 -D $(@D)/web_root/style.css $(TARGET_DIR)/usr/share/evsoc_camera/web_root/style.css
+	$(INSTALL) -m 0644 -D $(@D)/web_root/script.js $(TARGET_DIR)/usr/share/evsoc_camera/web_root/script.js
 endef
 
 $(eval $(generic-package))
