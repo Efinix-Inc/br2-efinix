@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <dirent.h>
 #include <fnmatch.h>
+#include <pthread.h>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
@@ -82,6 +83,7 @@ struct dev {
 	int sw_grayscale;
 	int capture;
 	struct img *head;
+	pthread_mutex_t lock;
 };
 
 void parse_json(struct mg_http_message *hm, char *buf)
@@ -340,6 +342,7 @@ static void handle_request(struct mg_connection *c, int ev, void *ev_data, void 
 	char buff[256] = {0};
 	int num = 0;
 
+	pthread_mutex_lock(&dev->lock);
 	if (ev == MG_EV_HTTP_MSG) {
 		if (mg_http_match_uri(hm, "/api/camera")) {
 			c->label[0] = 'S';
@@ -347,7 +350,7 @@ static void handle_request(struct mg_connection *c, int ev, void *ev_data, void 
 				c, "%s",
 				"HTTP/1.0 200 OK\r\n"
 				"Cache-Control: no-cache\r\n"
-				"Pragma: no-cache\r\nExpires: Thu, 01 Dec 1994 16:00:00 GMT\\r\n"
+				"Pragma: no-cache\r\nExpires: Thu, 01 Dec 2023 00:00:00 GMT\\r\n"
 				"Content-Type: multipart/x-mixed-replace; boundary=--foo\r\n\r\n"
 			);
 		} else if (mg_vcmp(&hm->uri, "/load") == 0) {
@@ -425,6 +428,8 @@ static void handle_request(struct mg_connection *c, int ev, void *ev_data, void 
 			mg_http_serve_dir(c, (struct mg_http_message *)ev_data, &opts);
 		}
 	}
+
+	pthread_mutex_unlock(&dev->lock);
 }
 
 static void send_frame(struct dev *dev, struct mg_connection *c, string video_data)
@@ -505,37 +510,60 @@ static void capture_photo(struct dev *dev, Mat *frame)
 	update_page(c, dev);
 }
 
-static void broadcast_mjpeg_camera_frame(struct dev *dev)
-{
-	Mat *frame;
-	vector<uchar> encoded_frame;
-	struct mg_connection *c;
-	vector<int> params = {CV_IMWRITE_JPEG_QUALITY, 95};
+Mat* capture_frame(struct dev *dev) {
+    pthread_mutex_lock(&dev->lock);
+    Mat *frame = video_capture_stream(&dev->hw_accel);
+    pthread_mutex_unlock(&dev->lock);
+    return frame;
+}
 
-	frame = video_capture_stream(&dev->hw_accel);
+void process_frame(struct dev *dev, Mat *frame) {
+    pthread_mutex_lock(&dev->lock);
+    if (dev->sw_grayscale == 1) {
+        cv::cvtColor(*frame, *frame, COLOR_BGR2GRAY);
+        canny_threshold(frame);
+    }
+    pthread_mutex_unlock(&dev->lock);
+}
 
-	if (dev->sw_grayscale == 1) {
-		cv::cvtColor(*frame, *frame, COLOR_BGR2GRAY);
-		canny_threshold(frame);
-	}
+vector<uchar> encode_frame(Mat *frame) {
+    vector<uchar> encoded_frame;
+    vector<int> params = {CV_IMWRITE_JPEG_QUALITY, 95};
+    imencode(".jpg", *frame, encoded_frame, params);
+    return encoded_frame;
+}
 
-	imencode(".jpg", *frame, encoded_frame, params);
-	string video_data(encoded_frame.begin(), encoded_frame.end());
+void send_encoded_frame(struct dev *dev, vector<uchar> &encoded_frame) {
+    pthread_mutex_lock(&dev->lock);
+    string video_data(encoded_frame.begin(), encoded_frame.end());
+    send_frame(dev, NULL, video_data);
+    pthread_mutex_unlock(&dev->lock);
+}
 
-	send_frame(dev, c, video_data);
+void check_and_capture_photo(struct dev *dev, Mat *frame) {
+    pthread_mutex_lock(&dev->lock);
+    if (dev->capture == 1) {
+        capture_photo(dev, frame);
+        dev->capture = 0;
+    }
+    pthread_mutex_unlock(&dev->lock);
+}
 
-	if (dev->capture == 1) {
-		capture_photo(dev, frame);
-		dev->capture = 0;
-	}
-
-	delete frame;
-        encoded_frame.clear();
+void broadcast_mjpeg_camera_frame(struct dev *dev) {
+    Mat *frame = capture_frame(dev);
+    process_frame(dev, frame);
+    vector<uchar> encoded_frame = encode_frame(frame);
+    send_encoded_frame(dev, encoded_frame);
+    check_and_capture_photo(dev, frame);
+    delete frame;
+    encoded_frame.clear();
 }
 
 static void timer_callback(void *arg)
 {
-	broadcast_mjpeg_camera_frame((struct dev *)arg);
+	struct dev *dev = (struct dev *)arg;
+
+	broadcast_mjpeg_camera_frame(dev);
 }
 
 char *get_ip_address()
@@ -570,6 +598,27 @@ char *get_ip_address()
 	return  ip;
 }
 
+void *listen_thread(void *arg)
+{
+	struct dev *dev = (struct dev *)arg;
+
+	printf("listen thread started\n");
+	mg_http_listen(&dev->mgr, "0.0.0.0:8000", handle_request, dev);
+
+	return NULL;
+}
+
+void *stream_thread(void *arg)
+{
+	struct dev *dev = (struct dev *)arg;
+	struct mg_timer t;
+
+	printf("stream thread started\n");
+    mg_timer_init(&t, 10, MG_TIMER_REPEAT, timer_callback, dev);
+
+	return NULL;
+}
+
 int main(void)
 {
     struct dev dev;
@@ -578,13 +627,14 @@ int main(void)
 	char *ip_address = get_ip_address();
 	struct img *head = NULL;
 	dev.head = head;
+	pthread_t t1, t2;
 
     printf("mongoose version %s\n", MG_VERSION);
     mg_mgr_init(&dev.mgr);
-    mg_http_listen(&dev.mgr, "0.0.0.0:8000", handle_request, &dev);
 
-    struct mg_timer t;
-    mg_timer_init(&t, 10, MG_TIMER_REPEAT, timer_callback, &dev);
+	pthread_create(&t1, NULL, &listen_thread, &dev);
+	pthread_create(&t2, NULL, &stream_thread, &dev);
+
 	printf("Go to http://%s:8000 for live camera stream\n", ip_address);
 
 	signal(SIGINT, inthand);
@@ -594,9 +644,12 @@ int main(void)
 		mg_mgr_poll(&dev.mgr, 1);
 	}
 
+	pthread_join(t1, NULL);
+	pthread_join(t2, NULL);
+
     mg_mgr_free(&dev.mgr);
 	free_list(dev.head);
 	printf("Stream server shutdown\n");
 
-        return 0;
+    return 0;
 }
