@@ -1,0 +1,5 @@
+config BR2_PACKAGE_LINPACK
+	bool "linpack"
+	help
+	  LINPACK Benchmarks are a measure of a system's floating point computing power.
+	  LINPACK is a software library for performing numerical linear algebra on digital computers
