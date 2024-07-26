@@ -43,7 +43,7 @@ Steps to buid the Linux image for unified hardware design.
 1. Clone this repository.
    
    ```bash
-   git clone http://gitlab/mnalim/br2-efinix
+   git clone https://github.com/Efinix-Inc/br2-efinix.git
    cd br2-efinix
    ```
 
