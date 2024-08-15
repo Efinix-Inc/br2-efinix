@@ -172,6 +172,8 @@ function generate_device_tree()
 			cp $SOC_H $PROJ_DIR/kernel_modules/evsoc/src/soc.h #Copy the custom soc.h for evsoc kernel
 		elif [ "$BOARD" == "ti180j484" ]; then
 			base_cmd+=$unified_hw_softcore
+			cp $EFINIX_DIR/$BOARD/u-boot/uboot.dts $EFINIX_DIR/$BOARD/u-boot/uboot.dts.spi
+			cp $EFINIX_DIR/$BOARD/u-boot/uboot.dts.mmc $EFINIX_DIR/$BOARD/u-boot/uboot.dts
 			cp $SOC_H $PROJ_DIR/kernel_modules/evsoc/src/soc.h #Copy the custom soc.h for evsoc kernel
 		else
 			echo "$BOARD"
