@@ -1,8 +1,8 @@
 #ifndef DMASG_CONFIG_H
 #define DMASG_CONFIG_H
 
-#define DMASG_BASE            IO_APB_SLAVE_2_INPUT
-#define PLIC_DMASG_CHANNEL    SYSTEM_PLIC_USER_INTERRUPT_B_INTERRUPT
+#define DMASG_BASE            IO_APB_SLAVE_0_INPUT
+#define PLIC_DMASG_CHANNEL    SYSTEM_PLIC_USER_INTERRUPT_A_INTERRUPT
 
 //Each channel connects to only 1 port, hence all ports are referred as port 0.
 #define DMASG_CAM_S2MM_CHANNEL         0
