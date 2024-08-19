@@ -7,8 +7,12 @@
 #define ADR_I2C_CTRL_MIPI   SYSTEM_I2C_0_IO_CTRL
 #define ADR_EXAMPLE_APB_SLV IO_APB_SLAVE_1_INPUT
 #define ADR_DMASG_BASE      IO_APB_SLAVE_0_INPUT
-#define ADR_EXAMPLE_AXI_SLV SYSTEM_AXI_A_BMB
 
+#ifdef SYSTEM_HARD_RISCV_QC32  //HPS
+	#define ADR_EXAMPLE_AXI_SLV SYSTEM_AXI_SLAVE_3_IO_CTRL
+#else //Soft Sapphire
+	#define ADR_EXAMPLE_AXI_SLV SYSTEM_AXI_A_BMB
+#endif
 static void __iomem *i2c_base = NULL;
 static void __iomem *example_apb_base = NULL;
 static void __iomem *dmasg_base = NULL;
