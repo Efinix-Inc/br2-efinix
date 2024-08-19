@@ -41,7 +41,7 @@
         };
 };
 
-&sdmmc0 {
+&mmc0 {
         status = "okay";
         compatible = "efx,efx-sdhost";
 
