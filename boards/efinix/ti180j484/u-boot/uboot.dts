@@ -10,7 +10,6 @@
 	aliases {
                 serial0 = &uart0;
                 spi0 = &spi0;
-                spi1 = &spi1;
         };
 
 	chosen {
@@ -42,12 +41,9 @@
         };
 };
 
-&spi1 {
-	status = "okay";
-	compatible = "vexriscv,spi";
-	mmc0: mmc@0 {
-		compatible = "mmc-spi-slot";
-		reg = <0>;
-		spi-max-frequency = <10000000>;
-	};
+&mmc0 {
+        status = "okay";
+        compatible = "efx,efx-sdhost";
+
 };
+

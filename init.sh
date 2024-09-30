@@ -47,10 +47,13 @@ function usage()
 	echo "	-a			Reconfigure the Buildroot configuration and regenerate Linux device tree"
 	echo "	-e                      Generate Linux configuration with ethernet support"
 	echo "	-p                      Generate Linux device tree for Sapphire High Performance SoC"
-	echo "	-u			Generate Linux device tree for unified hardware design"
+	echo "	-u			Generate Linux device tree for unified hardware design for Ti180J484 and Ti375C529"
 	echo
 	echo "Example usage,"
 	echo "$0 t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
+	echo
+	echo "Demo Ti180J484 with unified hardware design"
+	echo "$ source init.sh ti180j484 /path/to/soc.h -u"
 	echo
 	echo "Demo Ti375C529 with unified hardware design"
 	echo "$ source init.sh ti375c529 /path/to/soc.h -p -u"
@@ -122,19 +125,22 @@ function modify_soc_h()
 	# change the size of DDR to 1024MB due to limitation of physical DDR.
 	if [ $HARDEN_SOC ]; then
 		sed -i 's/0xe7fff000/0x40000000/g' $SOC_H
+	else #Soft Core
+		sed -i 's/0xe0000000/0x40000000/g' $SOC_H
 	fi
 }
 
 function generate_device_tree()
 {
-	local base_cmd="python3 $DT_DIR/device_tree_generator.py -s $DT_DIR/config/linux_slaves.json "
+	local base_cmd="python3 $DT_DIR/device_tree_generator.py -j -s $DT_DIR/config/linux_slaves.json "
 	local end_cmd="$SOC_H $BOARD linux"
 	local spi="-c $DT_DIR/config/linux_spi.json "
 	local ethernet="-c $DT_DIR/config/ethernet.json "
 	local ethernet_ed="-c $DT_DIR/config/ed_ti375c529.json "
 	local sdhc="-c $DT_DIR/config/sdhc.json "
-	local unified_hw="-c $DT_DIR/config/unified_hw.json "
-
+	local unified_hw="-c $COMMON_DIR/unified_hw.json "
+	local unified_hw_softcore="-c $COMMON_DIR/unified_hw_softcore.json "
+	echo $COMMON_DIR
 	if [ $ETHERNET ]; then
 		if [ $HARDEN_SOC ]; then
 			base_cmd+=$ethernet_ed
@@ -163,8 +169,13 @@ function generate_device_tree()
 	if [ $UNIFIED_HW ]; then
 		if [ $HARDEN_SOC ]; then
 			base_cmd+=$unified_hw
+			cp $SOC_H $PROJ_DIR/kernel_modules/evsoc/src/soc.h #Copy the custom soc.h for evsoc kernel
+		elif [ "$BOARD" == "ti180j484" ]; then
+			base_cmd+=$unified_hw_softcore
+			cp $SOC_H $PROJ_DIR/kernel_modules/evsoc/src/soc.h #Copy the custom soc.h for evsoc kernel
 		else
-			echo Error: Unified hardware not support for $BOARD
+			echo "$BOARD"
+			echo "Error: Unified hardware not support for $BOARD"
 			exit 1
 		fi
 	fi
