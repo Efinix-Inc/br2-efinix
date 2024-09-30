@@ -132,15 +132,16 @@ function modify_soc_h()
 
 function generate_device_tree()
 {
-	local base_cmd="python3 $DT_DIR/device_tree_generator.py -j -s $DT_DIR/config/linux_slaves.json "
+	local linux_slaves="$DT_DIR/config/linux_slaves.json"
+	local base_cmd="python3 $DT_DIR/device_tree_generator.py -s $linux_slaves "
 	local end_cmd="$SOC_H $BOARD linux"
 	local spi="-c $DT_DIR/config/linux_spi.json "
 	local ethernet="-c $DT_DIR/config/ethernet.json "
 	local ethernet_ed="-c $DT_DIR/config/ed_ti375c529.json "
 	local sdhc="-c $DT_DIR/config/sdhc.json "
-	local unified_hw="-c $COMMON_DIR/unified_hw.json "
-	local unified_hw_softcore="-c $COMMON_DIR/unified_hw_softcore.json "
-	echo $COMMON_DIR
+	local unified_hw="-c $DT_DIR/config/unified_hw.json "
+	local unified_hw_softcore="-c $DT_DIR/config/unified_hw_softcore.json "
+
 	if [ $ETHERNET ]; then
 		if [ $HARDEN_SOC ]; then
 			base_cmd+=$ethernet_ed
@@ -167,16 +168,23 @@ function generate_device_tree()
 	fi
 
 	if [ $UNIFIED_HW ]; then
+		if [ $HARDEN_SOC ] || [ "$BOARD" == "ti180j484" ]; then
+			#Copy the custom soc.h for evsoc kernel
+			cp "$SOC_H" "$PROJ_DIR/kernel_modules/evsoc/src/soc.h"
+			echo "Copy $SOC_H to $PROJ_DIR/kernel_modules/evsoc/src/soc.h"
+
+			# Create a temp for linux_slave json file to disable spi1
+			linux_slaves="$DT_DIR/config/linux_slaves_modified.json"
+			jq '.child.spi_mmc.status = "disabled"' "$DT_DIR/config/linux_slaves.json" > "$linux_slaves"
+		fi
+
 		if [ $HARDEN_SOC ]; then
 			base_cmd+=$unified_hw
-			cp $SOC_H $PROJ_DIR/kernel_modules/evsoc/src/soc.h #Copy the custom soc.h for evsoc kernel
 		elif [ "$BOARD" == "ti180j484" ]; then
 			base_cmd+=$unified_hw_softcore
 			cp $EFINIX_DIR/$BOARD/u-boot/uboot.dts $EFINIX_DIR/$BOARD/u-boot/uboot.dts.spi
 			cp $EFINIX_DIR/$BOARD/u-boot/uboot.dts.mmc $EFINIX_DIR/$BOARD/u-boot/uboot.dts
-			cp $SOC_H $PROJ_DIR/kernel_modules/evsoc/src/soc.h #Copy the custom soc.h for evsoc kernel
 		else
-			echo "$BOARD"
 			echo "Error: Unified hardware not support for $BOARD"
 			exit 1
 		fi
