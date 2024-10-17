@@ -88,14 +88,16 @@ function sanity_check()
 		return 1
 	fi
 
-	if [[ $HARDEN_SOC ]] && [[ ! $BOARD =~ "ti375.*"  ]] ; then
+	if [[ $HARDEN_SOC ]] && [[ ! $BOARD == "ti375c529" ]]; then
 		echo Error: board $BOARD does not support harden SoC.
 		echo "The -p optional argument only used for board which support harden SoC such as Ti375C529"
 		return 1;
 	fi
 
-	if [[ $UNIFIED_HW -eq 1 ]]; then
-		if [[ ! $BOARD =~ "ti375.*" || ! $BOARD = ~"ti180.*" ]]; then
+	if [[ $UNIFIED_HW ]]; then
+		if [[ $BOARD == "ti375c529" || $BOARD == "ti180j484" ]]; then
+			echo Info: board $BOARD support unified hardware design
+		else
 			echo Error: board $BOARD does not support unified hardware design
 			return 1;
 		fi
