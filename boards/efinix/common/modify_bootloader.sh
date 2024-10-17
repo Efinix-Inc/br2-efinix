@@ -196,14 +196,20 @@ if [ $DEBUG ]; then
 	echo
 fi
 
-RISCV_TOOLCHAIN="efinity-riscv-ide-[0-9]+\.[0-9]+\.[0-9]"
+RISCV_TOOLCHAIN="efinity-riscv-ide"
 
 if [[ $RISCV_IDE =~ $RISCV_TOOLCHAIN ]]; then
 	RISCV_IDE=$RISCV_IDE/toolchain/bin
-	export PATH=$RISCV_IDE:$PATH
+	$RISCV_IDE/riscv-none-embed-gcc -dumpversion > /dev/null 2>&1
+	if [[ $? -eq 0 ]]; then
+		export PATH=$RISCV_IDE:$PATH
+	else
+		echo Error: RISCV_IDE path is invalid
+		exit 1
+	fi
 else
-	echo Error: RISCV_IDE is not valid
-	exit
+	echo Error: RISCV_IDE path is invalid
+	exit 1
 fi
 
 BOOTLOADER_DIR=$EFINITY_PROJECT_PATH/software/standalone/bootloader
