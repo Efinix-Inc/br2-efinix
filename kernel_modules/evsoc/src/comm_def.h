@@ -5,13 +5,8 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 
 #include "soc.h"
-#ifdef SYSTEM_HARD_RISCV_QC32  //HPS
-	#define FRAME_WIDTH    1920
-	#define FRAME_HEIGHT   1080
-#else //Soft Sapphire
-	#define FRAME_WIDTH    1280
-	#define FRAME_HEIGHT   720
-#endif
+#define FRAME_WIDTH    1280
+#define FRAME_HEIGHT   720
 #define DEMO_MAGIC           0x68
 #define CMD_SET_MODE         _IOW(DEMO_MAGIC, 1, unsigned long)
 #define CMD_SET_CAM_SIZE     _IOW(DEMO_MAGIC, 3, unsigned long)
