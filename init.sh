@@ -147,7 +147,7 @@ function modify_soc_h()
 function generate_device_tree()
 {
 	local linux_slaves="$DT_DIR/config/linux_slaves.json"
-	local base_cmd="python3 $DT_DIR/device_tree_generator.py -s $linux_slaves "
+	local base_cmd="python3 $DT_DIR/device_tree_generator.py "
 	local end_cmd="$SOC_H $BOARD linux"
 	local spi="-c $DT_DIR/config/linux_spi.json "
 	local ethernet="-c $DT_DIR/config/ethernet.json "
@@ -204,6 +204,7 @@ function generate_device_tree()
 		fi
 	fi
 
+	base_cmd+="-s $linux_slaves "
 	base_cmd+=$end_cmd
 	echo DEBUG: device tree cmd: $base_cmd
 	eval $base_cmd
