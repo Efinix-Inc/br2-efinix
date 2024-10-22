@@ -1,40 +1,69 @@
-# Unified Hardware
+# Unified Hardware Design for High Performance Sapphire SoC
 
-This is an example design to showcase the Efinix Sapphire High Performance SoC integrate with triple speed ethernet, SD host controller, MIPI camera and HDMI.
+This is an example design to showcase the Efinix Sapphire High Performance SoC integrate with triple speed ethernet (10/100/1000 Mbps), SD host controller, MIPI camera and HDMI display.
 
-| Address    | Bus          | Peripheral                      | Interrupt number |
-| ---------- | ------------ | ------------------------------- | ---------------- |
-| 0xe8000000 | axi slave 0  |                                 |                  |
-| 0xe8010000 |              | uart0                           | 9                |
-| 0xe8020000 |              | i2c0                            | 10               |
-| 0xe8030000 |              | spi0                            | 11               |
-| 0xe8040000 |              | gpio0                           | 13, 14           |
-| 0xe8100000 | apb3 slave 0 | dma0                            | 7, 8             |
-| 0xe8200000 | apb3 slave 1 | camera & display registers      | -                |
-| 0xe8300000 | apb3 slave 2 | hardware accelerator dma_vision | 2                |
-| 0xe9000000 | axi slave 1  | sd host controller              | 6                |
-| 0xe9100000 | axi slave 2  | triple speed ethernet           | -                |
-| 0xe9200000 | axi slave 3  | hdmi                            | -                |
+Project repository:
 
-## Additional Hardware Requirements
+- [Sapphire-SoC-Embedded-Solution](https://github.com/Efinix-Inc/Sapphire-SoC-Embedded-Solution)
 
-- Raspberry Pi Camera V3 Module
+- [Unified hardware design High Performance Sapphire SoC](https://github.com/Efinix-Inc/Sapphire-SoC-Embedded-Solution/tree/main/hps_soc/Ti375C529_devkit)
 
-- MIPI daughter card
+## Mofidy the bootloader of unified hardware design
 
-- HDMI daughter card
+This section is mandatory for boot up Linux using the unified hardware design.
+
+1. Clone the hardware design repository
+   
+   ```bash
+   cd ~
+   git clone https://github.com/Efinix-Inc/Sapphire-SoC-Embedded-Solution.git
+   ```
+
+2. Setup the project environment
+   
+   ```bash
+   cd ~
+   cd Sapphire-SoC-Embedded-Solution
+   python3 setup.py
+   ```
+
+3. Modify the bootloader using `modify_bootloader.sh` script. Please note that `modify_bootlader.sh` require 3 arguments. See [modify bootloader](docs/modify_fpga_bootloader.md) guide for more details. Here is an example to modify the bootloader.
+   
+   ```bash
+   cd ~/br2-efinix/boards/efinix/common
+   ./modify_bootloader.sh \
+   ti375c529 \
+   ~/Sapphire-SoC-Embedded-Solution/hps_soc/Ti375C529_devkit \
+   ~/efinity/efinity-riscv-ide-2023.2.5.1
+   ```
+
+## Additional modification for the unified hardware design
+
+This section is optional, but recommended for running the [evsoc_camera](../../../../../package/evsoc_camera/README.md) demo. The display resolution need to set to 720p with following these steps.
+
+1. Uncomment this line `define DISPLAY_1280x720_60Hz` and comment this line `define DISPLAY_1920x1080_60Hz` from the `top_soc.v`.
+   
+   ![](../../../../../docs/img/display_720p.jpg)
+
+2. Modify the i_hdmi_clk_148p5MHz to use 74.25MHz. Open Efinity Interface Designer -> PLL -> hdmi_pll_clk -> Automated Clock Calculation. Then, click Finish.
+   
+   ![](../../../../../docs/img/pll_720p.jpg)
+
+3. Generate the constraint by clicking Design -> Generate Efinity Constraint Files. Then, modify the constraints.sdc of i_hdmi_clk_148p5MHz as follows.
+   
+   ```
+   create_clock -period 13.4680 i_hdmi_clk_148p5MHz
+   ```
+
+4. Compile the project.
+
+## Address Mapping
+
+See [Address Mapping for High Performance Sapphire SoC](https://github.com/Efinix-Inc/Sapphire-SoC-Embedded-Solution/blob/main/docs/soc/addr_mapping_soc.md) document.
 
 ## Board Setup
 
-1. Connect a USB cable type C to Ti375C529 development board and to your computer.
-
-2. Insert micro SD card into the SD card slot.
-
-3. Attach the network cable into the board.
-
-4. Attach the Raspberry Pi Camera V3 module to MIPI daughter card. Then, attach it to port P2.
-
-5. Attach the HDMI daughter card to port P1.
+See [board setup guide](https://github.com/Efinix-Inc/Sapphire-SoC-Embedded-Solution/blob/main/docs/hardware/setup_devkit_Ti375C529.md)
 
 ## Build Linux Image
 
