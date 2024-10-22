@@ -2,7 +2,7 @@ config BR2_PACKAGE_EVSOC_CAMERA
 	bool "EVSoC camera stream"
 	default n
 	depends on BR2_PACKAGE_EVSOC
-	depends on BR2_GCC_ENABLE_OPENMP
+	select BR2_GCC_ENABLE_OPENMP
 	select BR2_PACKAGE_OPENCV3
 	select BR2_PACKAGE_OPENCV3_LIB_HIGHGUI
 	select BR2_PACKAGE_I2C
