@@ -33,7 +33,7 @@ This section is mandatory for boot up Linux using the unified hardware design.
    cd ~/br2-efinix/boards/efinix/common
    ./modify_bootloader.sh \
    ti180j484 \
-   ~/Sapphire-SoC-Embedded-Solution/hps_soc/Ti375C529_devkit \
+   ~/Sapphire-SoC-Embedded-Solution/sapphire_soc/Ti180J484_devkit \
    ~/efinity/efinity-riscv-ide-2023.2.5.1
    ```
 
