@@ -8,7 +8,7 @@ Project repository:
 
 - [Unified hardware design High Performance Sapphire SoC](https://github.com/Efinix-Inc/Sapphire-SoC-Embedded-Solution/tree/main/hps_soc/Ti375C529_devkit)
 
-## Mofidy the bootloader of unified hardware design
+## Modify the bootloader of unified hardware design
 
 This section is mandatory for boot up Linux using the unified hardware design.
 
