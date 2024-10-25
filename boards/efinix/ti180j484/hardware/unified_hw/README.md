@@ -79,7 +79,7 @@ Steps to buid the Linux image for unified hardware design.
 
 5. Flash firmware images.
    
-   - Follow [Flash firmware image](docs/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the Ti375C529 devkit.
+   - Follow [Flash firmware image](docs/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the Ti180J484 devkit.
 
 6. Flash Linux image `sdcard.img` in to SD card.
    
