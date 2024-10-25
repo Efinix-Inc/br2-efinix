@@ -13,9 +13,51 @@ This is a defaut example design for Ti375C529 with Efinix Sapphire High Performa
 | 0xe9000000 | axi slave 1  | sd host controller    | 6                |
 | 0xe9100000 | axi slave 2  | triple speed ethernet | -                |
 
+## Build Linux Image
+
+1. Clone this repository.
+   
+   ```bash
+   git clone https://github.com/Efinix-Inc/br2-efinix.git
+   cd br2-efinix
+   ```
+
+2. Build the Linux image using preconfigure Efinity project and soc.h.
+   
+   ```bash
+   source init.sh ti375c529 \
+   boards/efinix/ti375c529/hardware/soc/soc.h -p -e
+   ```
+
+3. Build the Linux image
+   
+   ```bash
+   make -j$(nproc)
+   ```
+
+4. The output images are located in `<path/to/br2-efinix/../build_ti375c29/build/images`.
+   
+   - `sdcard.img` is a Linux image
+   
+   - `fw_jump.bin` is an OpenSBI image
+   
+   - `u-boot` is an U-boot image
+
+5. Flash firmware images.
+   
+   - Follow [Flash firmware image](docs/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the Ti375C529 devkit.
+
+6. Flash Linux image `sdcard.img` in to SD card.
+   
+   - you can use [Etcher](https://www.balena.io/etcher/) for Linux
+   
+   - or, Linux command line to flash the Linux image into SD card. See [flash linux](docs/flash_linux.md) document.
+
+7. Access the board serial console over USB UART. See [accessing uart terminal](docs/accessing_uart_terminal.md) document.
+
 ## Customize Linux Device Tree
 
-Use the `device_tree_generator.py` script to generate the device tree.
+Use the `device_tree_generator.py` script to generate the device tree for Linux. Please note that this [soc.h](soc.h) file contain additional information regarding to axi slave which might not available on newly generated soc. For example, use this command to generate the device tree for this soc configuration.
 
 ```python
 cd boards/efinix/common/sapphire-soc-dt-generator
@@ -26,6 +68,8 @@ cd boards/efinix/common/sapphire-soc-dt-generator
 /path/to/soc.h \
 ti375c529 linux
 ```
+
+**This step only require for newly generated soc.**
 
 For customize configuration, the `soc.h` does not contain the information for `axi1` and `axi2`. Thus, user need to append the axi slave 1 (`axi1`) and axi slave 2 (`axi2`) nodes manually to the linux device tree. These nodes should be append in the `boards/efinix/common/dts/sapphire.dtsi`. 
 
@@ -41,7 +85,7 @@ For customize configuration, the `soc.h` does not contain the information for `a
                 compatible = "simple-bus";
                 ranges = <0x0 0xe9000000 0x10000>;
 
-                sdmmc0: sdmmc@0 {
+                mmc0: mmc@0 {
                         reg = <0x0 0x10000>;
                         compatible = "efx,sdhci";
                         interrupt-parent = <&plic>;
