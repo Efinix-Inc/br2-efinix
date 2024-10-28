@@ -332,6 +332,12 @@ if [ ! -d $DT_DIR ]; then
         else
                 git clone $DT_REPO $DT_DIR
         fi
+
+	if [ ! $? -eq 0 ]; then
+		echo Error: Failed to clone $DT_REPO
+		echo Check you internet connection
+		return 1
+	fi
 fi
 
 sanity_check
@@ -384,6 +390,12 @@ if [ ! -d $BUILDROOT_DIR ]; then
 	else
 		echo Using Buildroot master/main branch
 		git clone $BUILDROOT_REPO
+	fi
+
+	if [ ! $? -eq 0 ]; then
+		echo Error: Failed to clone $BUILDROOT_REPO
+		echo Check you internet connection
+		return 1
 	fi
 
 	mv buildroot $BUILDROOT_DIR
