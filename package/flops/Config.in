@@ -1,0 +1,4 @@
+config BR2_PACKAGE_FLOPS
+	bool "flops"
+	help
+	  benchmark floating-point 'MFLOPS' rating for the FADD, FSUB, FMUL, and FDIV operations based on specific 'instruction mixes'

@@ -1,0 +1,32 @@
+From b21514005fed296b9d918cf9107c6b2f7e0dbb68 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Tue, 5 Nov 2024 14:13:22 +0800
+Subject: [PATCH] makefile: use gcc cross compiler
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ Makefile | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 35599d3..5456346 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,11 +1,10 @@
+-CC?=		cc
+-CFLAGS?=	# empty
+-CFLAGS+=	-DUNIX -Wall -Wextra -pedantic
++CC?=		$(CROSS_COMPILE)cc
++EXTRA_CFLAGS =	-DUNIX -Wall -Wextra -pedantic
+ 
+ all: flops
+ 
+ flops: flops.c
+-	${CC} ${CFLAGS} flops.c -o flops
++	${CC} ${CFLAGS} $(EXTRA_CFLAGS) flops.c -o flops
+ 
+ clean:
+ 	rm -f flops
+-- 
+2.17.1
+
