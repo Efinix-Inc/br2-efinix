@@ -1,0 +1,237 @@
+From 64acfc003aa6510368936628efe326863b95c173 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Fri, 22 Nov 2024 16:51:18 +0800
+Subject: [PATCH] spi-spinal-lib: fix spi driver to support dummy clock cycle
+
+SPI flash require 8 dummy clock cycle during read operation
+before it can receive the data. However, this might not needed
+by other SPI device such as SD card when operate in SPI mode.
+Thus, a new device tree property called 'dummy-cycle' is added
+to resolve this issue. This optional device tree property is
+needed for controlling the SPI flash device.
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/spi/spi-spinal-lib.c | 154 +++++++++++++++++++++++------------
+ 1 file changed, 100 insertions(+), 54 deletions(-)
+
+diff --git a/drivers/spi/spi-spinal-lib.c b/drivers/spi/spi-spinal-lib.c
+index 18012b3d364c..3c9674ad5185 100644
+--- a/drivers/spi/spi-spinal-lib.c
++++ b/drivers/spi/spi-spinal-lib.c
+@@ -7,8 +7,9 @@
+ #include <linux/of.h>
+ #include <linux/gpio.h>
+ #include <linux/clk.h>
++#include <linux/delay.h>
+ 
+-#define DRV_NAME "spinal-lib,spi-1.0"
++#define DRV_NAME "spinal-lib,spi-1.1"
+ 
+ #define SPI_CMD_WRITE (1 << 8)
+ #define SPI_CMD_READ (1 << 9)
+@@ -52,6 +53,7 @@ struct spi_spinal_lib {
+ 	/* data buffers */
+ 	const u8 *tx;
+ 	u8 *rx;
++	bool dummy_cycle;
+ };
+ 
+ static inline struct spi_spinal_lib *spi_spinal_lib_to_hw(struct spi_device *sdev)
+@@ -79,9 +81,9 @@ static void spi_spinal_lib_cmd_wait(struct spi_spinal_lib *hw){
+ 	while(spi_spinal_lib_cmd_availability(hw) == 0) cpu_relax();
+ }
+ 
+-//static void spi_spinal_lib_rsp_wait(struct spi_spinal_lib *hw){
+-//	while(spi_spinal_lib_rsp_occupancy(hw) == 0) cpu_relax();
+-//}
++static void spi_spinal_lib_rsp_wait(struct spi_spinal_lib *hw){
++	while(spi_spinal_lib_rsp_occupancy(hw) == 0) cpu_relax();
++}
+ 
+ static u32 spi_spinal_lib_rsp_pull(struct spi_spinal_lib *hw){
+ 	u32 rsp;
+@@ -106,11 +108,75 @@ static void spi_spinal_lib_speed(struct spi_spinal_lib *hw, u32 speed_hz){
+ 	writel(clk_divider, hw->base + SPI_SPINAL_LIB_SS_HOLD);
+ }
+ 
++static int spi_spinal_lib_tx(struct spi_spinal_lib *hw, u32 token)
++{
++	u32 burst, cmd;
++	const u8 *ptr, *end;
++
++	burst = min(hw->len - hw->txCount, token);
++	ptr = hw->tx + hw->txCount;
++	end = ptr + burst;
++	cmd = (hw->tx ? SPI_CMD_WRITE : 0) | SPI_CMD_READ;
++
++	if(hw->tx) {
++		while(ptr != end) {
++			spi_spinal_lib_cmd_wait(hw);
++			writel(cmd | *ptr++, hw->base + SPI_SPINAL_LIB_DATA);
++		}
++	} else {
++		while(ptr != end){
++			ptr++;
++			spi_spinal_lib_cmd_wait(hw);
++			writel(cmd, hw->base + SPI_SPINAL_LIB_DATA);
++		}
++	}
++	hw->txCount += burst;
++
++	return burst;
++}
++
++static int spi_spinal_lib_rx(struct spi_spinal_lib *hw)
++{
++	u32 burst;
++	u8 *ptr, *end;
++	u8 *rptr;
++
++	burst = spi_spinal_lib_rsp_occupancy(hw);
++	ptr = hw->rx + hw->count;
++	end = ptr + burst;
++	rptr = hw->rx;
++
++	if(hw->rx) {
++		/* this only works for spi flash */
++		if (hw->dummy_cycle) {
++			while(ptr != end) {
++				spi_spinal_lib_rsp_wait(hw);
++				*rptr = spi_spinal_lib_rsp_pull(hw);
++				ptr++;
++			}
++		} else {
++			/* this only works for spi sd card */
++			while (ptr != end) {
++				spi_spinal_lib_rsp_wait(hw);
++				*ptr++ = spi_spinal_lib_rsp(hw);
++			}
++		}
++	} else {
++		while(ptr != end) {
++			ptr++;
++			spi_spinal_lib_rsp(hw);
++		}
++	}
++	hw->count += burst;
++	udelay(10);
++
++	return burst;
++}
++
+ static int spi_spinal_lib_txrx(struct spi_master *master, struct spi_device *spi, struct spi_transfer *t)
+ {
+ 	struct spi_spinal_lib *hw = spi_master_get_devdata(master);
+ 
+-
+ 	spi_spinal_lib_speed(hw, t->speed_hz);
+ 
+ 	hw->tx = t->tx_buf;
+@@ -120,59 +186,34 @@ static int spi_spinal_lib_txrx(struct spi_master *master, struct spi_device *spi
+ 	hw->bytes_per_word = DIV_ROUND_UP(t->bits_per_word, 8);
+ 	hw->len = t->len / hw->bytes_per_word;
+ 
+-	if (hw->irq >= 0) {
+-		dev_info(&master->dev, "Interrupt not implemented\n");
+-		/* enable receive interrupt */
+-//		hw->imr |= spi_spinal_lib_CONTROL_IRRDY_MSK;
+-//		writel(hw->imr, hw->base + spi_spinal_lib_CONTROL);
++	if (hw->dummy_cycle) {
++		/*
++		* +1 when reading data using spi. this will add 1 more dummy
++		* write for read operation of spi flash.
++		*/
++		if (hw->rx)
++			hw->len += 1;
++	}
+ 
+-		/* send the first byte */
+-//		spi_spinal_lib_tx_word(hw);
++	if(hw->cmdFifoDepth > 1 && hw->rspFifoDepth > 1){
++		u32 token = min(hw->cmdFifoDepth, hw->rspFifoDepth);
++		while (hw->count < hw->len) {
++			token += spi_spinal_lib_rx(hw);
++			token -= spi_spinal_lib_tx(hw, token);
++		}
+ 	} else {
+-		if(hw->cmdFifoDepth > 1 && hw->rspFifoDepth > 1){
+-			u32 cmd = (hw->tx ? SPI_CMD_WRITE : 0) | SPI_CMD_READ;
+-			u32 token = min(hw->cmdFifoDepth, hw->rspFifoDepth);
+-			while (hw->count < hw->len) {
+-				{	//rsp
+-					u32 burst;
+-					u8 *ptr, *end;
+-
+-					burst = spi_spinal_lib_rsp_occupancy(hw);
+-					ptr = hw->rx + hw->count;
+-					end = ptr + burst;
+-					if(hw->rx) {while(ptr != end) {*ptr++ = spi_spinal_lib_rsp(hw);}}
+-					else	   {while(ptr != end) { ptr++;  spi_spinal_lib_rsp(hw);}}
+-					hw->count += burst;
+-					token += burst;
+-				}
+-
+-				{	//cmd
+-					u32 burst;
+-					const u8 *ptr, *end;
+-					burst = min(hw->len - hw->txCount, token);
+-					ptr = hw->tx + hw->txCount;
+-					end = ptr + burst;
+-					if(hw->tx) {while(ptr != end) {writel(cmd | *ptr++, hw->base + SPI_SPINAL_LIB_DATA);}}
+-					else	   {while(ptr != end) {ptr++; writel(cmd, hw->base + SPI_SPINAL_LIB_DATA);}}
+-					hw->txCount += burst;
+-					token -= burst;
+-				}
+-			}
+-		} else {
+-			u32 cmd = (hw->tx ? SPI_CMD_WRITE : 0) | SPI_CMD_READ;
+-			while (hw->count < hw->len) {
+-				u32 data = hw->tx ? hw->tx[hw->count] : 0;
+-				writel(cmd | data, hw->base + SPI_SPINAL_LIB_DATA);
+-				data = spi_spinal_lib_rsp_pull(hw);
+-				if (hw->rx) hw->rx[hw->count] = data;
+-
+-				hw->count++;
+-			}
++		u32 cmd = (hw->tx ? SPI_CMD_WRITE : 0) | SPI_CMD_READ;
++		while (hw->count < hw->len) {
++			u32 data = hw->tx ? hw->tx[hw->count] : 0;
++			writel(cmd | data, hw->base + SPI_SPINAL_LIB_DATA);
++			data = spi_spinal_lib_rsp_pull(hw);
++			if (hw->rx) hw->rx[hw->count] = data;
++
++			hw->count++;
+ 		}
+-
+-		spi_finalize_current_transfer(master);
+ 	}
+ 
++	spi_finalize_current_transfer(master);
+ 
+ 	return t->len;
+ }
+@@ -219,7 +260,6 @@ static int spi_spinal_lib_setup(struct spi_device *spi)
+ 		config |= SPI_MODE_CPHA;
+ 	writel(config, hw->base + SPI_SPINAL_LIB_CONFIG);
+ 
+-
+ //	printk("Setup %d %d\n", hw->ssActiveHigh, config);
+ 	return 0;
+ }
+@@ -269,6 +309,12 @@ static int spi_spinal_lib_probe(struct platform_device *pdev)
+ 		goto exit;
+ 	}
+ 
++	hw->dummy_cycle = false;
++	if (of_property_read_bool(pdev->dev.of_node, "dummy-cycle")) {
++		hw->dummy_cycle = true;
++		dev_info(&pdev->dev, "SPI controller configure with dummy clock cycle\n");
++	}
++
+ 	/* find and map our resources */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	hw->base = devm_ioremap_resource(&pdev->dev, res);
+-- 
+2.17.1
+
