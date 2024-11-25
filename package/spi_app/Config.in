@@ -1,0 +1,4 @@
+config BR2_PACKAGE_SPI_APP
+	bool "spi_app"
+	help
+	  Sample application to read and write to SPI flash device
