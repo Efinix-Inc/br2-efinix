@@ -14,6 +14,9 @@ genimage                               \
         --outputpath "${BINARIES_DIR}" \
         --config "${GENIMAGE_CFG}"
 
+rm -rf $BINARIES_DIR/sdcard.img.zip
+zip -rj $BINARIES_DIR/sdcard.img.zip $BINARIES_DIR/sdcard.img
+
 rm -rf $BINARIES_DIR/nfs_root
 mkdir $BINARIES_DIR/nfs_root
 tar -xf $BINARIES_DIR/rootfs.tar -C $BINARIES_DIR/nfs_root
