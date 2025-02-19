@@ -1,0 +1,880 @@
+From 9db87337d24da2d9029bb5c4505e1959d8cae90b Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Thu, 13 Feb 2025 16:41:50 +0800
+Subject: [PATCH] dma: add Efinix DMA controller driver
+
+---
+ drivers/dma/Kconfig   |   7 +
+ drivers/dma/Makefile  |   1 +
+ drivers/dma/efx_dma.c | 829 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 837 insertions(+)
+ create mode 100644 drivers/dma/efx_dma.c
+
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 90284ffda58a..af471ee70861 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -186,6 +186,13 @@ config DW_AXI_DMAC
+ 	  NOTE: This driver wasn't tested on 64 bit platform because
+ 	  of lack 64 bit platform with Synopsys DW AXI DMAC.
+ 
++config EFINIX_DMA
++	bool "Efinix DMA support"
++	select DMA_ENGINE
++	select DMA_VIRTUAL_CHANNELS
++	help
++	  Enable support for Efinix DMA controller
++
+ config EP93XX_DMA
+ 	bool "Cirrus Logic EP93xx DMA support"
+ 	depends on ARCH_EP93XX || COMPILE_TEST
+diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+index 948a8da05f8b..79181a9938fe 100644
+--- a/drivers/dma/Makefile
++++ b/drivers/dma/Makefile
+@@ -29,6 +29,7 @@ obj-$(CONFIG_DMA_SUN6I) += sun6i-dma.o
+ obj-$(CONFIG_DW_AXI_DMAC) += dw-axi-dmac/
+ obj-$(CONFIG_DW_DMAC_CORE) += dw/
+ obj-$(CONFIG_DW_EDMA) += dw-edma/
++obj-$(CONFIG_EFINIX_DMA) += efx_dma.o
+ obj-$(CONFIG_EP93XX_DMA) += ep93xx_dma.o
+ obj-$(CONFIG_FSL_DMA) += fsldma.o
+ obj-$(CONFIG_FSL_EDMA) += fsl-edma.o fsl-edma-common.o
+diff --git a/drivers/dma/efx_dma.c b/drivers/dma/efx_dma.c
+new file mode 100644
+index 000000000000..9ba6048917d6
+--- /dev/null
++++ b/drivers/dma/efx_dma.c
+@@ -0,0 +1,829 @@
++#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/interrupt.h>
++#include <linux/dmaengine.h>
++#include <linux/dma-mapping.h>
++#include <linux/of.h>
++#include <linux/of_dma.h>
++#include <linux/of_irq.h>
++
++#include "dmaengine.h"
++#include "virt-dma.h"
++
++#define EFX_DMA_CHANNEL_INPUT_ADDRESS				0x00
++#define EFX_DMA_CHANNEL_INPUT_STREAM				0x08
++#define EFX_DMA_CHANNEL_INPUT_CONFIG				0x0c
++#define EFX_DMA_CHANNEL_INPUT_CONFIG_MEMORY			(1 << 12)
++#define EFX_DMA_CHANNEL_INPUT_CONFIG_STREAM			0x0
++#define EFX_DMA_CHANNEL_INPUT_CONFIG_COMPLETION_ON_PACKET	(1 << 13)
++#define EFX_DMA_CHANNEL_INPUT_CONFIG_WAIT_ON_PACKET		(1 << 14)
++
++#define EFX_DMA_CHANNEL_OUTPUT_ADDRESS				0x10
++#define EFX_DMA_CHANNEL_OUTPUT_STREAM				0x18
++#define EFX_DMA_CHANNEL_OUTPUT_CONFIG				0x1c
++#define EFX_DMA_CHANNEL_OUTPUT_CONFIG_MEMORY			(1 << 12)
++#define EFX_DMA_CHANNEL_OUTPUT_CONFIG_STREAM			0x0
++#define EFX_DMA_CHANNEL_OUTPUT_CONFIG_LAST			(1 << 13)
++
++#define EFX_DMA_CHANNEL_DIRECT_BYTES				0x20
++#define EFX_DMA_CHANNEL_STATUS					0x2c
++#define EFX_DMA_CHANNEL_STATUS_DIRECT_START			(1 << 0)
++#define EFX_DMA_CHANNEL_STATUS_BUSY				(1 << 0)
++#define EFX_DMA_CHANNEL_STATUS_SELF_RESTART			(1 << 1)
++#define EFX_DMA_CHANNEL_STATUS_STOP				(1 << 2)
++#define EFX_DMA_CHANNEL_STATUS_LINKED_LIST_START		(1 << 4)
++
++#define EFX_DMA_CHANNEL_FIFO					0x40
++#define EFX_DMA_CHANNEL_PRIORITY				0x44
++
++#define EFX_DMA_CHANNEL_INTERRUPT_ENABLE			0x50
++#define EFX_DMA_CHANNEL_INTERRUPT_PENDING			0x54
++
++// Interrupt at the end of each descriptor
++#define EFX_DMA_CHANNEL_INTERRUPT_DESCRIPTOR_COMPLETION_MASK	(1 << 0)
++// Interrupt at the middle of each descriptor, require the half_completion_interrpt
++// option to be enabled for the channel
++#define EFX_DMA_CHANNEL_INTERRUPT_DESCRIPTOR_COMPLETION_HALF_MASK	(1 << 1)
++// Interrupt when the channel is going off (not busy anymore)
++#define EFX_DMA_CHANNEL_INTERRUPT_CHANNEL_COMPLETION_MASK	(1 << 2)
++// Interrupt each time that a linked list's descriptor stats field is updated
++#define EFX_DMA_CHANNEL_INTERRUPT_LINKED_LIST_UPDATE_MASK	(1 << 3)
++// Interrupt each time a S -> M channel has done transferring a packet into the memory
++#define EFX_DMA_CHANNEL_INTERRUPT_INPUT_PACKET_MASK		(1 << 4)
++
++#define EFX_DMA_CHANNEL_PROGRESS_BYTES				0x60
++#define EFX_DMA_CHANNEL_LINKED_LIST_HEAD			0x70
++#define EFX_DMA_CHANNEL_LINKED_LIST_FROM_SG_BUS			0x78
++
++#define EFX_DMA_DESCRIPTOR_CONTROL_BYTES			0x7FFFFFF
++#define EFX_DMA_DESCRIPTOR_CONTROL_END_OF_PACKET		(1 << 30)
++#define EFX_DMA_DESCRIPTOR_NO_COMPLETION			(1 << 31)
++
++#define EFX_DMA_DESCRIPTOR_STATUS_BYTES				0x7FFFFFF
++#define EFX_DMA_DESCRIPTOR_STATUS_END_OF_PACKET			(1 << 30)
++#define EFX_DMA_DESCRIPTOR_STATUS_COMPLETED			(1 << 31)
++
++// Hardware descriptor
++struct efx_dma_hw_desc {
++        u32 status;
++        u32 control;
++        u64 src_addr;
++        u64 dst_addr;
++        u64 next;
++} __attribute__((aligned(64)));
++
++// Per transfer descriptor
++struct efx_dma_desc {
++	struct virt_dma_desc vdesc;
++	struct efx_dma_hw_desc *hw_desc;
++	phys_addr_t phys_hw_desc;
++	size_t segments;
++	enum dma_transfer_direction direction;
++	dma_addr_t src_addr;
++	dma_addr_t dst_addr;
++	int cyclic;
++	struct list_head node;
++};
++
++// Channel specific private data
++struct efx_dma_chan {
++	const char *name;
++	void __iomem *reg;
++	int chan_id;
++	struct virt_dma_chan vchan;
++	struct efx_dma_priv *priv;
++	struct efx_dma_desc *desc;
++	struct dma_slave_config *cfg;
++	int priority;
++	int irq;
++};
++
++// DMA device specific private data
++struct efx_dma_priv {
++	struct device *dev;
++	void __iomem *base;
++	struct dma_device dma_dev;
++	struct efx_dma_chan *dchan;
++	int chan_count;
++};
++
++static inline struct efx_dma_chan *to_efx_dma_chan(struct dma_chan *chan)
++{
++	return container_of(chan, struct efx_dma_chan, vchan.chan);
++}
++
++static inline struct efx_dma_priv *to_efx_dma_priv(struct dma_chan *chan)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	return dchan->priv;
++}
++
++static void efx_dma_input_memory(struct dma_chan *chan)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	struct efx_dma_hw_desc *hw_desc = dchan->desc->hw_desc;
++	u32 byte_per_burst = 0;
++
++	if (dchan->cfg)
++		byte_per_burst = dchan->cfg->src_maxburst;
++	else
++		byte_per_burst = chan->device->max_burst;
++
++	writel(hw_desc->src_addr, dchan->reg + EFX_DMA_CHANNEL_INPUT_ADDRESS);
++	writel(EFX_DMA_CHANNEL_INPUT_CONFIG_MEMORY | ((byte_per_burst - 1) & 0xFFF),
++		dchan->reg + EFX_DMA_CHANNEL_INPUT_CONFIG);
++}
++
++static void efx_dma_output_memory(struct dma_chan *chan)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	struct efx_dma_hw_desc *hw_desc = dchan->desc->hw_desc;
++	u32 len = hw_desc->control & 0x1FFFFFF;
++	
++	writel(hw_desc->dst_addr, dchan->reg + EFX_DMA_CHANNEL_OUTPUT_ADDRESS);
++	writel(EFX_DMA_CHANNEL_OUTPUT_CONFIG_MEMORY | ((len - 1) & 0xFFF),
++		dchan->reg + EFX_DMA_CHANNEL_OUTPUT_CONFIG);
++}
++
++static void efx_dma_input_stream(struct dma_chan *chan, u32 wait_on_packet, u32 completion_on_packet)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	completion_on_packet = completion_on_packet ? EFX_DMA_CHANNEL_INPUT_CONFIG_COMPLETION_ON_PACKET : 0;
++	wait_on_packet = wait_on_packet ? EFX_DMA_CHANNEL_INPUT_CONFIG_WAIT_ON_PACKET : 0;
++
++	writel(0, dchan->reg + EFX_DMA_CHANNEL_INPUT_STREAM);
++	writel(EFX_DMA_CHANNEL_INPUT_CONFIG_STREAM | completion_on_packet | wait_on_packet,
++		dchan->reg + EFX_DMA_CHANNEL_INPUT_CONFIG);
++}
++
++static void efx_dma_output_stream(struct dma_chan *chan)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++
++	writel(0, dchan->reg + EFX_DMA_CHANNEL_OUTPUT_STREAM);
++	writel(EFX_DMA_CHANNEL_OUTPUT_CONFIG_LAST |  EFX_DMA_CHANNEL_OUTPUT_CONFIG_STREAM,
++		dchan->reg + EFX_DMA_CHANNEL_OUTPUT_CONFIG);
++}
++
++static void efx_dma_linked_list_start(struct dma_chan *chan)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++
++	writel(dchan->desc->phys_hw_desc, dchan->reg + EFX_DMA_CHANNEL_LINKED_LIST_HEAD);
++	writel(0, dchan->reg + EFX_DMA_CHANNEL_LINKED_LIST_FROM_SG_BUS);
++	writel(EFX_DMA_CHANNEL_STATUS_LINKED_LIST_START, dchan->reg + EFX_DMA_CHANNEL_STATUS);
++}
++
++static void efx_dma_stop(struct dma_chan *chan)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++
++	writel(EFX_DMA_CHANNEL_STATUS_STOP, dchan->reg + EFX_DMA_CHANNEL_STATUS); 
++}
++
++static bool efx_dma_busy(struct dma_chan *chan)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	int busy = 0;
++
++	busy = readl(dchan->reg + EFX_DMA_CHANNEL_STATUS) & EFX_DMA_CHANNEL_STATUS_BUSY;
++
++	return busy ? true : false;
++}
++
++static void efx_dma_interrupt_config(struct dma_chan *chan, u32 mask)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++
++	writel(0xFFFFFFFF, dchan->reg + EFX_DMA_CHANNEL_INTERRUPT_PENDING);
++	writel(mask, dchan->reg + EFX_DMA_CHANNEL_INTERRUPT_ENABLE);
++}
++
++static void efx_dma_interrupt_pending_clear(struct dma_chan *chan, u32 mask)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++
++	writel(mask, dchan->reg + EFX_DMA_CHANNEL_INTERRUPT_PENDING);
++}
++
++static void efx_dma_set_channel_priority(struct efx_dma_chan *dchan)
++{
++	writel(dchan->priority, dchan->reg + EFX_DMA_CHANNEL_PRIORITY);
++}
++
++static void efx_dma_configure_registers(struct dma_chan *chan)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	struct efx_dma_desc *desc = dchan->desc;
++
++	if (desc->direction == DMA_DEV_TO_MEM) {
++		efx_dma_output_memory(chan);
++		efx_dma_input_stream(chan, 1, 0);
++
++	} else if (desc->direction == DMA_MEM_TO_DEV) {
++		efx_dma_input_memory(chan);
++		efx_dma_output_stream(chan);
++
++	} else if (desc->direction == DMA_MEM_TO_MEM) {
++		efx_dma_input_memory(chan);
++		efx_dma_output_memory(chan);
++	}
++}
++
++static void efx_dma_start_transfer(struct dma_chan *chan)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	struct virt_dma_desc *vdesc;
++
++	vdesc = vchan_next_desc(&dchan->vchan);
++	if (!vdesc)
++		return;
++
++	efx_dma_configure_registers(chan);
++	efx_dma_linked_list_start(chan);
++}
++
++static irqreturn_t efx_dma_interrupt_handler(int irq, void *dev_id)
++{
++	struct efx_dma_chan *dchan = (struct efx_dma_chan *)dev_id;
++	struct efx_dma_desc *desc = dchan->desc;
++	struct dma_chan *chan = &dchan->vchan.chan;
++	unsigned long flags;
++	u32 pending;
++
++	spin_lock_irqsave(&dchan->vchan.lock, flags);
++	pending = readl(dchan->reg + EFX_DMA_CHANNEL_INTERRUPT_PENDING);
++
++	if (pending & EFX_DMA_CHANNEL_INTERRUPT_DESCRIPTOR_COMPLETION_MASK)
++		efx_dma_interrupt_pending_clear(chan, EFX_DMA_CHANNEL_INTERRUPT_DESCRIPTOR_COMPLETION_MASK);
++
++	if (pending & EFX_DMA_CHANNEL_INTERRUPT_CHANNEL_COMPLETION_MASK)
++		efx_dma_interrupt_pending_clear(chan, EFX_DMA_CHANNEL_INTERRUPT_CHANNEL_COMPLETION_MASK);
++
++	vchan_cookie_complete(&desc->vdesc);
++
++	// Unmask the interrupt
++	efx_dma_interrupt_pending_clear(chan, 0x0);
++	spin_unlock_irqrestore(&dchan->vchan.lock, flags);
++
++	return IRQ_HANDLED;
++}
++
++static int efx_dma_alloc_chan_resources(struct dma_chan *chan)
++{
++	return 0;
++}
++
++static void efx_dma_free_chan_resources(struct dma_chan *chan)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	struct device *dev = dchan->priv->dev;
++
++	dev_info(dev, "Freeing channel %s\n", chan->name);
++	efx_dma_stop(chan);
++}
++
++static void efx_dma_desc_free(struct virt_dma_desc *vd)
++{
++	struct dma_chan *chan = vd->tx.chan;
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	struct efx_dma_hw_desc *hw_desc, *phw_desc;
++	size_t segments = dchan->desc->segments;
++	int i;
++
++	hw_desc = dchan->desc->hw_desc;
++
++	for (i = 0; i < segments; i++) {
++		phw_desc = hw_desc;
++		kfree(phw_desc);
++		hw_desc = phys_to_virt(hw_desc->next);
++	}
++	kfree(dchan->desc);
++}
++
++static void efx_dma_set_hw_desc_address(struct efx_dma_desc *desc,
++				struct efx_dma_hw_desc *hw_desc,
++				struct scatterlist *sg, int i)
++{
++	if (desc->direction == DMA_DEV_TO_MEM) {
++		hw_desc->src_addr = 0;
++		hw_desc->dst_addr = sg_dma_address(sg);
++
++	} else if (desc->direction == DMA_MEM_TO_DEV) {
++		hw_desc->src_addr = sg_dma_address(sg);
++		hw_desc->dst_addr = 0;
++
++	} else if (desc->direction == DMA_MEM_TO_MEM) {
++		hw_desc->src_addr = desc->src_addr + (i * PAGE_SIZE);
++		hw_desc->dst_addr = desc->dst_addr + (i * PAGE_SIZE);
++	}
++}
++
++static void efx_dma_set_hw_desc_control(struct efx_dma_desc *desc,
++				struct efx_dma_hw_desc *hw_desc,
++				struct scatterlist *sg,
++				int i, size_t len,
++				struct efx_dma_hw_desc *fhw_desc)
++{
++	u32 control = desc->cyclic ? EFX_DMA_DESCRIPTOR_NO_COMPLETION: EFX_DMA_DESCRIPTOR_CONTROL_END_OF_PACKET;
++	hw_desc->next = 0;
++	hw_desc->status = 0;
++	if (!sg)
++		hw_desc->control = (PAGE_SIZE - 1) | control;
++	else
++		hw_desc->control = (sg_dma_len(sg) - 1) | control;
++
++	if (desc->cyclic && i == len -1)
++		hw_desc->next = (u32)virt_to_phys(fhw_desc);
++	else if (!desc->cyclic && i == len -1)
++		hw_desc->status = EFX_DMA_DESCRIPTOR_STATUS_COMPLETED;
++}
++
++static void efx_dma_free_hw_desc_chain(struct efx_dma_hw_desc *hw_desc)
++{
++	struct efx_dma_hw_desc *phw_desc;
++
++	while (hw_desc) {
++		phw_desc = hw_desc;
++		hw_desc = phys_to_virt(hw_desc->next);
++		kfree(phw_desc);
++	}
++}
++
++static int efx_dma_hw_desc_init(struct efx_dma_desc *desc,
++				struct scatterlist *sgl, size_t len)
++{
++	struct efx_dma_hw_desc *hw_desc, *fhw_desc = NULL, *phw_desc = NULL;
++	struct scatterlist *sg;
++	int i;
++	desc->segments = 0;
++
++	for (i = 0; i < len; i++) {
++		hw_desc = kzalloc(sizeof(*hw_desc), GFP_KERNEL);
++		if (!hw_desc)
++			goto free_hw_desc;
++
++		if (!fhw_desc) {
++			fhw_desc = hw_desc;
++			desc->hw_desc = hw_desc;
++			desc->phys_hw_desc = virt_to_phys(hw_desc);
++		}
++
++		sg = sgl? &sgl[i]: NULL;
++		efx_dma_set_hw_desc_address(desc, hw_desc, sg, i);
++		efx_dma_set_hw_desc_control(desc, hw_desc, sg, i, len, fhw_desc);
++
++		if (phw_desc)
++			phw_desc->next = (u32)virt_to_phys(hw_desc);
++
++		phw_desc = hw_desc;
++		desc->segments++;
++	}
++
++	return 0;
++
++free_hw_desc:
++	efx_dma_free_hw_desc_chain(fhw_desc);
++	return -ENOMEM;
++}
++
++static void efx_dma_show_desc(struct efx_dma_chan *dchan)
++{
++	struct efx_dma_hw_desc *hw_desc = dchan->desc->hw_desc;
++	int i;
++
++	for (i = 0; i < dchan->desc->segments; i++) {
++		if (i < 4 || i >= dchan->desc->segments - 2) {
++			pr_info("%s: [%d] hw_desc=0x%x, next=0x%x\n",
++			__func__, i, hw_desc, (u32)phys_to_virt(hw_desc->next));
++		}
++		hw_desc = phys_to_virt(hw_desc->next);
++	}
++}
++
++static struct dma_async_tx_descriptor *efx_dma_prep_slave_sg(
++			struct dma_chan *chan,
++			struct scatterlist *sg, unsigned int sg_len,
++			enum dma_transfer_direction direction,
++			unsigned long flags, void *context)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	struct efx_dma_desc *desc;
++	int ret;
++
++	if (unlikely(!chan || !sg || !sg_len))
++		return NULL;
++
++	desc = kzalloc(sizeof(struct efx_dma_desc), GFP_KERNEL);
++	if (!desc)
++		return NULL;
++
++	desc->cyclic = 0;
++	desc->direction = direction;
++
++	// sg_len +1 to include the last status of the descriptor
++        sg_len += 1;
++	ret = efx_dma_hw_desc_init(desc, sg, sg_len);
++	if (ret) {
++		kfree(desc);
++		return NULL;
++	}
++
++	dchan->desc = desc;
++	dchan->vchan.cyclic = &desc->vdesc;
++
++	//efx_dma_show_desc(dchan);
++	return vchan_tx_prep(&dchan->vchan, &desc->vdesc, flags);
++}
++
++static int efx_dma_init_scatterlist(
++				struct efx_dma_chan *dchan,
++				dma_addr_t buf_addr,
++				struct scatterlist *sg,
++				size_t period_len,
++				int segments,
++				enum dma_transfer_direction direction)
++{
++	struct page *page;
++	void *vaddr_iter;
++	dma_addr_t dma_addr;
++	int i, nents;
++
++	if (!is_vmalloc_addr((void *)buf_addr)) {
++		// use for kmalloc memory
++		sg_init_table(sg, segments);
++		for (i = 0; i < segments; i++) {
++			sg_dma_address(&sg[i]) = buf_addr + i *period_len;
++			sg_dma_len(&sg[i]) = period_len;
++		}
++
++	} else {
++		// use vmalloc memory
++		vaddr_iter = (void *)buf_addr;
++
++		sg_init_table(sg, segments);
++		for (i = 0; i < segments; i++) {
++			page = vmalloc_to_page(vaddr_iter);
++			if (!page) {
++				pr_err("%s: Failed to get page for vmalloc address\n", __func__);
++				return -ENOMEM;
++			}
++			sg_set_page(&sg[i], page, PAGE_SIZE, 0);
++			vaddr_iter += PAGE_SIZE;
++		}
++
++		dma_addr = dma_map_page(dchan->priv->dev, vmalloc_to_page(vaddr_iter), 0, PAGE_SIZE, direction);
++		if (dma_mapping_error(dchan->priv->dev, dma_addr)) {
++			pr_err("%s: Failed to map vmalloc with DMA address\n", __func__);
++			return -ENOMEM;
++		}
++
++		nents = dma_map_sg(dchan->priv->dev, sg, segments, direction);
++		if (nents <= 0) {
++			pr_err("%s: Failed to map scatterlist with vmalloc\n", __func__);
++			return -ENOMEM;
++		}
++	}
++
++	return 0;
++}
++
++static struct dma_async_tx_descriptor *efx_dma_prep_cyclic(
++		struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
++		size_t period_len, enum dma_transfer_direction direction,
++		unsigned long flags)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	struct efx_dma_desc *desc;
++	struct device *dev = dchan->priv->dev;
++	struct scatterlist *sg;
++	int segments = 0, ret;
++
++	if (unlikely(!chan || !buf_addr || buf_len <= 0 || period_len <= 0))
++		return NULL;
++
++	if (period_len > buf_len)
++		return NULL;
++
++	segments = buf_len / period_len;
++
++	// Allocate memory for scatterlists
++	sg = kcalloc(segments, sizeof(struct scatterlist), GFP_KERNEL);
++	if (!sg) {
++		dev_err(dev, "Failed to allocated scatterlist\n");
++		return NULL;
++	}
++
++	desc = kzalloc(sizeof(struct efx_dma_desc), GFP_KERNEL);
++	if (!desc)
++		goto free_sg;
++
++	ret = efx_dma_init_scatterlist(dchan, buf_addr, sg, period_len,
++					segments, direction);
++	if (ret)
++		goto free_desc;
++
++	desc->cyclic = 1;
++	desc->direction = direction;
++	dchan->desc = desc;
++	dchan->vchan.cyclic = &desc->vdesc;
++
++	ret = efx_dma_hw_desc_init(desc, sg, segments);
++        if (ret)
++		goto free_desc;
++
++	kfree(sg);
++
++	//efx_dma_show_desc(dchan);
++	return vchan_tx_prep(&dchan->vchan, &desc->vdesc, flags);
++
++free_desc:
++	kfree(desc);
++free_sg:
++	kfree(sg);
++	return NULL;
++}
++
++static void efx_dma_issue_pending(struct dma_chan *chan)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	unsigned long flags;
++
++	spin_lock_irqsave(&dchan->vchan.lock, flags);
++
++	if (vchan_issue_pending(&dchan->vchan))
++		efx_dma_start_transfer(chan);
++
++	spin_unlock_irqrestore(&dchan->vchan.lock, flags);
++}
++
++static int efx_dma_device_config(struct dma_chan *chan,
++				 struct dma_slave_config *config)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++
++	dchan->cfg = config;
++	
++	return 0;
++}
++
++static enum dma_status efx_dma_tx_status(struct dma_chan *chan, dma_cookie_t cookie, struct dma_tx_state *txstate)
++{
++	if (efx_dma_busy(chan))
++		return DMA_IN_PROGRESS;
++
++	if (cookie < DMA_MIN_COOKIE)
++		return DMA_ERROR;
++
++	if (chan->completed_cookie == cookie)
++		return DMA_COMPLETE;
++
++	return DMA_COMPLETE;
++}
++
++static struct dma_async_tx_descriptor *efx_dma_prep_dma_memcpy(struct dma_chan *chan,
++				dma_addr_t dst_addr, dma_addr_t src_addr, size_t len,
++				unsigned long flags)
++{
++	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
++	struct efx_dma_desc *desc;
++	int segments;
++	int ret;
++
++	if (unlikely(!chan || !dst_addr || !src_addr || !len))
++		return NULL;
++
++	desc = kzalloc(sizeof(struct efx_dma_desc), GFP_KERNEL);
++	if (!desc)
++		return NULL;
++
++	if (len < PAGE_SIZE)
++		segments = 1;
++	else
++		segments = (len / PAGE_SIZE);
++
++	segments += 1; // +1 to include the last status of the descriptor
++	desc->cyclic = 0;
++	desc->src_addr = src_addr;
++	desc->dst_addr = dst_addr;
++	desc->direction = DMA_MEM_TO_MEM;
++	dchan->vchan.cyclic = &desc->vdesc;
++	dchan->desc = desc;
++
++	ret = efx_dma_hw_desc_init(desc, NULL, segments);
++	if (ret) {
++		kfree(desc);
++		return NULL;
++	}
++
++	return vchan_tx_prep(&dchan->vchan, &desc->vdesc, flags);
++}
++
++
++static int efx_dma_terminate_all(struct dma_chan *chan)
++{
++	if (chan)
++		efx_dma_stop(chan);
++	
++	return 0;
++}
++
++static void efx_dma_release(struct dma_device *dev)
++{
++
++}
++
++static int efx_dma_chan_probe(struct platform_device *pdev)
++{
++	struct efx_dma_priv *priv = platform_get_drvdata(pdev);
++	struct efx_dma_chan *dchan;
++	struct device_node *node = pdev->dev.of_node;
++	struct device_node *child = pdev->dev.of_node;
++	int ret, i = 0;
++
++	priv->dchan = devm_kzalloc(&pdev->dev, sizeof(struct efx_dma_chan) * priv->chan_count, GFP_KERNEL);
++	if (!priv->dchan) {
++		dev_err(&pdev->dev, "Failed to allocated memory for DMA channels\n");
++		return -ENOMEM;
++	}
++
++	for_each_child_of_node(node, child) {
++		dchan = &priv->dchan[i];
++		if (of_property_read_string(child, "dma-names", &dchan->name)) {
++                        dev_warn(&pdev->dev, "Failed to get dma-names for channel %d\n", i);
++                        return -EINVAL;
++                }
++
++                dev_info(&pdev->dev, "Initialize DMA channel %d for %s\n", i, dchan->name);
++
++		dchan->priv = priv;
++		vchan_init(&dchan->vchan, &priv->dma_dev);
++		dchan->chan_id = i;
++		dchan->reg = priv->base + i * 0x80;
++		dchan->cfg = NULL;
++                dchan->vchan.desc_free = &efx_dma_desc_free;
++
++		dchan->irq = irq_of_parse_and_map(node, i);
++		if (dchan->irq <= 0) {
++			dev_warn(&pdev->dev, "Failed to get interrupt number\n");
++		}
++
++		ret = devm_request_irq(&pdev->dev, dchan->irq, efx_dma_interrupt_handler,
++					IRQF_SHARED, dchan->name, dchan);
++		if (ret) {
++			dev_warn(&pdev->dev, "Warning: Failed to register interrupt handler\n");
++		}
++
++		efx_dma_stop(&dchan->vchan.chan);
++		efx_dma_interrupt_config(&dchan->vchan.chan, EFX_DMA_CHANNEL_INTERRUPT_CHANNEL_COMPLETION_MASK);
++
++		ret = of_property_read_u32(child, "chan-priority", &dchan->priority);
++		if (ret) {
++			dev_warn(&pdev->dev, "'chan-priority' is not found in the DMA device tree node. Use the default priority\n");
++			dchan->priority = 0;
++		}
++		dev_info(&pdev->dev, "  channel address 0x%x, priority %d\n", dchan->reg, dchan->priority);
++		efx_dma_set_channel_priority(dchan);
++		i++;
++	}
++
++	return 0;
++}
++
++static struct dma_chan *of_dma_efx_dma_xlate(struct of_phandle_args *dma_spec,
++					     struct of_dma *ofdma)
++{
++	struct efx_dma_priv *priv = ofdma->of_dma_data;
++	struct efx_dma_chan *dchan;
++	struct dma_chan *chan = NULL;
++	int chan_id;
++
++	chan_id = dma_spec->args[0];
++	if (chan_id < 0 || chan_id > priv->chan_count)
++		return NULL;
++
++	dchan = &priv->dchan[chan_id];
++	
++	chan = dma_get_slave_channel(&dchan->vchan.chan);
++	if (!chan) {
++		dev_err(priv->dev, "Failed to get DMA slave channel %d\n", chan_id);
++		return NULL;
++	}
++
++	dev_info(priv->dev, "Found DMA slave '%s' at channel %d\n", dchan->name, chan_id);
++
++	return chan;
++}
++
++static int efx_dma_probe(struct platform_device *pdev)
++{
++	struct efx_dma_priv *priv;
++	struct resource *res;
++	struct device_node *node = pdev->dev.of_node;
++	struct device_node *child = pdev->dev.of_node;
++	int ret;
++
++	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->dev = &pdev->dev;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	priv->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(priv->base))
++		return PTR_ERR(priv->base);
++
++	dma_cap_zero(priv->dma_dev.cap_mask);
++	dma_cap_set(DMA_SLAVE, priv->dma_dev.cap_mask);
++	dma_cap_set(DMA_CYCLIC, priv->dma_dev.cap_mask);
++	dma_cap_set(DMA_MEMCPY, priv->dma_dev.cap_mask);
++
++	priv->dma_dev.src_addr_widths = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	priv->dma_dev.dst_addr_widths = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	priv->dma_dev.max_burst = 16;
++	priv->dma_dev.directions = BIT(DMA_MEM_TO_DEV) | BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_MEM);
++
++	INIT_LIST_HEAD(&priv->dma_dev.channels);
++
++	// Initialize and register the DMA engine
++	priv->dma_dev.dev = &pdev->dev;
++	priv->dma_dev.device_alloc_chan_resources = efx_dma_alloc_chan_resources;
++	priv->dma_dev.device_free_chan_resources = efx_dma_free_chan_resources;
++	priv->dma_dev.device_prep_slave_sg = efx_dma_prep_slave_sg;
++	priv->dma_dev.device_prep_dma_cyclic = efx_dma_prep_cyclic;
++	priv->dma_dev.device_issue_pending = efx_dma_issue_pending;
++	priv->dma_dev.device_config = efx_dma_device_config;
++	priv->dma_dev.device_tx_status = efx_dma_tx_status;
++	priv->dma_dev.device_prep_dma_memcpy = efx_dma_prep_dma_memcpy;
++	priv->dma_dev.device_release = efx_dma_release;
++	priv->dma_dev.device_terminate_all = efx_dma_terminate_all;
++
++	platform_set_drvdata(pdev, priv);
++
++	priv->chan_count = 0;
++	ret = of_property_read_u32(node, "dma-channels", &priv->chan_count);
++	if (ret) {
++		dev_warn(&pdev->dev, "`dma-channels` not found in the DMA device tree node. Try to auto detect the number of channels\n");
++		for_each_child_of_node(node, child) {
++			priv->chan_count++;
++		}
++	}
++
++	dev_info(&pdev->dev, "Found %d DMA channels\n", priv->chan_count);
++
++	// Initialize DMA channels
++	ret = efx_dma_chan_probe(pdev);
++	if (ret)
++		return ret;
++	
++	dev_info(&pdev->dev, "Register DMA controller\n");
++	ret = dma_async_device_register(&priv->dma_dev);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to register DMA controller\n");
++		return ret;
++	}
++
++	// Register DMA controller with device tree framework
++	ret = of_dma_controller_register(node, of_dma_efx_dma_xlate, priv);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Unable to register DMA controller to DT\n");
++		dma_async_device_unregister(&priv->dma_dev);
++		return ret;
++	}
++
++	dev_info(&pdev->dev, "DMA controller registered\n");
++	
++	return 0;
++}
++
++static int efx_dma_remove(struct platform_device *pdev)
++{
++	struct efx_dma_priv *priv = platform_get_drvdata(pdev);
++
++	dma_async_device_unregister(&priv->dma_dev);
++
++	return 0;
++}
++
++static const struct of_device_id efx_dma_of_match[] = {
++	{ .compatible = "efx,dma-controller" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, efx_dma_of_match);
++
++static struct platform_driver efx_dma_driver = {
++	.probe = efx_dma_probe,
++	.remove = efx_dma_remove,
++	.driver = {
++		.name = "efx-dma",
++		.of_match_table = efx_dma_of_match,
++	},
++};
++
++module_platform_driver(efx_dma_driver);
++
++MODULE_AUTHOR("Alim Hussin <mnalim@efinixinc.com>");
++MODULE_DESCRIPTION("Efinix DMA driver");
++MODULE_LICENSE("GPL v2");
+-- 
+2.17.1
+
