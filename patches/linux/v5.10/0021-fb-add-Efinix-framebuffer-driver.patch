@@ -1,0 +1,503 @@
+From b3728927a0d3ec02edfc37a3fca73cb561c2f32b Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Wed, 19 Feb 2025 13:27:43 +0800
+Subject: [PATCH] fb: add Efinix framebuffer driver
+
+---
+ drivers/video/fbdev/Kconfig  |   9 +
+ drivers/video/fbdev/Makefile |   1 +
+ drivers/video/fbdev/fb_efx.c | 450 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 460 insertions(+)
+ create mode 100644 drivers/video/fbdev/fb_efx.c
+
+diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+index cfb7f5612ef0..78a864876d55 100644
+--- a/drivers/video/fbdev/Kconfig
++++ b/drivers/video/fbdev/Kconfig
+@@ -2206,6 +2206,15 @@ config FB_SIMPLE
+ 	  Configuration re: surface address, size, and format must be provided
+ 	  through device tree, or plain old platform data.
+ 
++config FB_EFX
++	bool "Efinix framebuffer support"
++	depends on FB
++	select FB_CFB_FILLRECT
++	select FB_CFB_COPYAREA
++	select FB_CFB_IMAGEBLIT
++	help
++	  Efinix framebuffer support
++
+ config FB_SSD1307
+ 	tristate "Solomon SSD1307 framebuffer support"
+ 	depends on FB && I2C
+diff --git a/drivers/video/fbdev/Makefile b/drivers/video/fbdev/Makefile
+index 477b9624b703..feebff39ec92 100644
+--- a/drivers/video/fbdev/Makefile
++++ b/drivers/video/fbdev/Makefile
+@@ -118,6 +118,7 @@ obj-$(CONFIG_FB_MB862XX)	  += mb862xx/
+ obj-$(CONFIG_FB_HYPERV)		  += hyperv_fb.o
+ obj-$(CONFIG_FB_OPENCORES)	  += ocfb.o
+ obj-$(CONFIG_FB_SM712)		  += sm712fb.o
++obj-$(CONFIG_FB_EFX)		  += fb_efx.o
+ 
+ # Platform or fallback drivers go here
+ obj-$(CONFIG_FB_UVESA)            += uvesafb.o
+diff --git a/drivers/video/fbdev/fb_efx.c b/drivers/video/fbdev/fb_efx.c
+new file mode 100644
+index 000000000000..0b39e130156d
+--- /dev/null
++++ b/drivers/video/fbdev/fb_efx.c
+@@ -0,0 +1,450 @@
++#include <linux/module.h>
++#include <linux/fb.h>
++#include <linux/io.h>
++#include <linux/of_platform.h>
++#include <linux/errno.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/dma-mapping.h>
++#include <linux/dmaengine.h>
++#include <linux/vmalloc.h>
++
++#define DRIVER_NAME	"efx-framebuffer"
++#define EFX_MAX_FB_SIZE	(4 * 1024 * 1024)
++
++struct efxfb_format {
++	const char *name;
++	u32 bits_per_pixel;
++	struct fb_bitfield red;
++	struct fb_bitfield green;
++	struct fb_bitfield blue;
++	struct fb_bitfield transp;
++};
++
++struct efxfb_params {
++	u32 width;
++	u32 height;
++	u32 stride;
++	struct efxfb_format *format;
++};
++
++#define PSEUDO_PALETTE_SIZE     16
++
++struct efxfb_par {
++        u32 palette[PSEUDO_PALETTE_SIZE];
++	struct resource *res;
++	void __iomem *display_buff_io;
++	char *display_buf;
++	u32 fb_size;
++	int fb_transfer_mode;
++
++	/* DMA */
++	struct dma_chan *chan;
++	dma_addr_t dma_display_buff_io;
++	struct completion transfer_ok;
++};
++
++static const struct fb_fix_screeninfo efxfb_fix = {
++	.id = "efxfb",
++	.type = FB_TYPE_PACKED_PIXELS,
++	.visual = FB_VISUAL_TRUECOLOR,
++	.accel = FB_ACCEL_NONE,
++};
++
++static const struct fb_var_screeninfo efxfb_var = {
++	.height = -1,
++	.width = -1,
++	.activate = FB_ACTIVATE_NOW,
++	.vmode = FB_VMODE_NONINTERLACED,
++};
++
++static int efxfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
++			   u_int transp, struct fb_info *info)
++{
++	u32 *pal = info->pseudo_palette;
++	u32 cr = red >> (16 - info->var.red.length);
++	u32 cg = green >> (16 - info->var.green.length);
++	u32 cb = blue >> (16 - info->var.blue.length);
++	u32 value;
++
++	if (regno >= PSEUDO_PALETTE_SIZE)
++		return -EINVAL;
++
++	value = (cr << info->var.red.offset) |
++		(cg << info->var.green.offset) |
++		(cb << info->var.blue.offset);
++
++	if (info->var.transp.length > 0) {
++		u32 mask = (1 << info->var.transp.length) - 1;
++		mask <<= info->var.transp.offset;
++		value |= mask;
++	}
++
++	pal[regno] = value;
++
++	return 0;
++}
++
++static int efxfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
++{
++	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
++	unsigned long size = vma->vm_end - vma->vm_start;
++	struct efxfb_par *par = info->par;
++	unsigned long page_start = (unsigned long)par->display_buf + offset;
++	unsigned long page_count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	unsigned long start = vma->vm_start;
++	unsigned long pfn;
++	int i;
++
++	for (i = 0; i < page_count; i++) {
++		pfn = vmalloc_to_pfn((void *)(page_start + (i << PAGE_SHIFT)));
++		if(remap_pfn_range(vma, start + (i << PAGE_SHIFT), pfn, PAGE_SIZE, vma->vm_page_prot)) {
++			return -EAGAIN;
++		}
++	}
++
++	return 0;
++}
++
++static void efxfb_destroy(struct fb_info *info)
++{
++	if (info->screen_base)
++		iounmap(info->screen_base);
++}
++
++static struct fb_ops efxfb_ops = {
++	.owner = THIS_MODULE,
++	.fb_mmap = efxfb_mmap,
++	.fb_destroy = efxfb_destroy,
++	.fb_setcolreg = efxfb_setcolreg,
++	.fb_fillrect = cfb_fillrect,
++	.fb_copyarea = cfb_copyarea,
++	.fb_imageblit = cfb_imageblit,
++};
++
++static int efxfb_parse_dt(struct platform_device *pdev,
++		struct efxfb_params *params)
++{
++	struct device_node *np = pdev->dev.of_node;
++	int ret;
++
++	ret = of_property_read_u32(np, "width", &params->width);
++	if (ret) {
++		dev_err(&pdev->dev, "Can't parse width property\n");
++		return ret;
++	}
++
++	ret = of_property_read_u32(np, "height", &params->height);
++	if (ret) {
++		dev_err(&pdev->dev, "Can't parse height property\n");
++		return ret;
++	}
++
++	ret = of_property_read_u32(np, "stride", &params->stride);
++	if (ret) {
++		dev_err(&pdev->dev, "Can't parse stride property\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static void efxfb_set_fix(struct platform_device *pdev,
++			  struct efxfb_params *params)
++{
++	struct fb_info *info = platform_get_drvdata(pdev);
++	struct efxfb_par *par = info->par;
++
++	info->fix = efxfb_fix;
++	if (par->fb_transfer_mode == 1)
++		info->fix.smem_start = par->dma_display_buff_io;
++	else if (par->fb_transfer_mode == 2)
++		info->fix.smem_start = par->display_buf;
++
++	info->fix.smem_len = par->fb_size;
++	info->fix.line_length = params->stride;
++}
++
++static void efxfb_set_var(struct platform_device *pdev,
++			  struct efxfb_params *params)
++{
++	struct efxfb_format format;
++	struct fb_info *info = platform_get_drvdata(pdev);
++	char format_name[] = "a8b8g8r8";
++
++        format.bits_per_pixel = 32;
++
++	format.red.offset = 0;
++        format.red.length = 8;
++
++        format.green.offset = 8;
++        format.green.length = 8;
++
++        format.blue.offset = 16;
++        format.blue.length = 8;
++
++        format.transp.offset = 24;
++        format.transp.length = 8;
++
++	info->var = efxfb_var;
++
++	info->var.xres = params->width;
++	info->var.yres = params->height;
++	info->var.xres_virtual = params->width;
++	info->var.yres_virtual = params->height;
++
++	info->var.bits_per_pixel = format.bits_per_pixel;
++	info->var.red = format.red;
++	info->var.green = format.green;
++	info->var.blue = format.blue;
++	info->var.transp = format.transp;
++
++	dev_info(&pdev->dev, "framebuffer at 0x%lx, 0x%x bytes, mapped to 0x%pK\n",
++                        info->fix.smem_start, info->fix.smem_len,
++                        info->screen_base);
++        dev_info(&pdev->dev, "format=%s, mode=%dx%dx%d, linelength=%d\n",
++                        format_name,
++                        info->var.xres, info->var.yres,
++                        info->var.bits_per_pixel, info->fix.line_length);
++}
++
++static int efxfb_dma_init_vmalloc_sg_cyclic(struct platform_device *pdev, struct efxfb_par *par)
++{
++	struct dma_chan *chan;
++	struct dma_async_tx_descriptor *tx = NULL;
++	dma_cookie_t cookie;
++
++	par->display_buf = vmalloc(par->fb_size);
++	if (!par->display_buf) {
++		dev_err(&pdev->dev, "Failed to allocate memory using vmalloc\n");
++		return -ENOMEM;
++	}
++
++	chan = dma_request_chan(&pdev->dev, "display");
++	if (!chan) {
++		dev_err(&pdev->dev, "Failed to request DMA channel for display\n");
++		vfree(par->display_buf);
++		return -ENODEV;
++	}
++
++	par->chan = chan;
++
++	tx = dmaengine_prep_dma_cyclic(chan, (dma_addr_t)par->display_buf,
++				par->fb_size, PAGE_SIZE, DMA_MEM_TO_DEV, 0);
++	if (!tx) {
++		dev_err(&pdev->dev, "Failed to prepare DMA cyclic descriptor\n");
++		goto err_prep_vmem;
++	}
++
++	cookie = dmaengine_submit(tx);
++	if (dma_submit_error(cookie)) {
++                dev_err(&pdev->dev, "Failed to submit DMA transfer\n", __func__);
++		goto err_prep_vmem;
++        }
++	dma_async_issue_pending(chan);
++
++	return 0;
++
++err_prep_vmem:
++	dma_release_channel(chan);
++	vfree(par->display_buf);
++	return -EIO;
++}
++
++static int efxfb_dma_init_kmalloc_sg_cyclic(struct platform_device *pdev, struct efxfb_par *par)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct dma_chan *chan;
++	struct dma_async_tx_descriptor *tx = NULL;
++	dma_cookie_t cookie;
++	int ret;
++
++	par->display_buf = devm_kzalloc(&pdev->dev, par->fb_size, GFP_KERNEL);
++        if (!par->display_buf) {
++                dev_err(&pdev->dev, "Failed to request memory region\n");
++                return -ENOMEM;
++        }
++
++	par->dma_display_buff_io = dma_map_single(&pdev->dev,
++				par->display_buf, par->fb_size, DMA_TO_DEVICE);
++        ret = dma_mapping_error(&pdev->dev, par->dma_display_buff_io);
++        if (ret) {
++                dev_err(&pdev->dev, "DMA mapping error: %d\n", ret);
++                return ret;
++	}
++
++	chan = dma_request_chan(&pdev->dev, "display");
++	if (!chan) {
++		dev_err(&pdev->dev, "Failed to request DMA channel\n");
++		return -ENODEV;
++	}
++
++	par->chan = chan;
++
++	dev_info(&pdev->dev, "prepare dma transfer\n");
++	tx = dmaengine_prep_dma_cyclic(chan, par->dma_display_buff_io,
++					par->fb_size, par->fb_size, DMA_MEM_TO_DEV, 0);
++	if (!tx) {
++		dev_err(&pdev->dev, "Failed to prepare DMA transfer\n");
++		goto err_prep;
++	}
++
++	cookie = dmaengine_submit(tx);
++	if (dma_submit_error(cookie)) {
++                dev_err(&pdev->dev, "Failed to submit DMA transfer\n", __func__);
++		goto err_prep;
++        }
++
++	dma_async_issue_pending(chan);
++
++	return 0;
++
++err_prep:
++	dma_release_channel(chan);
++	dma_unmap_single(&pdev->dev, par->dma_display_buff_io,
++			par->fb_size, DMA_TO_DEVICE);
++	return -EIO;
++}
++
++static int efxfb_probe(struct platform_device *pdev)
++{
++	int ret;
++	struct efxfb_params params;
++	struct fb_info *info;
++	struct efxfb_par *par;
++	struct resource *res;
++
++	if (pdev->dev.of_node)
++		ret = efxfb_parse_dt(pdev, &params);
++	else
++		return -ENODEV;
++
++	par = devm_kzalloc(&pdev->dev, sizeof(struct efxfb_par), GFP_KERNEL);
++	if (!par)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "No memory resource\n");
++		return -EINVAL;
++	}
++
++	par->res = res;
++
++	info = framebuffer_alloc(sizeof(struct efxfb_par), &pdev->dev);
++        if (!info)
++                return -ENOMEM;
++
++	par->fb_size = params.stride * params.height;
++	if (!par->fb_size) {
++		dev_err(&pdev->dev, "Framebuffer size should not be 0\n");
++		return -EINVAL;
++	}
++
++	if (par->fb_size < EFX_MAX_FB_SIZE) {
++		par->fb_transfer_mode = 1;
++		ret = efxfb_dma_init_kmalloc_sg_cyclic(pdev, par);
++		info->screen_buffer = par->display_buf;
++		efxfb_ops.fb_mmap = NULL;
++
++	} else {
++		par->fb_transfer_mode = 2;
++		ret = efxfb_dma_init_vmalloc_sg_cyclic(pdev, par);
++		info->screen_base = (char __iomem *)par->display_buf;
++	}
++
++	if (ret)
++		goto error_fb_release;
++
++	platform_set_drvdata(pdev, info);
++	info->par = par;
++	info->pseudo_palette = par->palette;
++
++	efxfb_set_fix(pdev, &params);
++	efxfb_set_var(pdev, &params);
++
++	info->fbops = &efxfb_ops;
++	info->flags = FBINFO_DEFAULT | FBINFO_MISC_FIRMWARE;
++
++	ret = register_framebuffer(info);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Unable to register efxfb: %d\n", ret);
++		goto error_fb_release;
++	}
++
++	dev_info(&pdev->dev, "fb%d: efxfb registerd!\n", info->node);
++
++	return 0;
++
++error_fb_release:
++	dma_release_channel(par->chan);
++	if (par->fb_transfer_mode == 1)
++		dma_unmap_single(&pdev->dev, par->dma_display_buff_io, par->fb_size, DMA_TO_DEVICE);
++	else if (par->fb_transfer_mode == 2)
++		vfree(par->display_buf);
++
++	framebuffer_release(info);
++	return ret;
++}
++
++static int efxfb_remove(struct platform_device *pdev)
++{
++	struct fb_info *info = platform_get_drvdata(pdev);
++	struct efxfb_par *par = info->par;
++	struct dma_chan *chan = par->chan;
++
++	if (chan)
++		dma_release_channel(chan);
++
++	if (par->fb_transfer_mode == 1)
++		dma_unmap_single(&pdev->dev, par->dma_display_buff_io, par->fb_size, DMA_TO_DEVICE);
++	else if (par->fb_transfer_mode == 2)
++		vfree(par->display_buf);
++
++	unregister_framebuffer(info);
++	framebuffer_release(info);
++
++	return 0;
++}
++
++static const struct of_device_id efxfb_of_match[] = {
++	{ .compatible = "efx,efx-fb"},
++	{},
++};
++MODULE_DEVICE_TABLE(of, efxfb_of_match);
++
++static struct platform_driver efxfb_driver = {
++	.driver = {
++		.name = DRIVER_NAME,
++		.of_match_table = efxfb_of_match,
++	},
++	.probe = efxfb_probe,
++	.remove = efxfb_remove,
++};
++
++static int __init efxfb_init(void)
++{
++	struct device_node *np;
++
++	platform_driver_register(&efxfb_driver);
++
++	if (IS_ENABLED(CONFIG_OF_ADDRESS) && of_chosen) {
++		for_each_child_of_node(of_chosen, np) {
++			if (of_device_is_compatible(np, DRIVER_NAME))
++				of_platform_device_create(np, NULL, NULL);
++		}
++	}
++
++	return 0;
++}
++
++static void __exit efxfb_exit(void)
++{
++	platform_driver_unregister(&efxfb_driver);
++}
++
++late_initcall(efxfb_init);
++
++MODULE_AUTHOR("Alim Hussin <mnalim@efinixinc.com>");
++MODULE_DESCRIPTION("Efinix framebuffer driver");
++MODULE_LICENSE("GPL v2");
+-- 
+2.17.1
+
