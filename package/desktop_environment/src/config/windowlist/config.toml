@@ -1,0 +1,51 @@
+sort_by = "none" # "none" | "position" | "application"
+max_windows = 13
+
+name = "class" # "class" | "title"
+name_case = "lowercase" # "none" | "lowercase" | "uppercase"
+name_max_length = 30
+name_padding = 1
+
+separator_string = ""
+empty_desktop_string = ""
+
+active_window_left_click   = "minimize"
+active_window_middle_click = "none"
+active_window_right_click  = "none"
+active_window_scroll_up    = "none"
+active_window_scroll_down  = "none"
+
+inactive_window_left_click   = "raise"
+inactive_window_middle_click = "none"
+inactive_window_right_click  = "none"
+inactive_window_scroll_up    = "none"
+inactive_window_scroll_down  = "none"
+
+active_window_fg_color = "#5294E2"
+active_window_bg_color = "#5a6477"
+active_window_ul_color = "#5294E2"
+
+inactive_window_fg_color = "none"
+inactive_window_bg_color = "#292d37"
+inactive_window_ul_color = "#292d37"
+
+separator_fg_color = "#808080"
+separator_bg_color = "none"
+separator_ul_color = "none"
+
+empty_desktop_fg_color = "none"
+empty_desktop_bg_color = "none"
+empty_desktop_ul_color = "none"
+
+overflow_fg_color = "none"
+overflow_bg_color = "none"
+overflow_ul_color = "none"
+
+ignored_classes = [
+    # "foo",
+    # "bar"
+]
+
+[window_nicknames]
+# "foo" = "bar"
+# "baz" = "qux"

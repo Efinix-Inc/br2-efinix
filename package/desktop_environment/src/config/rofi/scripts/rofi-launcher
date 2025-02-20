@@ -1,0 +1,6 @@
+#!/bin/sh
+
+DIR="$HOME/.config"
+RASI="$DIR/rofi/launcher.rasi"
+
+rofi -show drun -kb-cancel Alt-F1 -theme ${RASI}

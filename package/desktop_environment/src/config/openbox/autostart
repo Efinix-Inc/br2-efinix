@@ -1,0 +1,15 @@
+#!/bin/sh
+
+dir="/$USER/.config"
+
+# Set wallpaper
+hsetroot -cover /usr/share/backgrounds/mountains.png &
+
+# Launch polybar
+exec "$dir"/polybar/launch.sh &
+
+# Set keyboard layout
+xmodmap "/root/.keycodes" &
+
+# Start compositing manager
+#exec picom --config "$dir"/picom.conf -b
