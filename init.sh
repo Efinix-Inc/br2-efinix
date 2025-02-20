@@ -10,6 +10,7 @@ unset OPT_DIR
 unset ETHERNET
 unset HARDEN_SOC
 unset UNIFIED_HW
+unset HW_FEATURES
 
 BOARD=$1
 SOC_H=$2
@@ -48,6 +49,8 @@ function usage()
 	echo "	-e                      Generate Linux configuration with ethernet support"
 	echo "	-p                      Generate Linux device tree for Sapphire High Performance SoC"
 	echo "	-u			Generate Linux device tree for unified hardware design for Ti180J484 and Ti375C529"
+	echo "	-s			Set hardware features to enable in the Linux kernel. Must be in comma seperated."
+	echo "				For example, spi,i2c,gpio,ethernet,dma,framebuffer"
 	echo
 	echo "Example usage,"
 	echo "$0 t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
@@ -266,6 +269,44 @@ function get_version()
 	version=${arr[1]}
 }
 
+function set_kernel_config()
+{
+	local kernel_frag_dir="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/kernel"
+	local hw_features=""
+	local br2_defconfig="configs/efinix_${BOARD}_defconfig"
+	local br2_kernel_cfg_keyword="BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES"
+	#local br2_linux_kernel_cfg=$(grep ${br2_kernel_cfg_keyword} ${br2_defconfig} | awk -F '=' '{print $2}' | sed 's/"//g')
+	local br2_linux_kernel_cfg=""
+	local feature
+
+	if [ ! -z ${HW_FEATURES} ]; then
+		echo HW_FEATURES=${HW_FEATURES}
+
+		IFS=',' read -ra hw_features <<< "${HW_FEATURES}"
+
+		echo br2_linux_kernel_cfg=$br2_linux_kernel_cfg
+		for feature in "${hw_features[@]}"; do
+			echo INFO: hardware feature: $feature
+
+			[ "$feature" = "spi" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/spi.config"
+			[ "$feature" = "i2c" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/i2c.config"
+			[ "$feature" = "gpio" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/gpio.config"
+			[ "$feature" = "mmc" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/mmc.config"
+			[ "$feature" = "ethernet" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/ethernet.config"
+			[ "$feature" = "dma" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/dma.config"
+			[ "$feature" = "fb" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/framebuffer.config"
+			[ "$feature" = "usb" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/usb.config"
+		done
+	fi
+
+	echo INFO: $br2_kernel_cfg_keyword=\"$br2_linux_kernel_cfg\"
+	if grep -q ${br2_kernel_cfg_keyword} ${br2_defconfig}; then
+		sed -i "/$br2_kernel_cfg_keyword/c\\$br2_kernel_cfg_keyword=\"$br2_linux_kernel_cfg\"" "${br2_defconfig}"
+	else
+		echo "$br2_kernel_cfg_keyword=\"$br2_linux_kernel_cfg\"" >> "${br2_defconfig}"
+	fi
+}
+
 while [ $# -gt 0 ]
 do
 	case $1 in
@@ -275,7 +316,7 @@ do
 	shift
 done
 
-while getopts ":d:raephu" o; do
+while getopts ":d:s:raephu" o; do
 	case "${o}" in
 		:)
                         echo "ERROR: Option -$OPTARG requires an argument"
@@ -298,6 +339,9 @@ while getopts ":d:raephu" o; do
 			;;
 		u)
 			UNIFIED_HW=1
+			;;
+		s)
+			HW_FEATURES=${OPTARG}
 			;;
 		h)
 			usage
@@ -345,6 +389,9 @@ sanity_check
 if [[ $? -gt 0 ]]; then
        return
 fi
+
+set_kernel_config
+
 WORKSPACE="build_$BOARD"
 
 if [[ ! -z $OPT_DIR ]]; then
