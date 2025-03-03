@@ -1,0 +1,5 @@
+config BR2_PACKAGE_HSETROOT
+	bool "hsetroot"
+	select BR2_PACKAGE_IMLIB2
+	help
+	  Yet another wallpaper application
