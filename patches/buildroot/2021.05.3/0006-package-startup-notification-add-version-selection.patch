@@ -1,0 +1,69 @@
+From b3c77847ebc26a407c3d2417d7bde831dc6104d0 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Sun, 9 Feb 2025 01:20:23 +0800
+Subject: [PATCH] package/startup-notification: add version selection
+
+Some packages require to use newer version of startup-notification
+library which currenly does not support by the package makefile.
+This patch created a version selection for this package.
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ package/startup-notification/Config.in                | 11 +++++++++++
+ .../startup-notification/startup-notification.hash    |  1 +
+ package/startup-notification/startup-notification.mk  |  8 ++++++--
+ 3 files changed, 18 insertions(+), 2 deletions(-)
+
+diff --git a/package/startup-notification/Config.in b/package/startup-notification/Config.in
+index 88d18174bc..4f4a651e68 100644
+--- a/package/startup-notification/Config.in
++++ b/package/startup-notification/Config.in
+@@ -1,3 +1,14 @@
++config BR2_STARTUP_NOTIFICATION_VERSION_0_9
++	bool "startup-notification 0.9"
++
++config BR2_STARTUP_NOTIFICATION_VERSION_0_12
++	bool "startup-notification 0.12"
++
++config BR2_STARTUP_NOTIFICATION_VERSION
++	string
++	default "0.9"	if BR2_STARTUP_NOTIFICATION_VERSION_0_9
++	default "0.12"	if BR2_STARTUP_NOTIFICATION_VERSION_0_12
++
+ config BR2_PACKAGE_STARTUP_NOTIFICATION
+ 	bool "startup-notification"
+ 	depends on BR2_PACKAGE_XORG7
+diff --git a/package/startup-notification/startup-notification.hash b/package/startup-notification/startup-notification.hash
+index 474c8bd92c..f213a73ba3 100644
+--- a/package/startup-notification/startup-notification.hash
++++ b/package/startup-notification/startup-notification.hash
+@@ -1,3 +1,4 @@
+ # Locally calculated
+ sha256  c2fa09f9a49d8b319e79638e49e967c682df8726006e03059b1ffca5ab82099c  startup-notification-0.9.tar.gz
++sha256	3c391f7e930c583095045cd2d10eb73a64f085c7fde9d260f2652c7cb3cfbe4a  startup-notification-0.12.tar.gz
+ sha256  29935974beae046f50da806b5f4e54532401dd7bcfbc696a0b645f4cbcce9dbb  COPYING
+diff --git a/package/startup-notification/startup-notification.mk b/package/startup-notification/startup-notification.mk
+index b3314087f5..65469a759e 100644
+--- a/package/startup-notification/startup-notification.mk
++++ b/package/startup-notification/startup-notification.mk
+@@ -3,11 +3,15 @@
+ # startup-notification
+ #
+ ################################################################################
+-
+-STARTUP_NOTIFICATION_VERSION = 0.9
++STARTUP_NOTIFICATION_VERSION = $(call qstrip,$(BR2_STARTUP_NOTIFICATION_VERSION))
+ STARTUP_NOTIFICATION_SITE = http://freedesktop.org/software/startup-notification/releases
+ STARTUP_NOTIFICATION_INSTALL_STAGING = YES
+ STARTUP_NOTIFICATION_DEPENDENCIES = xlib_libX11
++
++ifeq ($(BR2_STARTUP_NOTIFICATION_VERSION_0_12), y)
++STARTUP_NOTIFICATION_DEPENDENCIES += xcb-util
++endif
++
+ STARTUP_NOTIFICATION_CONF_ENV = lf_cv_sane_realloc=yes
+ STARTUP_NOTIFICATION_CONF_OPTS = --with-x \
+ 	--x-includes="$(STAGING_DIR)/usr/include/X11" \
+-- 
+2.17.1
+
