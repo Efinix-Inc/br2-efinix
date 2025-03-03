@@ -1,0 +1,30 @@
+From 9c5c3c65215625ac42b8e8501d1035b9f03c95a7 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Tue, 18 Feb 2025 00:09:10 +0800
+Subject: [PATCH] package/font-awesome: copy the fonts to standard fonts
+ directory
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ package/font-awesome/font-awesome.mk | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/package/font-awesome/font-awesome.mk b/package/font-awesome/font-awesome.mk
+index 666346be0e..1a27a779f9 100644
+--- a/package/font-awesome/font-awesome.mk
++++ b/package/font-awesome/font-awesome.mk
+@@ -10,9 +10,9 @@ FONT_AWESOME_LICENSE = OFL-1.1 (font), MIT (CSS, LESS and Sass files)
+ FONT_AWESOME_DIRECTORIES_LIST = css fonts less scss
+ 
+ define FONT_AWESOME_INSTALL_TARGET_CMDS
+-	mkdir -p $(TARGET_DIR)/usr/share/font-awesome/
++	mkdir -p $(TARGET_DIR)/usr/share/fonts/font-awesome/
+ 	$(foreach d,$(FONT_AWESOME_DIRECTORIES_LIST),\
+-		cp -dpfr $(@D)/$(d) $(TARGET_DIR)/usr/share/font-awesome$(sep))
++		cp -dpfr $(@D)/$(d) $(TARGET_DIR)/usr/share/fonts/font-awesome$(sep))
+ endef
+ 
+ $(eval $(generic-package))
+-- 
+2.17.1
+
