@@ -10,7 +10,7 @@ unset OPT_DIR
 unset ETHERNET
 unset HARDEN_SOC
 unset UNIFIED_HW
-unset HW_FEATURES
+unset EXTRA_HW_FEATURES
 
 BOARD=$1
 SOC_H=$2
@@ -275,14 +275,20 @@ function set_kernel_config()
 	local hw_features=""
 	local br2_defconfig="configs/efinix_${BOARD}_defconfig"
 	local br2_kernel_cfg_keyword="BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES"
-	#local br2_linux_kernel_cfg=$(grep ${br2_kernel_cfg_keyword} ${br2_defconfig} | awk -F '=' '{print $2}' | sed 's/"//g')
 	local br2_linux_kernel_cfg=""
 	local feature
 
-	if [ ! -z ${HW_FEATURES} ]; then
-		echo HW_FEATURES=${HW_FEATURES}
+	# Read from SOC_H to get the hardware features
+	local base_features=("spi" "i2c" "gpio")
 
-		IFS=',' read -ra hw_features <<< "${HW_FEATURES}"
+	for feature in "${base_features[@]}"; do
+		if grep -i -q $feature $SOC_H; then
+			br2_linux_kernel_cfg+=" $kernel_frag_dir/$feature.config"
+		fi
+	done
+
+	if [ ! -z ${EXTRA_HW_FEATURES} ]; then
+		IFS=',' read -ra hw_features <<< "${EXTRA_HW_FEATURES}"
 
 		echo br2_linux_kernel_cfg=$br2_linux_kernel_cfg
 		for feature in "${hw_features[@]}"; do
@@ -341,7 +347,7 @@ while getopts ":d:s:raephu" o; do
 			UNIFIED_HW=1
 			;;
 		s)
-			HW_FEATURES=${OPTARG}
+			EXTRA_HW_FEATURES=${OPTARG}
 			;;
 		h)
 			usage
