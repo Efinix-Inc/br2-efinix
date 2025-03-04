@@ -33,7 +33,7 @@ DT_REPO="https://github.com/Efinix-Inc/sapphire-soc-dt-generator.git"
 
 function usage()
 {
-	echo "Usage: $0 [board <t120f324|ti60f225>] [path/to/soc.h <string> ] [-d build directory <string>] [-r reconfigure]"
+	echo "Usage: init.sh [board <t120f324|ti60f225>] [path/to/soc.h <string> ] [-d build directory <string>] [-r reconfigure]"
 	echo
 	echo "Positional arguments:"
 	echo "	board			development kit name such as t120f324, ti60f225"
@@ -53,7 +53,7 @@ function usage()
 	echo "				For example, spi,i2c,gpio,ethernet,dma,framebuffer"
 	echo
 	echo "Example usage,"
-	echo "$0 t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
+	echo "$	source init.sh t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
 	echo
 	echo "Demo Ti180J484 with unified hardware design"
 	echo "$ source init.sh ti180j484 /path/to/soc.h -u"
