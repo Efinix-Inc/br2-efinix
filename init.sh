@@ -134,7 +134,7 @@ function modify_soc_h()
 	ext_c=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_C | awk '{print $3}' | head -1)
 	if [ $ext_c == 1 ]; then
 		# enable compressed extension flag in buildroot defconfig
-		echo "INFO: Enable compressed extensin in $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG"
+		echo "INFO: Enable compressed extension (RVC) in $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG"
 		sed -i 's/BR2_RISCV_ISA_CUSTOM_RVC=n/BR2_RISCV_ISA_CUSTOM_RVC=y/g' $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG
 		sed -i 's/CONFIG_RISCV_ISA_C=n/CONFIG_RISCV_ISA_C=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
 	fi
