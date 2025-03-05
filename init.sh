@@ -60,7 +60,7 @@ function usage()
 	echo "$ source init.sh ti180j484 /path/to/soc.h -u"
 	echo
 	echo "Demo Ti375C529 with unified hardware design"
-	echo "$ source init.sh ti375c529 /path/to/soc.h -p -u"
+	echo "$ source init.sh ti375c529 /path/to/soc.h -u"
 	echo
 	echo "Demo Ti375c529 with unified hardware design + X11 graphics"
 	echo "$ source init.sh ti375c529 /path/to/soc.h -u -x"
@@ -97,7 +97,6 @@ function sanity_check()
 
 	if [[ $HARDEN_SOC ]] && [[ ! $BOARD == "ti375c529" ]]; then
 		echo Error: board $BOARD does not support harden SoC.
-		echo "The -p optional argument only used for board which support harden SoC such as Ti375C529"
 		return 1;
 	fi
 
