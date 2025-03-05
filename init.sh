@@ -52,7 +52,7 @@ function usage()
 	echo "	-s			Set hardware features to enable in the Linux kernel. Must be in comma seperated."
 	echo "				For example, spi,i2c,gpio,ethernet,dma,framebuffer"
 	echo "	-x			Enable X11 graphics for unified hardware design. This enable framebuffer, DMA and USB drivers."
-	echo "				Not compatible with camera (evsoc driver)"
+	echo "				Not compatible with camera (evsoc driver). This optional argument requires -u to be set first."
 	echo
 	echo "Example usage,"
 	echo "$	source init.sh t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
@@ -62,6 +62,9 @@ function usage()
 	echo
 	echo "Demo Ti375C529 with unified hardware design"
 	echo "$ source init.sh ti375c529 /path/to/soc.h -p -u"
+	echo
+	echo "Demo Ti375c529 with unified hardware design + X11 graphics"
+	echo "$ source init.sh ti375c529 /path/to/soc.h -u -x"
 }
 
 function sanity_check()
@@ -211,7 +214,7 @@ function generate_device_tree()
 			cp $EFINIX_DIR/$BOARD/u-boot/uboot.dts.mmc $EFINIX_DIR/$BOARD/u-boot/uboot.dts
 		else
 			echo "Error: Unified hardware not support for $BOARD"
-			exit 1
+			return
 		fi
 	fi
 
@@ -359,8 +362,13 @@ while getopts ":d:s:raephux" o; do
 			EXTRA_HW_FEATURES=${OPTARG}
 			;;
 		x)
-			X11_GRAPHICS=1
-			EXTRA_HW_FEATURES+="fb,dma,usb,"
+			if [ "$UNIFIED_HW" = "1" ]; then
+				X11_GRAPHICS=1
+				EXTRA_HW_FEATURES+="fb,dma,usb,"
+			else
+				echo "ERROR: -x option requires -u to be set first."
+				return
+			fi
 			;;
 		h)
 			usage
