@@ -51,6 +51,8 @@ function usage()
 	echo "	-u			Generate Linux device tree for unified hardware design for Ti180J484 and Ti375C529"
 	echo "	-s			Set hardware features to enable in the Linux kernel. Must be in comma seperated."
 	echo "				For example, spi,i2c,gpio,ethernet,dma,framebuffer"
+	echo "	-x			Enable X11 graphics for unified hardware design. This enable framebuffer, DMA and USB drivers."
+	echo "				Not compatible with camera (evsoc driver)"
 	echo
 	echo "Example usage,"
 	echo "$	source init.sh t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
@@ -158,6 +160,7 @@ function generate_device_tree()
 	local sdhc="-c $DT_DIR/config/sdhc.json "
 	local unified_hw="-c $DT_DIR/config/unified_hw.json "
 	local unified_hw_softcore="-c $DT_DIR/config/unified_hw_softcore.json "
+	local x11_graphics="-c $DT_DIR/config/framebuffer.json "
 
 	if [ $ETHERNET ]; then
 		if [ $HARDEN_SOC ]; then
@@ -193,6 +196,11 @@ function generate_device_tree()
 			# Create a temp for linux_slave json file to disable spi1
 			linux_slaves="$DT_DIR/config/linux_slaves_modified.json"
 			jq '.child.spi_mmc.status = "disabled"' "$DT_DIR/config/linux_slaves.json" > "$linux_slaves"
+
+			if [ $X11_GRAPHICS ]; then
+				echo INFO: Enable X11 graphics
+				base_cmd+=$x11_graphics
+			fi
 		fi
 
 		if [ $HARDEN_SOC ]; then
@@ -283,6 +291,7 @@ function set_kernel_config()
 
 	for feature in "${base_features[@]}"; do
 		if grep -i -q $feature $SOC_H; then
+			echo INFO: hardware feature: $feature
 			br2_linux_kernel_cfg+=" $kernel_frag_dir/$feature.config"
 		fi
 	done
@@ -290,7 +299,6 @@ function set_kernel_config()
 	if [ ! -z ${EXTRA_HW_FEATURES} ]; then
 		IFS=',' read -ra hw_features <<< "${EXTRA_HW_FEATURES}"
 
-		echo br2_linux_kernel_cfg=$br2_linux_kernel_cfg
 		for feature in "${hw_features[@]}"; do
 			echo INFO: hardware feature: $feature
 
@@ -322,7 +330,7 @@ do
 	shift
 done
 
-while getopts ":d:s:raephu" o; do
+while getopts ":d:s:raephux" o; do
 	case "${o}" in
 		:)
                         echo "ERROR: Option -$OPTARG requires an argument"
@@ -345,9 +353,14 @@ while getopts ":d:s:raephu" o; do
 			;;
 		u)
 			UNIFIED_HW=1
+			EXTRA_HW_FEATURES="mmc,ethernet,"
 			;;
 		s)
 			EXTRA_HW_FEATURES=${OPTARG}
+			;;
+		x)
+			X11_GRAPHICS=1
+			EXTRA_HW_FEATURES+="fb,dma,usb,"
 			;;
 		h)
 			usage
