@@ -47,7 +47,6 @@ function usage()
 	echo "	-r			Reconfigure the Buildroot configuration"
 	echo "	-a			Reconfigure the Buildroot configuration and regenerate Linux device tree"
 	echo "	-e                      Generate Linux configuration with ethernet support"
-	echo "	-p                      Generate Linux device tree for Sapphire High Performance SoC"
 	echo "	-u			Generate Linux device tree for unified hardware design for Ti180J484 and Ti375C529"
 	echo "	-s			Set hardware features to enable in the Linux kernel. Must be in comma seperated."
 	echo "				For example, spi,i2c,gpio,ethernet,dma,framebuffer"
@@ -109,6 +108,10 @@ function sanity_check()
 			echo Error: board $BOARD does not support unified hardware design
 			return 1;
 		fi
+	fi
+
+	if [ "$(grep SYSTEM_HARD_RISCV_QC32 $SOC_H | awk '{print $3}')" == "1" ]; then
+		HARDEN_SOC=1
 	fi
 }
 
@@ -333,7 +336,7 @@ do
 	shift
 done
 
-while getopts ":d:s:raephux" o; do
+while getopts ":d:s:raehux" o; do
 	case "${o}" in
 		:)
                         echo "ERROR: Option -$OPTARG requires an argument"
@@ -350,9 +353,6 @@ while getopts ":d:s:raephux" o; do
 			;;
 		e)
 			ETHERNET=1
-			;;
-		p)
-			HARDEN_SOC=1
 			;;
 		u)
 			UNIFIED_HW=1
