@@ -166,6 +166,7 @@ function generate_device_tree()
 	local sdhc="-c $DT_DIR/config/sdhc.json "
 	local unified_hw="-c $DT_DIR/config/unified_hw.json "
 	local unified_hw_softcore="-c $DT_DIR/config/unified_hw_softcore.json "
+	local evsoc="-c $DT_DIR/config/evsoc.json "
 	local x11_graphics="-c $DT_DIR/config/framebuffer.json "
 
 	if [ $ETHERNET ]; then
@@ -206,6 +207,9 @@ function generate_device_tree()
 			if [ $X11_GRAPHICS ]; then
 				echo INFO: Enable X11 graphics
 				base_cmd+=$x11_graphics
+
+			else
+				base_cmd+=$evsoc
 			fi
 		fi
 
