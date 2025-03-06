@@ -104,6 +104,8 @@ function usage()
 
 function sanity_check()
 {
+	title "Sanity Check"
+
 	if [[ ! -f $SOC_H ]]; then
 		echo "Error: $SOC_H file not exists"
 		return
@@ -338,6 +340,8 @@ function set_kernel_config()
 	# Read from SOC_H to get the hardware features
 	local base_features=("spi" "i2c" "gpio")
 
+	title "Set Kernel Configuration"
+
 	for feature in "${base_features[@]}"; do
 		if grep -i -q $feature $SOC_H; then
 			echo INFO: hardware feature: $feature
@@ -455,14 +459,12 @@ if [ ! -d $DT_DIR ]; then
 	fi
 fi
 
-title "Sanity Check"
 sanity_check
 
 if [[ $? -gt 0 ]]; then
        return
 fi
 
-title "Set Kernel Configuration"
 set_kernel_config
 
 WORKSPACE="build_$BOARD"
