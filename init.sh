@@ -58,6 +58,15 @@ function title()
 	echo -e "\n${BLACK}${BG_WHITE}>>> $1 ${NC}"
 }
 
+function self_check()
+{
+	if [ $2 -eq 0 ]; then
+		echo -e "Check: $1 ${RED}NO${NC}"
+	else
+		echo -e "Check: $1 ${GREEN}YES${NC}"
+	fi
+}
+
 function usage()
 {
 	echo "Usage: init.sh [board <t120f324|ti60f225>] [path/to/soc.h <string> ] [-d build directory <string>] [-r reconfigure]"
@@ -141,9 +150,20 @@ function sanity_check()
 	fi
 }
 
-function modify_soc_h()
+function check_soc_configuration()
 {
-	title "Updating soc.h"
+	title "Checking Efinix RISC-V Sapphire SoC Configuration"
+
+	get_cpu_count
+        echo "INFO: Detecting $cpu_count RISC-V CPU cores"
+        if [[ $cpu_count -gt 1 ]]; then
+                # enable CONFIG_SMP=y in linux.config
+                sed -i 's/^CONFIG_SMP=n/CONFIG_SMP=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
+        else
+                sed -i 's/^CONFIG_SMP=y/CONFIG_SMP=n/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
+        fi
+	self_check "Enable SMP support ..." "$cpu_count"
+
 	# modify soc.h by appending SYSTEM_CORES_COUNT
 	if [[ ! $(cat $SOC_H | grep SYSTEM_CORES_COUNT) ]]; then
 		IFS=$'\n' read -d '' -r -a lines < $SOC_H
@@ -164,6 +184,7 @@ function modify_soc_h()
 		echo "INFO: Disable Linux FPU support in $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config"
 		sed -i 's/^CONFIG_FPU=y/CONFIG_FPU=n/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
 	fi
+	self_check "Floating point support ..." "$fp"
 
 	# check for compressed extension from soc.h
 	ext_c=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_C | awk '{print $3}' | head -1)
@@ -173,6 +194,7 @@ function modify_soc_h()
 		sed -i 's/BR2_RISCV_ISA_CUSTOM_RVC=n/BR2_RISCV_ISA_CUSTOM_RVC=y/g' $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG
 		sed -i 's/CONFIG_RISCV_ISA_C=n/CONFIG_RISCV_ISA_C=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
 	fi
+	self_check "Compressed extension support ..." "$ext_c"
 
 	# change the size of DDR to 1024MB due to limitation of physical DDR.
 	if [ $HARDEN_SOC ]; then
@@ -288,19 +310,6 @@ function get_cpu_count()
 			break
 		fi
 	done
-}
-
-function check_smp()
-{
-	title "Check for SMP"
-	get_cpu_count
-	echo "INFO: Detecting $cpu_count RISC-V CPU cores"
-	if [[ $cpu_count -gt 1 ]]; then
-		# enable CONFIG_SMP=y in linux.config
-		sed -i 's/^CONFIG_SMP=n/CONFIG_SMP=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
-	else
-		sed -i 's/^CONFIG_SMP=y/CONFIG_SMP=n/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
-	fi
 }
 
 function get_version()
@@ -476,8 +485,7 @@ if [[ $RECONFIGURE == 1 ]]; then
 			cp $SOC_H $OPENSBI_DIR/soc.h
 			SOC_H=$OPENSBI_DIR/soc.h
 
-			check_smp || return 1
-			modify_soc_h || return 1
+			check_soc_configuration || return 1
 			generate_device_tree || return 1
 		fi
 		cd $BUILD_DIR && \
@@ -524,7 +532,6 @@ title "Copy soc.h file to OpenSBI directory"
 cp $PROJ_DIR/$SOC_H $OPENSBI_DIR/soc.h
 SOC_H=$OPENSBI_DIR/soc.h
 
-check_smp || return 1
-modify_soc_h || return 1
+check_soc_configuration || return 1
 generate_device_tree || return 1
 prepare_buildroot_env || return 1
