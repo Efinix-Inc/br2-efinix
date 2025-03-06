@@ -32,6 +32,32 @@ COMMON_DIR="$EFINIX_DIR/common"
 DT_DIR="$COMMON_DIR/sapphire-soc-dt-generator"
 DT_REPO="https://github.com/Efinix-Inc/sapphire-soc-dt-generator.git"
 
+# Text colors
+WHITE='\033[0;37m'
+BLACK='\033[0;30m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+
+# Background colors
+BG_WHITE='\033[47m'
+BG_BLACK='\033[40m'
+BG_RED='\033[41m'
+BG_GREEN='\033[42m'
+BG_YELLOW='\033[43m'
+BG_BLUE='\033[44m'
+NC='\033[0m'	# No color
+
+# Get the terminal width
+COLUMNS=$(tput cols)
+
+function title()
+{
+	# Print combined text and background colors
+	echo -e "\n${BLACK}${BG_WHITE}>>> $1 ${NC}"
+}
+
 function usage()
 {
 	echo "Usage: init.sh [board <t120f324|ti60f225>] [path/to/soc.h <string> ] [-d build directory <string>] [-r reconfigure]"
@@ -117,6 +143,7 @@ function sanity_check()
 
 function modify_soc_h()
 {
+	title "Updating soc.h"
 	# modify soc.h by appending SYSTEM_CORES_COUNT
 	if [[ ! $(cat $SOC_H | grep SYSTEM_CORES_COUNT) ]]; then
 		IFS=$'\n' read -d '' -r -a lines < $SOC_H
@@ -169,6 +196,7 @@ function generate_device_tree()
 	local evsoc="-c $DT_DIR/config/evsoc.json "
 	local x11_graphics="-c $DT_DIR/config/framebuffer.json "
 
+	title "Generate Device Tree"
 	if [ $ETHERNET ]; then
 		if [ $HARDEN_SOC ]; then
 			base_cmd+=$ethernet_ed
@@ -242,6 +270,7 @@ function generate_device_tree()
 function prepare_buildroot_env()
 {
 	# prepare Buildroot build environment
+	title "Prepare Buildroot Build Environment"
 	mkdir $BUILD_DIR
 	cd $BUILD_DIR && \
 	make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BUILDROOT_DEFCONFIG
@@ -263,6 +292,7 @@ function get_cpu_count()
 
 function check_smp()
 {
+	title "Check for SMP"
 	get_cpu_count
 	echo "INFO: Detecting $cpu_count RISC-V CPU cores"
 	if [[ $cpu_count -gt 1 ]]; then
@@ -398,6 +428,7 @@ fi
 
 # clone sapphire-soc-dt-generator repository
 if [ ! -d $DT_DIR ]; then
+	title "Cloning sapphire-soc-dt-generator Repository"
         substr="sapphire-soc-dt-generator"
         get_version $substr
         dt_version=$version
@@ -415,12 +446,14 @@ if [ ! -d $DT_DIR ]; then
 	fi
 fi
 
+title "Sanity Check"
 sanity_check
 
 if [[ $? -gt 0 ]]; then
        return
 fi
 
+title "Set Kernel Configuration"
 set_kernel_config
 
 WORKSPACE="build_$BOARD"
@@ -435,6 +468,7 @@ BUILD_DIR="$PROJ_DIR/../$WORKSPACE/build"
 OPENSBI_DIR="$BR2_EXTERNAL_DIR/boards/efinix/$BOARD/opensbi"
 
 if [[ $RECONFIGURE == 1 ]]; then
+	title "Reconfigure Buildroot"
 	# reconfigure the .config
 
 	if [[ -d "$BUILD_DIR" ]]; then
@@ -462,6 +496,7 @@ buildroot_version=$version
 
 if [ ! -d $BUILDROOT_DIR ]; then
 	# clone buildroot repository
+	title "Clone Buildroot repository"
 	if [[ ! -z $buildroot_version ]]; then
 		echo Using Buildroot $buildroot_version
 		git clone $BUILDROOT_REPO -b $buildroot_version
@@ -478,11 +513,13 @@ if [ ! -d $BUILDROOT_DIR ]; then
 
 	mv buildroot $BUILDROOT_DIR
 
+	title "Apply Patch"
 	# apply out of tree patches for buildroot
 	git -C $BUILDROOT_DIR reset --hard $buildroot_version
 	git -C $BUILDROOT_DIR am $BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version/*patch
 fi || return 1
 
+title "Copy soc.h file to OpenSBI directory"
 # copy soc.h to opensbi directory. Opensbi has dependency on soc.h.
 cp $PROJ_DIR/$SOC_H $OPENSBI_DIR/soc.h
 SOC_H=$OPENSBI_DIR/soc.h
