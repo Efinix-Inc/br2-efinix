@@ -199,10 +199,11 @@ function check_soc_configuration()
 	self_check "Compressed extension support ..." "$ext_c"
 
 	# change the size of DDR to 1024MB due to limitation of physical DDR.
-	if [ $HARDEN_SOC ]; then
-		sed -i 's/0xe7fff000/0x40000000/g' $SOC_H
-	else #Soft Core
-		sed -i 's/0xe0000000/0x40000000/g' $SOC_H
+	ddr_size=$(grep SYSTEM_DDR_BMB_SIZE $SOC_H | awk '{print $3}')
+	phy_ddr_size=0x40000000
+
+	if (( $ddr_size > $phy_ddr_size )); then
+		sed -i "s/$ddr_size/$phy_ddr_size/g" $SOC_H
 	fi
 }
 
