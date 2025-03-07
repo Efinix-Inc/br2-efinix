@@ -166,13 +166,31 @@ function check_soc_configuration()
         fi
 	self_check "Enable SMP support ..." "$cpu_count"
 
-	# modify soc.h by appending SYSTEM_CORES_COUNT
-	if [[ ! $(cat $SOC_H | grep SYSTEM_CORES_COUNT) ]]; then
-		IFS=$'\n' read -d '' -r -a lines < $SOC_H
-		lines[${#lines[@]}-1]="#define SYSTEM_CORES_COUNT $cpu_count"
-		lines[${#lines[@]}]="#endif"
-		printf "%s\n" "${lines[@]}" > ${SOC_H}
+	# modify soc.h
+	# remove last line '#endif'
+	sed '/#endif/d' $SOC_H > ${SOC_H}.temp
+	mv ${SOC_H}.temp $SOC_H
+
+	# append SYSTEM_CORES_COUNT
+	grep -q SYSTEM_CORES_COUNT $SOC_H || echo "#define SYSTEM_CORES_COUNT $cpu_count" >> $SOC_H
+
+	# append addresses for AXI interconnect to soc.h
+	if [ $UNIFIED_HW ]; then
+		grep -q SYSTEM_AXI_SLAVE $SOC_H || \
+		cat <<-EOF >> $SOC_H
+		#define SYSTEM_AXI_SLAVE_0_IO_CTRL 0xe8000000
+		#define SYSTEM_AXI_SLAVE_0_IO_CTRL_SIZE 0x1000000
+		#define SYSTEM_AXI_SLAVE_1_IO_CTRL 0xe9000000
+		#define SYSTEM_AXI_SLAVE_1_IO_CTRL_SIZE 0x10000
+		#define SYSTEM_AXI_SLAVE_2_IO_CTRL 0xe9100000
+		#define SYSTEM_AXI_SLAVE_2_IO_CTRL_SIZE 0x10000
+		#define SYSTEM_AXI_SLAVE_3_IO_CTRL 0xe9200000
+		#define SYSTEM_AXI_SLAVE_3_IO_CTRL_SIZE 0x10000
+EOF
 	fi
+
+	# append '#endif' to soc.h
+	grep -q "#endif" $SOC_H || echo "#endif" >> $SOC_H
 
 	# check for floating point from soc.h and modify buildroot defconfig
 	fp=$(cat ${SOC_H} | grep FPU | awk  '{print $3}' | head -1)
