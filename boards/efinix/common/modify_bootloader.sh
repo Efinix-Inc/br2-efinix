@@ -178,7 +178,7 @@ else
 	EFINITY_PROJECT_PATH="$EFINITY_PROJECT$EXAMPLE_DESIGN_DIR/embedded_sw/$SAPPHIRE_IP"
 fi
 
-EfxSapphireSoc_DIR="$EFINITY_PROJECT_PATH/bsp/efinix/EfxSapphireSoc"
+EfxSapphireSoc_DIR=$(find "$EFINITY_PROJECT" -type d -name EfxSapphireSoc)
 APP_DIR="$EfxSapphireSoc_DIR/app"
 SOC_H=$EfxSapphireSoc_DIR/include/soc.h
 
@@ -212,7 +212,7 @@ else
 	exit 1
 fi
 
-BOOTLOADER_DIR=$EFINITY_PROJECT_PATH/software/standalone/bootloader
+BOOTLOADER_DIR=$(find "$EFINITY_PROJECT" -type d -name bootloader)
 if [[ "Ti375C529_devkit" == *$DEVKIT* ]]; then
 	cp $SCRIPT_DIR/bootloaderConfig.h $BOOTLOADER_DIR/src
 else
@@ -227,7 +227,7 @@ if [[ ! -z $SMP ]]; then
 fi
 
 # compile bootloader program
-cd $EFINITY_PROJECT_PATH/software/standalone/bootloader && \
+cd $BOOTLOADER_DIR && \
 	BSP_PATH=$EfxSapphireSoc_DIR make clean && \
 	BSP_PATH=$EfxSapphireSoc_DIR make
 
