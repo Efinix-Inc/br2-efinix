@@ -410,8 +410,10 @@ function add_packages()
 	local br2_defconfig_path="$BR2_EXTERNAL_DIR/configs"
         local br2_defconfig="$BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG"
 
-        [ $UNIFIED_HW ] && grep -q EVSOC $br2_defconfig || \
-	cat $br2_defconfig_path/evsoc_fragment >> $br2_defconfig
+        if [ $UNIFIED_HW ]; then
+		grep -q EVSOC $br2_defconfig || \
+		cat $br2_defconfig_path/evsoc_fragment >> $br2_defconfig
+	fi
 
         if [ $X11_GRAPHICS ]; then
                 grep -q BR2_PACKAGE_DESKTOP_ENVIRONMENT $br2_defconfig || \
