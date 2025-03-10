@@ -227,82 +227,93 @@ EOF
 
 function generate_device_tree()
 {
-	local linux_slaves="$DT_DIR/config/linux_slaves.json"
+	local linux_dt_config="$DT_DIR/config/linux"
+	local uboot_dt_config="$DT_DIR/config/uboot"
 	local base_cmd="python3 $DT_DIR/device_tree_generator.py "
-	local end_cmd="$SOC_H $BOARD linux"
-	local spi="-c $DT_DIR/config/linux_spi.json "
-	local ethernet="-c $DT_DIR/config/ethernet.json "
-	local ethernet_ed="-c $DT_DIR/config/ed_ti375c529.json "
-	local sdhc="-c $DT_DIR/config/sdhc.json "
-	local unified_hw="-c $DT_DIR/config/unified_hw.json "
-	local unified_hw_softcore="-c $DT_DIR/config/unified_hw_softcore.json "
-	local evsoc="-c $DT_DIR/config/evsoc.json "
-	local x11_graphics="-c $DT_DIR/config/framebuffer.json "
+	local end_cmd="$SOC_H $BOARD"
 
-	title "Generate Device Tree"
+	local uboot_spi0="-s $uboot_dt_config/spi0.json "
+	local uboot_spi1="-s $uboot_dt_config/spi1.json "
+	local uboot_mmc="-c $uboot_dt_config/mmc.json "
+
+	local linux_slaves="$linux_dt_config/slaves.json"
+	local spi="-c $linux_dt_config/spi.json "
+	local ethernet="-c $linux_dt_config/ethernet.json "
+	local ethernet_ed="-c $linux_dt_config/ed_ti375c529.json "
+	local unified_hw="-c $linux_dt_config/unified_hw.json "
+	local unified_hw_softcore="-c $linux_dt_config/unified_hw_softcore.json "
+	local evsoc="-c $linux_dt_config/evsoc.json "
+	local x11_graphics="-c $linux_dt_config/framebuffer.json "
+
+	local linux_dt+=$base_cmd
+	local uboot_dt+=$base_cmd
+
+	title "Generate U-Boot Device Tree"
+	uboot_dt+=$uboot_spi0
+
+	if [ $UNIFIED_HW ]; then
+		uboot_dt+=$uboot_mmc
+	else
+		uboot_dt+=$uboot_spi1
+	fi
+
+	uboot_dt+="-d $DT_DIR/uboot_dts $end_cmd uboot"
+	echo DEBUG: uboot dts: $uboot_dt
+	eval $uboot_dt
+
+	if [ ! $? -eq 0 ]; then
+                echo "ERROR: Failed to generate U-Boot device tree."
+                return 1
+        fi
+
+	cp $DT_DIR/uboot_dts/uboot.dts $EFINIX_DIR/$BOARD/u-boot/uboot.dts
+
+	title "Generate Linux Device Tree"
+	linux_dt+=$spi
+
 	if [ $ETHERNET ]; then
 		if [ $HARDEN_SOC ]; then
-			base_cmd+=$ethernet_ed
+			linux_dt+=$ethernet_ed
 		else
-			base_cmd+=$ethernet
-		fi
-	fi
-
-	if [ $SDHC ]; then
-		base_cmd+=$sdhc
-	else
-		base_cmd+=$spi
-	fi
-
-	if [ $HARDEN_SOC ]; then
-		if [ ! -f "$EFINIX_DIR/$BOARD/u-boot/uboot.dts.spi" ]; then
-			cp $EFINIX_DIR/$BOARD/u-boot/uboot.dts $EFINIX_DIR/$BOARD/u-boot/uboot.dts.spi
-			cp $EFINIX_DIR/$BOARD/u-boot/uboot.dts.mmc $EFINIX_DIR/$BOARD/u-boot/uboot.dts
-		fi
-	else
-		if [ -f "$EFINIX_DIR/$BOARD/u-boot/uboot.dts.spi" ]; then
-			mv $EFINIX_DIR/$BOARD/u-boot/uboot.dts.spi $EFINIX_DIR/$BOARD/u-boot/uboot.dts
+			linux_dt+=$ethernet
 		fi
 	fi
 
 	if [ $UNIFIED_HW ]; then
 		if [ $HARDEN_SOC ] || [ "$BOARD" == "ti180j484" ]; then
-			#Copy the custom soc.h for evsoc kernel
-			cp "$SOC_H" "$PROJ_DIR/kernel_modules/evsoc/src/soc.h"
-			echo "Copy $SOC_H to $PROJ_DIR/kernel_modules/evsoc/src/soc.h"
-
 			# Create a temp for linux_slave json file to disable spi1
-			linux_slaves="$DT_DIR/config/linux_slaves_modified.json"
-			jq '.child.spi_mmc.status = "disabled"' "$DT_DIR/config/linux_slaves.json" > "$linux_slaves"
+			linux_slaves="$linux_dt_config/slaves_modified.json"
+			jq '.child.spi_mmc.status = "disabled"' "$linux_dt_config/slaves.json" > "$linux_slaves"
 
 			if [ $X11_GRAPHICS ]; then
 				echo INFO: Enable X11 graphics
-				base_cmd+=$x11_graphics
+				linux_dt+=$x11_graphics
 
 			else
-				base_cmd+=$evsoc
+				linux_dt+=$evsoc
+				#Copy the custom soc.h for evsoc kernel
+				cp "$SOC_H" "$PROJ_DIR/kernel_modules/evsoc/src/soc.h"
+				echo "INFO: Copy $SOC_H to $PROJ_DIR/kernel_modules/evsoc/src/soc.h"
 			fi
 		fi
 
 		if [ $HARDEN_SOC ]; then
-			base_cmd+=$unified_hw
+			linux_dt+=$unified_hw
 		elif [ "$BOARD" == "ti180j484" ]; then
-			base_cmd+=$unified_hw_softcore
-			cp $EFINIX_DIR/$BOARD/u-boot/uboot.dts $EFINIX_DIR/$BOARD/u-boot/uboot.dts.spi
-			cp $EFINIX_DIR/$BOARD/u-boot/uboot.dts.mmc $EFINIX_DIR/$BOARD/u-boot/uboot.dts
+			linux_dt+=$unified_hw_softcore
 		else
 			echo "Error: Unified hardware not support for $BOARD"
 			return
 		fi
 	fi
 
-	base_cmd+="-s $linux_slaves "
-	base_cmd+=$end_cmd
-	echo DEBUG: device tree cmd: $base_cmd
-	eval $base_cmd
+	linux_dt+="-s $linux_slaves "
+	linux_dt+="$end_cmd linux"
+	echo DEBUG: device tree cmd: $linux_dt
+	eval $linux_dt
 
 	if [ ! $? -eq 0 ]; then
-		echo "Error: Failed to generate device tree."
+		echo "ERROR: Failed to generate Linux device tree."
 		return 1
 	fi
 
