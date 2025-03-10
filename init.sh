@@ -236,8 +236,9 @@ function generate_device_tree()
 	local uboot_spi1="-s $uboot_dt_config/spi1.json "
 	local uboot_mmc="-c $uboot_dt_config/mmc.json "
 
-	local linux_slaves="$linux_dt_config/slaves.json"
+	local linux_slaves="-s $linux_dt_config/slaves.json "
 	local spi="-c $linux_dt_config/spi.json "
+	local spi_mmc="-s $linux_dt_config/spi_mmc.json "
 	local ethernet="-c $linux_dt_config/ethernet.json "
 	local ethernet_ed="-c $linux_dt_config/ed_ti375c529.json "
 	local unified_hw="-c $linux_dt_config/unified_hw.json "
@@ -281,10 +282,6 @@ function generate_device_tree()
 
 	if [ $UNIFIED_HW ]; then
 		if [ $HARDEN_SOC ] || [ "$BOARD" == "ti180j484" ]; then
-			# Create a temp for linux_slave json file to disable spi1
-			linux_slaves="$linux_dt_config/slaves_modified.json"
-			jq '.child.spi_mmc.status = "disabled"' "$linux_dt_config/slaves.json" > "$linux_slaves"
-
 			if [ $X11_GRAPHICS ]; then
 				echo INFO: Enable X11 graphics
 				linux_dt+=$x11_graphics
@@ -305,9 +302,12 @@ function generate_device_tree()
 			echo "Error: Unified hardware not support for $BOARD"
 			return
 		fi
+
+	else
+		linux_dt+=$spi_mmc
 	fi
 
-	linux_dt+="-s $linux_slaves "
+	linux_dt+=$linux_slaves
 	linux_dt+="$end_cmd linux"
 	echo DEBUG: device tree cmd: $linux_dt
 	eval $linux_dt
@@ -414,7 +414,7 @@ function add_packages()
 	cat $br2_defconfig_path/evsoc_fragment >> $br2_defconfig
 
         if [ $X11_GRAPHICS ]; then
-                grep BR2_PACKAGE_DESKTOP_ENVIRONMENT $br2_defconfig || \
+                grep -q BR2_PACKAGE_DESKTOP_ENVIRONMENT $br2_defconfig || \
 		cat $br2_defconfig_path/x11_fragment >> $br2_defconfig
 
 		# remove EVSOC packages
