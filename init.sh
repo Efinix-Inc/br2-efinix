@@ -107,7 +107,7 @@ function sanity_check()
 	title "Sanity Check"
 
 	if [[ ! -f $SOC_H ]]; then
-		echo "Error: $SOC_H file not exists"
+		echo "ERROR: $SOC_H file not exists"
 		return
 	fi
 
@@ -129,15 +129,15 @@ function sanity_check()
 	done
 
 	if [[ $found == false ]]; then
-		echo Error: board $BOARD is not supported
+		echo ERROR: board $BOARD is not supported
 		return 1
 	fi
 
 	if [[ $UNIFIED_HW ]]; then
 		if [[ $BOARD == "ti375c529" || $BOARD == "ti180j484" ]]; then
-			echo Info: board $BOARD support unified hardware design
+			echo INFO: board $BOARD support unified hardware design
 		else
-			echo Error: board $BOARD does not support unified hardware design
+			echo ERROR: board $BOARD does not support unified hardware design
 			return 1;
 		fi
 	fi
@@ -294,7 +294,7 @@ function generate_device_tree()
 		elif [ "$BOARD" == "ti180j484" ]; then
 			linux_dt+=$unified_hw_softcore
 		else
-			echo "Error: Unified hardware not support for $BOARD"
+			echo "ERROR: Unified hardware not support for $BOARD"
 			return
 		fi
 
@@ -476,12 +476,12 @@ done
 shift $((OPTIND-1))
 
 if [[ -z $BOARD ]]; then
-	echo Error: Board is not defined
+	echo ERROR: Board is not defined
 	return
 fi
 
 if [[ -z $SOC_H ]]; then
-	echo Error: soc.h is not defined
+	echo ERROR: soc.h is not defined
 	return
 fi
 
@@ -499,7 +499,7 @@ if [ ! -d $DT_DIR ]; then
         fi
 
 	if [ ! $? -eq 0 ]; then
-		echo Error: Failed to clone $DT_REPO
+		echo ERROR: Failed to clone $DT_REPO
 		echo Check you internet connection
 		return 1
 	fi
@@ -540,7 +540,7 @@ if [[ $RECONFIGURE == 1 ]]; then
 		cd $BUILD_DIR && \
 		make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BUILDROOT_DEFCONFIG 
 	else
-		echo "Error: $BUILD_DIR not exist"
+		echo "ERROR: $BUILD_DIR not exist"
 	fi
 	return
 fi
@@ -563,7 +563,7 @@ if [ ! -d $BUILDROOT_DIR ]; then
 	fi
 
 	if [ ! $? -eq 0 ]; then
-		echo Error: Failed to clone $BUILDROOT_REPO
+		echo ERROR: Failed to clone $BUILDROOT_REPO
 		echo Check you internet connection
 		return 1
 	fi
