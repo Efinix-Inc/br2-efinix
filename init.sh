@@ -69,7 +69,7 @@ function self_check()
 
 function usage()
 {
-	echo "Usage: init.sh [board] [path/to/soc.h] [-d][-r][-a][-e][-u][-s][-x]"
+	echo "Usage: init.sh [board] [path/to/soc.h] [-c][-d][-r][-a][-e][-u][-s][-x]"
 	echo
 	echo "Positional arguments:"
 	echo "	board			Development kit name such as t120f324, ti60f225, ti180j484, ti375c529"
@@ -80,6 +80,7 @@ function usage()
 	echo
 	echo "Optional arguments:"
 	echo "	-h			Show this help message and exit"
+	echo "	-c			Reset the repo to the original state"
 	echo "	-d			Rename default build directory name"
 	echo "				By default is <board>_build"
 	echo "				Example, if board is ti60f225 then, the name of build directory is 'ti60f225_build'."
@@ -454,11 +455,20 @@ do
 	shift
 done
 
-while getopts ":d:s:raehux" o; do
+while getopts ":d:s:raehuxc" o; do
 	case "${o}" in
 		:)
                         echo "ERROR: Option -$OPTARG requires an argument"
                         ;;
+		c)
+			mod_files=$(git status | grep modified | awk '{print $2}')
+			for f in ${mod_files[@]};
+			do
+				git checkout -- $f
+			done
+			echo INFO: Repo reset to the original state
+			return
+			;;
 		d)
 			OPT_DIR=${OPTARG}
 			;;
