@@ -69,20 +69,23 @@ function self_check()
 
 function usage()
 {
-	echo "Usage: init.sh [board <t120f324|ti60f225>] [path/to/soc.h <string> ] [-d build directory <string>] [-r reconfigure]"
+	echo "Usage: init.sh [board] [path/to/soc.h] [-d][-r][-a][-e][-u][-s][-x]"
 	echo
 	echo "Positional arguments:"
-	echo "	board			development kit name such as t120f324, ti60f225"
-	echo "	soc			path to soc.h. This file is located in Efinity project directory"
+	echo "	board			Development kit name such as t120f324, ti60f225, ti180j484, ti375c529"
+	echo "	soc			Path to 'soc.h'. This file is located in Efinity project directory."
+	echo "				For example,"
+	echo "				my_project/embedded_sw/SapphireCore/bsp/efinix/EfxSapphireSoc/include/soc.h"
+	echo "				my_project/embedded_sw/efx_hard_soc/bsp/efinix/EfxSapphireSoc/include/soc.h"
 	echo
 	echo "Optional arguments:"
 	echo "	-h			Show this help message and exit"
 	echo "	-d			Rename default build directory name"
 	echo "				By default is <board>_build"
-	echo "				Example, if board is ti60f225 then name of build directory is ti60f225_build"
-	echo "	-r			Reconfigure the Buildroot configuration"
-	echo "	-a			Reconfigure the Buildroot configuration and regenerate Linux device tree"
-	echo "	-e                      Generate Linux configuration with ethernet support"
+	echo "				Example, if board is ti60f225 then, the name of build directory is 'ti60f225_build'."
+	echo "	-r			Reconfigure the Buildroot configuration. This option will not regenerate device tree."
+	echo "	-a			Reconfigure the Buildroot configuration and regenerate Linux device tree."
+	echo "	-e                      Generate Linux devcie tree for SoC example design."
 	echo "	-u			Generate Linux device tree for unified hardware design for Ti180J484 and Ti375C529"
 	echo "	-s			Set hardware features to enable in the Linux kernel. Must be in comma seperated."
 	echo "				For example, spi,i2c,gpio,ethernet,dma,framebuffer"
@@ -92,14 +95,26 @@ function usage()
 	echo "Example usage,"
 	echo "$	source init.sh t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
 	echo
+	echo "Demo Ti60F225 with ethernet example design"
+	echo "$ source init.sh ti60f225 $(pwd)/boards/efinix/ti60f225/hardware/ethernet/soc.h -e"
+	echo
+	echo "Demo Ti180J484 with singlecore example design"
+	echo "$ source init.sh ti180j484 $(pwd)/boards/efinix/ti180j484/hardware/singlecore/soc.h"
+	echo
+	echo "Demo Ti180J484 with multicores example design"
+	echo "$ source init.sh ti180j484 $(pwd)/boards/efinix/ti180j484/hardware/multicores/soc.h"
+	echo
 	echo "Demo Ti180J484 with unified hardware design"
-	echo "$ source init.sh ti180j484 /path/to/soc.h -u"
+	echo "$ source init.sh ti180j484 $(pwd)/boards/efinix/ti180j484/hardware/unified_hw/soc.h -u"
+	echo
+	echo "Demo Ti375C529 soc example design"
+	echo "$ source init.sh ti375c529 $(pwd)/boards/efinix/ti375c529/hardware/soc/soc.h -e"
 	echo
 	echo "Demo Ti375C529 with unified hardware design"
-	echo "$ source init.sh ti375c529 /path/to/soc.h -u"
+	echo "$ source init.sh ti375c529 $(pwd)/boards/efinix/ti375c529/hardware/unified_hw/soc.h -u"
 	echo
 	echo "Demo Ti375c529 with unified hardware design + X11 graphics"
-	echo "$ source init.sh ti375c529 /path/to/soc.h -u -x"
+	echo "$ source init.sh ti375c529 $(pwd)/boards/efinix/ti375c529/hardware/unified_hw/soc.h -u -x"
 }
 
 function sanity_check()
