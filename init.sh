@@ -133,11 +133,6 @@ function sanity_check()
 		return 1
 	fi
 
-	if [[ $HARDEN_SOC ]] && [[ ! $BOARD == "ti375c529" ]]; then
-		echo Error: board $BOARD does not support harden SoC.
-		return 1;
-	fi
-
 	if [[ $UNIFIED_HW ]]; then
 		if [[ $BOARD == "ti375c529" || $BOARD == "ti180j484" ]]; then
 			echo Info: board $BOARD support unified hardware design
