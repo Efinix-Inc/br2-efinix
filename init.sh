@@ -7,7 +7,7 @@ OPTIND=1
 unset RECONFIGURE
 unset RECONFIGURE_ALL
 unset OPT_DIR
-unset ETHERNET
+unset EXAMPLE_DESIGN
 unset HARDEN_SOC
 unset UNIFIED_HW
 unset EXTRA_HW_FEATURES
@@ -262,8 +262,12 @@ function generate_device_tree()
 	title "Generate U-Boot Device Tree"
 	uboot_dt+=$uboot_spi0
 
-	if [ $UNIFIED_HW ]; then
-		uboot_dt+=$uboot_mmc
+	if [ $UNIFIED_HW ] || [ $EXAMPLE_DESIGN ]; then
+		if [ "$BOARD" = "ti60f225" ]; then
+			uboot_dt+=$uboot_spi1
+		else
+			uboot_dt+=$uboot_mmc
+		fi
 	else
 		uboot_dt+=$uboot_spi1
 	fi
@@ -282,7 +286,7 @@ function generate_device_tree()
 	title "Generate Linux Device Tree"
 	linux_dt+=$spi
 
-	if [ $ETHERNET ]; then
+	if [ $EXAMPLE_DESIGN ]; then
 		if [ $HARDEN_SOC ]; then
 			linux_dt+=$ethernet_ed
 		else
@@ -460,7 +464,7 @@ while getopts ":d:s:raehux" o; do
 			RECONFIGURE=1
 			;;
 		e)
-			ETHERNET=1
+			EXAMPLE_DESIGN=1
 			;;
 		u)
 			UNIFIED_HW=1
@@ -524,6 +528,16 @@ sanity_check
 
 if [[ $? -gt 0 ]]; then
        return
+fi
+
+if [ $EXAMPLE_DESIGN ]; then
+	if [ "$BOARD" = "ti60f225" ]; then
+		EXTRA_HW_FEATURES+="ethernet,"
+	fi
+
+	if [ "$BOARD" = "ti375c529" ]; then
+		EXTRA_HW_FEATURES+="mmc,ethernet,"
+	fi
 fi
 
 set_kernel_config
