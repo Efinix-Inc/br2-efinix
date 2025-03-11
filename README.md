@@ -123,7 +123,7 @@ Preconfigure Efinity project with Linux also provided in the repository for quic
   
   - [boards/efinix/ti180j484/hardware/multicores](boards/efinix/ti180j484/hardware/multicores/)
   
-  - [boards/efinix/ti180j484/hardware/ethernet](boards/efinix/ti180j484/hardware/ethernet/)
+  - [boards/efinix/ti180j484/hardware/unified_hw](boards/efinix/ti180j484/hardware/unified_hw/)
 
 - **Ti375C529**
   
@@ -161,16 +161,15 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
 2. Clone this repository.
    
    ```bash
-   git clone https://github.com/Efinix-Inc/br2-efinix -b 2021.05.9
+   git clone https://github.com/Efinix-Inc/br2-efinix
    cd br2-efinix
    ```
 
-3. Run `init.sh` script. Please note that we need to pass the argument `-p` and `-e` for generating Linux device tree with ethernet support.
+3. Run `init.sh` script to configure Linux kernel, generate device tree for Linux and U-Boot then, initialize build directory.
    
    ```bash
    source init.sh ti375c529 \
-   boards/efinix/ti375c529/hardware/soc/soc.h \
-   -p -e
+   boards/efinix/ti375c529/hardware/soc/soc.h -e
    ```
 
 4. Build the Linux.
