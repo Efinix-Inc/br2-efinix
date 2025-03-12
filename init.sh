@@ -187,6 +187,7 @@ function check_soc_configuration()
 
 	# append addresses for AXI interconnect to soc.h
 	if [ $UNIFIED_HW ] || ([ $EXAMPLE_DESIGN ] && [ $BOARD = "ti375c529" ]); then
+		sed -i '/SYSTEM_AXI_A_BMB/d' $SOC_H
 		echo INFO: Append addresses for AXI interconnect
 		grep -q SYSTEM_AXI_SLAVE $SOC_H || \
 		cat <<-EOF >> $SOC_H
