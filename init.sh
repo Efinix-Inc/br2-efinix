@@ -186,7 +186,8 @@ function check_soc_configuration()
 	grep -q SYSTEM_CORES_COUNT $SOC_H || echo "#define SYSTEM_CORES_COUNT $cpu_count" >> $SOC_H
 
 	# append addresses for AXI interconnect to soc.h
-	if [ $UNIFIED_HW ]; then
+	if [ $UNIFIED_HW ] || ([ $EXAMPLE_DESIGN ] && [ $BOARD = "ti375c529" ]); then
+		echo INFO: Append addresses for AXI interconnect
 		grep -q SYSTEM_AXI_SLAVE $SOC_H || \
 		cat <<-EOF >> $SOC_H
 		#define SYSTEM_AXI_SLAVE_0_IO_CTRL 0xe8000000
