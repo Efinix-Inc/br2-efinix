@@ -8,9 +8,6 @@ DEVKIT=$1
 EFINITY_PROJECT=$2
 RISCV_IDE=$3
 
-unset EXAMPLE_DESIGN
-unset DEBUG
-
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 BR2_DIR=${SCRIPT_DIR//"/boards/efinix/common"}
 DT_REPO="https://github.com/Efinix-Inc/sapphire-soc-dt-generator.git"
@@ -71,11 +68,9 @@ while getopts ":deh" o; do
                 echo "ERROR: Option -$OPTARG requires an argument"
                 ;;
 	d)
-		echo enable debug message
 		DEBUG=1
 		;;
 	e)
-		echo using example design
 		EXAMPLE_DESIGN=1
 		;;
         h)
@@ -90,17 +85,17 @@ done
 shift $((OPTIND-1))
 
 if [[ -z $DEVKIT ]]; then
-	echo Error: Devkit is not set
+	echo ERROR: Devkit is not set
 	usage
 fi
 
 if [[ -z $EFINITY_PROJECT ]]; then
-	echo Error: Efinity project is not set
+	echo ERROR: Efinity project is not set
 	usage
 fi
 
 if [[ -z $RISCV_IDE ]]; then
-	echo Error: RISCV_IDE is not set
+	echo ERROR: RISCV_IDE is not set
 	usage
 fi
 
@@ -134,110 +129,92 @@ for devkit in ${DEVKITS[@]}; do
 done
 
 if [[ $found == false ]]; then
-	echo "Error: Devkit $DEVKIT is not supported"
+	echo "ERROR: Devkit $DEVKIT is not supported"
 	exit 1
 fi
 
-echo Info: $DEVKIT devkit is supported
-
-SAPPHIRE_IP=
-
-if [[ $EXAMPLE_DESIGN ]];then
-	DEVKIT_DIR=$DEVKIT
-	if [[ "Ti375C529_devkit" == *$DEVKIT* ]]; then
-		EXAMPLE_DESIGN_DIR="/ip/EfxSapphireHpSoc_slb/$DEVKIT_DIR"
-	else
-		tmp=$(find $EFINITY_PROJECT -type d -name $DEVKIT_DIR)
-		if [ -z $tmp ]; then
-			echo Error: Example design for $DEVKIT is not exists
-			exit 1
-		fi
-
-		EXAMPLE_DESIGN_DIR=${tmp//$EFINITY_PROJECT}
-		ip_name=${EXAMPLE_DESIGN_DIR//$DEVKIT_DIR}
-		ip_name=${ip_name//"/ip/"}
-		ip_name=${ip_name//"/"}
-		EFINITY_PROJECT_NAME=$ip_name
-		SAPPHIRE_IP=$ip_name
-
-	fi
-else
-	DEVKIT_DIR=
-	EXAMPLE_DESIGN_DIR=""
-	embedded_sw="$EFINITY_PROJECT/embedded_sw/"
-	tmp=$(find $embedded_sw -type d -name bsp)
-	ip_name=${tmp//"/bsp"}
-	ip_name=${ip_name//$embedded_sw}
-	SAPPHIRE_IP=$ip_name
-
-fi
-
-if [[ "Ti375C529_devkit" == *$DEVKIT* ]]; then
-	EFINITY_PROJECT_PATH="$EFINITY_PROJECT$EXAMPLE_DESIGN_DIR/embedded_sw/efx_hard_soc"
-else
-	EFINITY_PROJECT_PATH="$EFINITY_PROJECT$EXAMPLE_DESIGN_DIR/embedded_sw/$SAPPHIRE_IP"
-fi
-
-EfxSapphireSoc_DIR=$(find "$EFINITY_PROJECT" -type d -name EfxSapphireSoc)
-APP_DIR="$EfxSapphireSoc_DIR/app"
-SOC_H=$EfxSapphireSoc_DIR/include/soc.h
-
-if [ $DEBUG ]; then
-	echo
-	echo "******** DEBUG *******"
-	echo EFINITY_PROJECT=$EFINITY_PROJECT
-	echo EXAMPLE_DESIGN_DIR=$EXAMPLE_DESIGN_DIR
-	echo DEVKIT_DIR=$DEVKIT_DIR
-	echo EFINITY_PROJECT_PATH=$EFINITY_PROJECT_PATH
-	echo EfxSapphireSoc_DIR=$EfxSapphireSoc_DIR
-	echo APP_DIR=$APP_DIR
-	echo SOC_H=$SOC_H
-	echo "***********************"
-	echo
-fi
-
+echo INFO: Checking RISC-V Toolchain
 RISCV_TOOLCHAIN="efinity-riscv-ide"
 
 if [[ $RISCV_IDE =~ $RISCV_TOOLCHAIN ]]; then
-	RISCV_IDE=$RISCV_IDE/toolchain/bin
-	$RISCV_IDE/riscv-none-embed-gcc -dumpversion > /dev/null 2>&1
-	if [[ $? -eq 0 ]]; then
-		export PATH=$RISCV_IDE:$PATH
+        RISCV_IDE=$RISCV_IDE/toolchain/bin
+        $RISCV_IDE/riscv-none-embed-gcc -dumpversion > /dev/null 2>&1
+        if [[ $? -eq 0 ]]; then
+                export PATH=$RISCV_IDE:$PATH
+        else
+                echo ERROR: RISCV_IDE path is invalid
+                exit 1
+        fi
+else
+        echo ERROR: RISCV_IDE path is invalid
+        exit 1
+fi
+
+if [[ "$EFINITY_PROJECT" != /* ]]; then
+	EFINITY_PROJECT=$(realpath $EFINITY_PROJECT)
+fi
+
+EFINITY_PROJECT_DIR="${EFINITY_PROJECT}"
+
+if [[ $EXAMPLE_DESIGN ]]; then
+	DEVKIT_DIR=$DEVKIT
+	EFINITY_PROJECT_DIR="$(find "${EFINITY_PROJECT}" -type d -name "${DEVKIT_DIR}")"
+fi
+
+EMBEDDED_SW_DIR="${EFINITY_PROJECT_DIR}/embedded_sw"
+BSP_DIR="$(find "${EMBEDDED_SW_DIR}" -type d -name bsp)"
+STANDALONE_DIR="$(find "${EMBEDDED_SW_DIR}" -type d -name standalone)"
+BOOTLOADER_DIR="$(find "${STANDALONE_DIR}" -type d -name bootloader)"
+BOOTLOADERCONFIG="$(find "${EMBEDDED_SW_DIR}" -type f -name bootloaderConfig.h)"
+SOC_H="$(find "${EMBEDDED_SW_DIR}" -type f -name soc.h)"
+EFXSAPPHIRESOC_DIR="$BSP_DIR/efinix/EfxSapphireSoc"
+
+if [ $DEBUG ]; then
+	echo EFINITY_PROJECT = $EFINITY_PROJECT
+	echo EFINITY_PROJECT_DIR = $EFINITY_PROJECT_DIR
+	echo EMBEDDED_SW_DIR = $EMBEDDED_SW_DIR
+	echo BSP_DIR = $BSP_DIR
+	echo STANDALONE_DIR = $STANDALONE_DIR
+	echo BOOTLOADER_DIR = $BOOTLOADER_DIR
+	echo BOOTLOADERCONFIG = $BOOTLOADERCONFIG
+	echo SOC_H = $SOC_H
+	echo EFXSAPPHIRESOC_DIR = $EFXSAPPHIRESOC_DIR
+fi
+
+echo INFO: Update Bootloader Program
+cp $SCRIPT_DIR/bootloaderConfig.h $BOOTLOADERCONFIG
+
+echo INFO: Check for SMP Flag
+if grep -q SYSTEM_PLIC_SYSTEM_CORES_1_EXTERNAL_INTERRUPT $SOC_H; then
+	echo INFO: Enable SMP Flag
+	if grep -q "\-DSMP" $BOOTLOADER_DIR/makefile; then
+		sed -i 's/^#CFLAGS+=-DSMP/CFLAGS+=-DSMP/g' $BOOTLOADER_DIR/makefile
 	else
-		echo Error: RISCV_IDE path is invalid
-		exit 1
+		echo "CFLAGS+=-DSMP" >> $BOOTLOADER_DIR/makefile
 	fi
+
 else
-	echo Error: RISCV_IDE path is invalid
-	exit 1
+	echo INFO: Disabled SMP Flag
+	sed -i 's/CFLAGS+=-DSMP/#CFLAGS+=-DSMP/g' $BOOTLOADER_DIR/makefile
 fi
 
-BOOTLOADER_DIR=$(find "$EFINITY_PROJECT" -type d -name bootloader)
-if [[ "Ti375C529_devkit" == *$DEVKIT* ]]; then
-	cp $SCRIPT_DIR/bootloaderConfig.h $BOOTLOADER_DIR/src
-else
-	cp $SCRIPT_DIR/bootloaderConfig.h $APP_DIR
+echo INFO: Disabled Debug Flags
+if ! grep -q DEBUG $BOOTLOADER_DIR/makefile; then
+	echo DEBUG=no >> $BOOTLOADER_DIR/makefile
+	echo DEBUG_OG=no >> $BOOTLOADER_DIR/makefile
 fi
 
-# check for SMP
-SMP=$(cat $SOC_H | grep SYSTEM_PLIC_SYSTEM_CORES_1_EXTERNAL_INTERRUPT)
-if [[ ! -z $SMP ]]; then
-    # enable SMP flag
-    sed -i 's/^#CFLAGS+=-DSMP/CFLAGS+=-DSMP/g' $EfxSapphireSoc_DIR/include/soc.mk
-fi
-
-# compile bootloader program
+echo INFO: Compiling Linux Bootloader for Sapphire SoC
 cd $BOOTLOADER_DIR && \
-	BSP_PATH=$EfxSapphireSoc_DIR make clean && \
-	BSP_PATH=$EfxSapphireSoc_DIR make
+	BSP_PATH=$EFXSAPPHIRESOC_DIR make clean && \
+	BSP_PATH=$EFXSAPPHIRESOC_DIR make
 
 	if [ ! $? -eq 0 ]; then
-		echo Error: compilation failed
-		cd -
+		echo ERROR: Compilation failed
+		cd - > /dev/null
 		exit 1
 	fi
 cd - > /dev/null
 
-cp -r $BOOTLOADER_DIR/build $EFINITY_PROJECT/linux_bootloader
-echo The bootloader is in $EFINITY_PROJECT/linux_bootloader/bootloader.hex
-echo done
+cp -r $BOOTLOADER_DIR/build $EFINITY_PROJECT_DIR/linux_bootloader
+echo INFO: The bootloader is in $EFINITY_PROJECT_DIR/linux_bootloader/bootloader.hex
