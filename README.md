@@ -214,7 +214,7 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
 
 3. [Debugging Linux Kernel](docs/debugging_linux_kernel.md)
 
-4. [Linux ethernet support](docs/ethernet_example_design.md)
+4. [Build Linux with X11 graphics](boards/efinix/ti375c529/hardware/unified_hw/README.md)
 
 ## Documentation
 
