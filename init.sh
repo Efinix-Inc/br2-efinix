@@ -165,6 +165,7 @@ function sanity_check()
 
 function check_soc_configuration()
 {
+	local smp_flag
 	title "Checking Efinix RISC-V Sapphire SoC Configuration"
 
 	get_cpu_count
@@ -172,10 +173,12 @@ function check_soc_configuration()
         if [[ $cpu_count -gt 1 ]]; then
                 # enable CONFIG_SMP=y in linux.config
                 sed -i 's/^CONFIG_SMP=n/CONFIG_SMP=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
+		smp_flag=1
         else
                 sed -i 's/^CONFIG_SMP=y/CONFIG_SMP=n/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
+		smp_flag=0
         fi
-	self_check "Enable SMP support ..." "$cpu_count"
+	self_check "Enable SMP support ..." "$smp_flag"
 
 	# modify soc.h
 	# remove last line '#endif'
