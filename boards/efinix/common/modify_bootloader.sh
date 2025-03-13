@@ -167,6 +167,7 @@ STANDALONE_DIR="$(find "${EMBEDDED_SW_DIR}" -type d -name standalone)"
 BOOTLOADER_DIR="$(find "${STANDALONE_DIR}" -type d -name bootloader)"
 BOOTLOADERCONFIG="$(find "${EMBEDDED_SW_DIR}" -type f -name bootloaderConfig.h)"
 SOC_H="$(find "${EMBEDDED_SW_DIR}" -type f -name soc.h)"
+SOC_MK="$(find "${EMBEDDED_SW_DIR}" -type f -name soc.mk)"
 EFXSAPPHIRESOC_DIR="$BSP_DIR/efinix/EfxSapphireSoc"
 
 if [ $DEBUG ]; then
@@ -187,22 +188,15 @@ cp $SCRIPT_DIR/bootloaderConfig.h $BOOTLOADERCONFIG
 echo INFO: Check for SMP Flag
 if grep -q SYSTEM_PLIC_SYSTEM_CORES_1_EXTERNAL_INTERRUPT $SOC_H; then
 	echo INFO: Enable SMP Flag
-	if grep -q "\-DSMP" $BOOTLOADER_DIR/makefile; then
-		sed -i 's/^#CFLAGS+=-DSMP/CFLAGS+=-DSMP/g' $BOOTLOADER_DIR/makefile
-	else
-		echo "CFLAGS+=-DSMP" >> $BOOTLOADER_DIR/makefile
-	fi
-
+	sed -i 's/^#CFLAGS+=-DSMP/CFLAGS+=-DSMP/g' $SOC_MK
 else
 	echo INFO: Disabled SMP Flag
-	sed -i 's/CFLAGS+=-DSMP/#CFLAGS+=-DSMP/g' $BOOTLOADER_DIR/makefile
+	sed -i 's/CFLAGS+=-DSMP/#CFLAGS+=-DSMP/g' $SOC_MK
 fi
 
 echo INFO: Disabled Debug Flags
-if ! grep -q DEBUG $BOOTLOADER_DIR/makefile; then
-	echo DEBUG=no >> $BOOTLOADER_DIR/makefile
-	echo DEBUG_OG=no >> $BOOTLOADER_DIR/makefile
-fi
+sed -i 's/DEBUG?=yes/DEBUG?=no/g' $SOC_MK
+sed -i 's/DEBUG_OG?=yes/DEBUG_OG?=no/g' $SOC_MK
 
 echo INFO: Compiling Linux Bootloader for Sapphire SoC
 cd $BOOTLOADER_DIR && \
