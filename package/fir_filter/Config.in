@@ -1,0 +1,6 @@
+config BR2_PACKAGE_FIR_FILTER
+	bool "FIR filter"
+	help
+	  Finite Impulse Response (FIR) is a digital filter used in the DSP application.
+	  This application showcase the usage of RISC-V custom instruction to accelerate
+	  the filter processing and compare it with software based implementation.
