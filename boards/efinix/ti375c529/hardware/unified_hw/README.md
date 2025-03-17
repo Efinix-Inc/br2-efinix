@@ -36,14 +36,14 @@ This section is mandatory for boot up Linux using the unified hardware design.
 
 ## Enabling X11 Graphics
 
-X11 graphics and desktop environment are supported by enabling Linux framebuffer driver and BR2_PACKAGE_DESKTOP_ENVIRONMENT package. Please note that enabling evsoc app and drviers are not compatible with framebuffer thus they will not work.
+X11 graphics and desktop environment are supported by enabling Linux framebuffer driver and BR2_PACKAGE_DESKTOP_ENVIRONMENT package. To build the Linux image with X11 graphics, just pass the `-u -x` optional arguments to `init.sh` script. See step 2 at **Building Linux Image** for building Linux image with X11 graphics. See [enable framebuffer and x11 graphics](../../../../../docs/enable_framebuffer_and_x11_graphics.md) document for more info.
 
-To build the Linux image with X11 graphics, just pass the `-u -x` optional arguments to `init.sh` script.
+![](../../../../../docs/img/screenshot_x11.png)
 
 ## Additional modification for the unified hardware design
 
-> This section is optional, but recommended for running the [evsoc_camera](../../../../../package/evsoc_camera/README.md) demo. The display resolution need to set to 720p with following these steps.
-> 
+This section is optional, but recommended for running the [evsoc_camera](../../../../../package/evsoc_camera/README.md) demo. The display resolution need to set to 720p. Alternatively, you may use prebuild bitstream with 720p by unzip the [unified_hw.zip](unified_hw.zip) file.
+
 > Please note that the evsoc app and drivers will not work if X11 graphics is turning on.
 
 1. Uncomment this line `define DISPLAY_1280x720_60Hz` and comment this line `define DISPLAY_1920x1080_60Hz` from the `top_soc.v`.
