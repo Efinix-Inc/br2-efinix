@@ -1,4 +1,4 @@
-From b3728927a0d3ec02edfc37a3fca73cb561c2f32b Mon Sep 17 00:00:00 2001
+From be9815c5021edf37742f1bb2e27c656f37bc8d9e Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Wed, 19 Feb 2025 13:27:43 +0800
 Subject: [PATCH] fb: add Efinix framebuffer driver
@@ -44,7 +44,7 @@ index 477b9624b703..feebff39ec92 100644
  obj-$(CONFIG_FB_UVESA)            += uvesafb.o
 diff --git a/drivers/video/fbdev/fb_efx.c b/drivers/video/fbdev/fb_efx.c
 new file mode 100644
-index 000000000000..0b39e130156d
+index 000000000000..cec3555ddfb8
 --- /dev/null
 +++ b/drivers/video/fbdev/fb_efx.c
 @@ -0,0 +1,450 @@
@@ -331,7 +331,6 @@ index 000000000000..0b39e130156d
 +
 +	par->chan = chan;
 +
-+	dev_info(&pdev->dev, "prepare dma transfer\n");
 +	tx = dmaengine_prep_dma_cyclic(chan, par->dma_display_buff_io,
 +					par->fb_size, par->fb_size, DMA_MEM_TO_DEV, 0);
 +	if (!tx) {
@@ -345,6 +344,7 @@ index 000000000000..0b39e130156d
 +		goto err_prep;
 +        }
 +
++	dev_info(&pdev->dev, "Start DMA transfer for framebuffer\n");
 +	dma_async_issue_pending(chan);
 +
 +	return 0;
