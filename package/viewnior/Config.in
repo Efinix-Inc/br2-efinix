@@ -1,0 +1,7 @@
+config BR2_PACKAGE_VIEWNIOR
+	bool "viewnior"
+	select BR2_PACKAGE_EXIV2
+	select BR2_PACKAGE_EXIV2_PNG
+	select BR2_PACKAGE_SHARED_MIME_INFO
+	help
+	  Elegant Image Viewer

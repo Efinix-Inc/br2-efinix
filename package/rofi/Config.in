@@ -1,0 +1,7 @@
+config BR2_PACKAGE_ROFI
+	bool "rofi"
+	select BR2_PACKAGE_STARTUP_NOTIFICATION
+	select BR2_STARTUP_NOTIFICATION_VERSION_0_12
+	select BR2_PACKAGE_LIBXKBCOMMON
+	help
+	  A window switcher, application launcher and dmenu replacement

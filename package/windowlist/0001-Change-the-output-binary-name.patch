@@ -1,0 +1,40 @@
+From a71b5f491a831f772e197984178c0a13365e1cbc Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Fri, 7 Feb 2025 01:31:37 +0800
+Subject: [PATCH 1/2] Change the output binary name
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ Makefile | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index c5300da..a43a1de 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,10 +1,10 @@
+ CFLAGS = -g -O2 -Wall
+ LDFLAGS = -lX11
+ 
+-all: main windowlist.o click-actions/raise click-actions/minimize click-actions/close
++all: windowlist windowlist.o click-actions/raise click-actions/minimize click-actions/close
+ 
+-main: main.c windowlist.o windowlist.h toml-c.h
+-	gcc $(CFLAGS) $(LDFLAGS) -o main main.c windowlist.o
++windowlist: main.c windowlist.o windowlist.h toml-c.h
++	gcc $(CFLAGS) $(LDFLAGS) -o windowlist main.c windowlist.o
+ 
+ windowlist.o: windowlist.c
+ 	gcc $(CFLAGS) -c windowlist.c
+@@ -20,7 +20,7 @@ click-actions/close: click-actions/close.c
+ 
+ clean:
+ 	rm windowlist.o
+-	rm main
++	rm windowlist
+ 	rm click-actions/raise
+ 	rm click-actions/minimize
+ 	rm click-actions/close
+-- 
+2.17.1
+

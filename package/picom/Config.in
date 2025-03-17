@@ -1,0 +1,8 @@
+config BR2_PACKAGE_PICOM
+	bool "picom"
+	select BR2_PACKAGE_LIBEV
+	select BR2_PACKAGE_LIBCONFIG
+	select BR2_PACKAGE_UTHASH
+	select BR2_PACKAGE_DBUS
+	help
+	  A lightweight compositor for X11 with animation support

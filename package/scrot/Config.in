@@ -1,0 +1,6 @@
+config BR2_PACKAGE_SCROT
+	bool "scrot"
+	select BR2_PACKAGE_IMLIB2
+	select BR2_PACKAGE_GIBLIB
+	help
+	  scrot (SCReen shOT) is a simple commandline screen capture utility

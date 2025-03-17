@@ -1,0 +1,42 @@
+From c2969f863b2e9c8e1077976af046378d638701d2 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Fri, 7 Feb 2025 01:42:50 +0800
+Subject: [PATCH 2/2] Change hard code gcc compiler
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ Makefile | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index a43a1de..4a2129b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -4,19 +4,19 @@ LDFLAGS = -lX11
+ all: windowlist windowlist.o click-actions/raise click-actions/minimize click-actions/close
+ 
+ windowlist: main.c windowlist.o windowlist.h toml-c.h
+-	gcc $(CFLAGS) $(LDFLAGS) -o windowlist main.c windowlist.o
++	$(CC) $(CFLAGS) $(LDFLAGS) -o windowlist main.c windowlist.o
+ 
+ windowlist.o: windowlist.c
+-	gcc $(CFLAGS) -c windowlist.c
++	$(CC) $(CFLAGS) -c windowlist.c
+ 
+ click-actions/raise: click-actions/raise.c
+-	gcc $(CFLAGS) $(LDFLAGS) -o click-actions/raise click-actions/raise.c
++	$(CC) $(CFLAGS) $(LDFLAGS) -o click-actions/raise click-actions/raise.c
+ 
+ click-actions/minimize: click-actions/minimize.c
+-	gcc $(CFLAGS) $(LDFLAGS) -o click-actions/minimize click-actions/minimize.c
++	$(CC) $(CFLAGS) $(LDFLAGS) -o click-actions/minimize click-actions/minimize.c
+ 
+ click-actions/close: click-actions/close.c
+-	gcc $(CFLAGS) $(LDFLAGS) -o click-actions/close click-actions/close.c
++	$(CC) $(CFLAGS) $(LDFLAGS) -o click-actions/close click-actions/close.c
+ 
+ clean:
+ 	rm windowlist.o
+-- 
+2.17.1
+

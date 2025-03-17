@@ -1,0 +1,7 @@
+config BR2_PACKAGE_WINDOWLIST
+	bool "windowlist"
+	depends on BR2_PACKAGE_POLYBAR
+	select BR2_PACKAGE_XAPP_XPROP
+	select BR2_PACKAGE_WMCTRL
+	help
+	  Polybar custom module - List all open windows, click to switch focus or minimize
