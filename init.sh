@@ -136,7 +136,7 @@ function sanity_check()
 
 	for devkit in ${devkits[@]}; do
 		devkit_l=$(echo $devkit | tr '[:upper:]' '[:lower:]')
-		if [[ $devkit_l == *$BOARD* ]]; then
+		if [[ "$devkit_l" == "$BOARD" ]]; then
 			BOARD=$(echo $devkit_l | tr -d \")
 			BUILDROOT_DEFCONFIG="efinix_"$BOARD"_defconfig"
 			found=true
