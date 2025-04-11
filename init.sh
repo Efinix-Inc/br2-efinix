@@ -135,7 +135,7 @@ function sanity_check()
 	devkits=$(jq '.devkits.Titanium, .devkits.Trion | .[]' $JSON_FILE)
 
 	for devkit in ${devkits[@]}; do
-		devkit_l=$(echo $devkit | tr '[:upper:]' '[:lower:]')
+		devkit_l=$(echo $devkit | tr '[:upper:]' '[:lower:]'| sed 's/^"//;s/"$//')
 		if [[ "$devkit_l" == "$BOARD" ]]; then
 			BOARD=$(echo $devkit_l | tr -d \")
 			BUILDROOT_DEFCONFIG="efinix_"$BOARD"_defconfig"
@@ -150,7 +150,7 @@ function sanity_check()
 	fi
 
 	if [[ $UNIFIED_HW ]]; then
-		if [[ $BOARD == "ti375c529" || $BOARD == "ti180j484" ]]; then
+		if [[ $BOARD == "ti375c529" || $BOARD == "ti180j484" || $BOARD == "ti375n1156" ]]; then
 			echo INFO: board $BOARD support unified hardware design
 		else
 			echo ERROR: board $BOARD does not support unified hardware design
@@ -193,7 +193,7 @@ function check_soc_configuration()
 
 		sed -i '/SYSTEM_AXI_A_BMB/d' $SOC_H
 		echo INFO: Append addresses for AXI interconnect
-		if [ $BOARD = "ti375c529" ]; then
+		if [[ $BOARD = "ti375c529" || $BOARD = "ti375n1156" ]]; then
 			grep -q SYSTEM_AXI_SLAVE $SOC_H || \
 			cat <<-EOF >> $SOC_H
 			#define SYSTEM_AXI_SLAVE_0_IO_CTRL 0xe8000000
@@ -577,7 +577,7 @@ if [ $EXAMPLE_DESIGN ]; then
 		EXTRA_HW_FEATURES+="ethernet,"
 	fi
 
-	if [ "$BOARD" = "ti375c529" ]; then
+	if [[ "$BOARD" = "ti375c529" || "$BOARD" = "ti375n1156" ]]; then
 		EXTRA_HW_FEATURES+="mmc,ethernet,"
 	fi
 fi
