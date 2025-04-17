@@ -26,8 +26,8 @@ define LINPACK_BUILD_CMDS
 endef
 
 define LINPACK_INSTALL_TARGET_CMDS
-	# $(INSTALL) -m 0755 -D $(@D)/linpack_dp $(TARGET_DIR)/usr/bin/linpack_dp
-	# $(INSTALL) -m 0755 -D $(@D)/linpack_sp $(TARGET_DIR)/usr/bin/linpack_sp
+	$(INSTALL) -m 0755 -D $(@D)/linpack_dp $(TARGET_DIR)/usr/bin/linpack_dp
+	$(INSTALL) -m 0755 -D $(@D)/linpack_sp $(TARGET_DIR)/usr/bin/linpack_sp
 endef
 
 $(eval $(generic-package))
