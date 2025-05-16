@@ -283,7 +283,7 @@ function generate_device_tree()
 	local spi="-c $linux_dt_config/spi.json "
 	local spi_mmc="-s $linux_dt_config/spi_mmc.json "
 	local ethernet="-c $linux_dt_config/ethernet.json "
-	local ethernet_ed="-c $linux_dt_config/ed_ti375c529.json "
+	local ti375_common="-c $linux_dt_config/ti375_common.json "
 	local unified_hw="-c $linux_dt_config/unified_hw.json "
 	local unified_hw_softcore="-c $linux_dt_config/unified_hw_softcore.json "
 	local evsoc="-c $linux_dt_config/evsoc.json "
@@ -321,7 +321,7 @@ function generate_device_tree()
 
 	if [ $EXAMPLE_DESIGN ]; then
 		if [ $HARDEN_SOC ]; then
-			linux_dt+=$ethernet_ed
+			linux_dt+=$ti375_common
 		else
 			linux_dt+=$ethernet
 		fi

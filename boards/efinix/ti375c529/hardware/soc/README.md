@@ -26,7 +26,7 @@ This is a defaut example design for Ti375C529 with Efinix Sapphire High Performa
    
    ```bash
    source init.sh ti375c529 \
-   boards/efinix/ti375c529/hardware/soc/soc.h -p -e
+   boards/efinix/ti375c529/hardware/soc/soc.h -e
    ```
 
 3. Build the Linux image
@@ -64,7 +64,7 @@ cd boards/efinix/common/sapphire-soc-dt-generator
 ./device_tree_generator.py \
 -s config/linux_slaves.json \
 -c config/linux_spi.json \
--c config/ed_ti375c529.json \
+-c config/ti375_common.json \
 /path/to/soc.h \
 ti375c529 linux
 ```
