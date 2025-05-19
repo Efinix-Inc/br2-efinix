@@ -1,6 +1,6 @@
 # Ti375N1156 Example Design
 
-This is a example design for Ti375N1156 with Efinix Sapphire High Performance SoC. This design is integrated with triple speed ethernet and SD host contoller. The SD host controller and triple speed ethernet are connected to AXI slave 1 and AXI slave 2 respectively. See the table below for more details.
+This is an example design for Ti375N1156 with Efinix Sapphire High Performance SoC. This design is integrated with triple speed ethernet and SD host contoller. The SD host controller and triple speed ethernet are connected to AXI slave 1 and AXI slave 2 respectively. See the table below for more details.
 
 | Address    | Bus          | Peripheral            | Interrupt number |
 | ---------- | ------------ | --------------------- | ---------------- |

@@ -131,6 +131,10 @@ Preconfigure Efinity project with Linux also provided in the repository for quic
   
   - [boards/efinix/ti375c529/hardware/unified_hw](boards/efinix/ti375c529/hardware/unified_hw)
 
+- **Ti375N1156**
+  
+  - [boards/efinix/ti375n1156/hardware/soc](boards/efinix/ti375n1156/hardware/soc)
+
 The precompiled bitstream file also provided for quick start in the `hex` format. This file stored in the Efinity project file for each supported development board. By using these files, user are not require to load and compile the Efinity project.
 
 ### 2. Generate Custom SoC
@@ -231,6 +235,7 @@ Currently supported development board
 2. [Titanium Ti60F225 ](https://www.efinixinc.com/products-devkits-titaniumti60f225.html)
 3. [Titanium Ti180J484](https://www.efinixinc.com/products-devkits-titaniumti180j484.html)
 4. [Titanium Ti375C529](https://www.efinixinc.com/products-devkits-titaniumti375c529.html)
+5. [Titanium Ti375N1156]([Titanium Ti375 N1156 Development Kit | Efinix, Inc.](https://www.efinixinc.com/products-devkits-titaniumti375n1156.html))
 
 ## License
 
