@@ -235,7 +235,7 @@ Currently supported development board
 2. [Titanium Ti60F225 ](https://www.efinixinc.com/products-devkits-titaniumti60f225.html)
 3. [Titanium Ti180J484](https://www.efinixinc.com/products-devkits-titaniumti180j484.html)
 4. [Titanium Ti375C529](https://www.efinixinc.com/products-devkits-titaniumti375c529.html)
-5. [Titanium Ti375N1156]([Titanium Ti375 N1156 Development Kit | Efinix, Inc.](https://www.efinixinc.com/products-devkits-titaniumti375n1156.html))
+5. [Titanium Ti375N1156](https://www.efinixinc.com/products-devkits-titaniumti375n1156.html)
 
 ## License
 
