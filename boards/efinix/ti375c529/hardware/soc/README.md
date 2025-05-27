@@ -10,7 +10,7 @@ This is a defaut example design for Ti375C529 with Efinix Sapphire High Performa
 | 0xe8030000 |              | spi0                  | 2                |
 | 0xe8040000 |              | gpio0                 | 4, 5             |
 | 0xe8100000 | apb3 slave 0 | dma0                  | 7, 8             |
-| 0xe9000000 | axi slave 1  | sd host controller    | 6                |
+| 0xe9000000 | axi slave 1  | sd host controller    | 9                |
 | 0xe9100000 | axi slave 2  | triple speed ethernet | -                |
 
 ## Build Linux Image
