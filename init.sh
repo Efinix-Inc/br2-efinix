@@ -122,11 +122,6 @@ function sanity_check()
 {
 	title "Sanity Check"
 
-	if [[ ! -f $SOC_H ]]; then
-		echo "ERROR: $SOC_H file not exists"
-		return
-	fi
-
 	# check the compatible of $BOARD in $JSON_FILE
 	local found=false
 	local devkit_l
@@ -538,13 +533,17 @@ shift $((OPTIND-1))
 
 if [[ -z $BOARD ]]; then
 	echo ERROR: Board is not defined
-	return
+	return 1
 fi
 
 if [[ -z $SOC_H ]]; then
 	echo ERROR: soc.h is not defined
-	return
+	return 1
+elif [[ ! -f $SOC_H ]]; then
+	echo ERROR: No such file for $SOC_H
+	return 1
 fi
+
 
 # clone sapphire-soc-dt-generator repository
 if [ ! -d $DT_DIR ]; then
@@ -566,11 +565,7 @@ if [ ! -d $DT_DIR ]; then
 	fi
 fi
 
-sanity_check
-
-if [[ $? -gt 0 ]]; then
-       return
-fi
+sanity_check || return 1
 
 if [ $EXAMPLE_DESIGN ]; then
 	if [ "$BOARD" = "ti60f225" ]; then
@@ -609,11 +604,12 @@ if [[ $RECONFIGURE == 1 ]]; then
 			generate_device_tree || return 1
 		fi
 		cd $BUILD_DIR && \
-		make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BUILDROOT_DEFCONFIG 
+		make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BUILDROOT_DEFCONFIG
+		return 0
 	else
 		echo "ERROR: $BUILD_DIR not exist"
+		return 1
 	fi
-	return
 fi
 
 mkdir -p $WORKSPACE_DIR
