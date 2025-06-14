@@ -645,7 +645,8 @@ fi || return 1
 
 title "Copy soc.h file to OpenSBI directory"
 # copy soc.h to opensbi directory. Opensbi has dependency on soc.h.
-cp $PROJ_DIR/$SOC_H $OPENSBI_DIR/soc.h
+echo "INFO: copy $SOC_H to $OPENSBI_DIR/soc.h"
+cp $SOC_H $OPENSBI_DIR/soc.h
 SOC_H=$OPENSBI_DIR/soc.h
 
 check_soc_configuration || return 1
