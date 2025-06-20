@@ -1,0 +1,30 @@
+From 498649a0d36d50118c7dccb48d25439e2bd5a15f Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Fri, 20 Jun 2025 10:45:40 +0800
+Subject: [PATCH] drivers/mtd/spi-nor: add support for is25wp512m spi flash
+ device
+
+Ti375C529 use spi flash is25wp512m. This spi flash did not recognize by
+the kernel as it missing the device id within spi-flash device driver.
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/mtd/spi-nor/issi.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/mtd/spi-nor/issi.c b/drivers/mtd/spi-nor/issi.c
+index ffcb60e54a80..2463a71edc3d 100644
+--- a/drivers/mtd/spi-nor/issi.c
++++ b/drivers/mtd/spi-nor/issi.c
+@@ -59,6 +59,8 @@ static const struct flash_info issi_parts[] = {
+ 			    SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
+ 			    SPI_NOR_4B_OPCODES)
+ 		.fixups = &is25lp256_fixups },
++	{ "is25wp512m", INFO(0x9d701a, 0, 64 * 1024, 512,
++                            SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+ 
+ 	/* PMC */
+ 	{ "pm25lv512",   INFO(0,        0, 32 * 1024,    2, SECT_4K_PMC) },
+-- 
+2.43.0
+
