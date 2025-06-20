@@ -274,9 +274,9 @@ function generate_device_tree()
 	local uboot_spi1="-s $uboot_dt_config/spi1.json "
 	local uboot_mmc="-c $uboot_dt_config/mmc.json "
 
-	local linux_slaves="-s $linux_dt_config/slaves.json "
-	local spi="-c $linux_dt_config/spi.json "
+	local spi="-c $linux_dt_config/spi-nor.json "
 	local spi_mmc="-s $linux_dt_config/spi_mmc.json "
+	local gpio="-c $linux_dt_config/gpio_led.json "
 	local ethernet="-c $linux_dt_config/ethernet.json "
 	local ti375_common="-c $linux_dt_config/ti375_common.json "
 	local unified_hw="-c $linux_dt_config/unified_hw.json "
@@ -349,7 +349,7 @@ function generate_device_tree()
 		linux_dt+=$spi_mmc
 	fi
 
-	linux_dt+=$linux_slaves
+	linux_dt+=$gpio
 	linux_dt+="$end_cmd linux"
 	echo DEBUG: device tree cmd: $linux_dt
 	eval $linux_dt
