@@ -1,4 +1,4 @@
-From 8a9da0c01583e11f45809d98f9b6aebc1d4d3e88 Mon Sep 17 00:00:00 2001
+From 29a74280b3be7fd8263f1690612c97c68932ea67 Mon Sep 17 00:00:00 2001
 From: Kenny Cheung <kenny.cheung@elitestek.com>
 Date: Thu, 30 Mar 2023 14:28:01 +0800
 Subject: [PATCH] drivers: add efinix tsemac driver
@@ -77,7 +77,7 @@ index 000000000000..51062131b736
 +obj-$(CONFIG_EFINIX_TSEMAC) += efinix_tsemac.o
 diff --git a/drivers/net/ethernet/efinix/efinix_tse.c b/drivers/net/ethernet/efinix/efinix_tse.c
 new file mode 100644
-index 000000000000..566455b662c2
+index 000000000000..6d52b3a0df0a
 --- /dev/null
 +++ b/drivers/net/ethernet/efinix/efinix_tse.c
 @@ -0,0 +1,1348 @@
@@ -429,13 +429,13 @@ index 000000000000..566455b662c2
 +
 +	/* Enable interrupts for Axi DMA Tx */
 +	ret = request_irq(lp->tx_irq, tsemac_tx_irq, IRQF_SHARED,
-+			  ndev->name, ndev);
++			  "eth tx", ndev);
 +	if (ret)
 +		goto err_tx_irq;
 +	tsemac_out32(lp, ETHERNET_CTRL_DMA_TX_RESET, 0);
 +	/* Enable interrupts for Axi DMA Rx */
 +	ret = request_irq(lp->rx_irq, tsemac_rx_irq, IRQF_SHARED,
-+			  ndev->name, ndev);
++			  "eth rx", ndev);
 +	if (ret)
 +		goto err_rx_irq;
 +	tsemac_out32(lp, ETHERNET_CTRL_DMA_RX_RESET, 0);
@@ -2339,5 +2339,5 @@ index 000000000000..cf085da93315
 +	lp->mii_bus = NULL;
 +}
 -- 
-2.17.1
+2.43.0
 
