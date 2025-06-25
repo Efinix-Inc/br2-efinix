@@ -3,14 +3,21 @@
 #ifndef SPI_H
 #define SPI_H
 
+#define WRITE_STATUS_REG	0x01
 #define READ_CMD		0x03
 #define WRITE_CMD		0x02
-#define WAIT_CMD		0x05
+#define READ_STATUS_REG		0x05
 #define WRITE_ENABLE_CMD	0x06
 #define GLOBAL_LOCK		0x7E
 #define GLOBAL_UNLOCK		0x98
 #define SECTOR_ERASE		0x20
 #define SPI_ID			0xAB
+#define READ_SFDP		0x5A
+
+/* status register bits field */
+#define SRP1	0x80 /* Status Register Protect bit */
+#define WEL	0x02 /* Write Enable Latch bit */
+#define WIP	0x01 /* Not currently writing bit */
 
 /*
  * Configuration for the SPI device.

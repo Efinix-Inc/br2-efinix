@@ -31,12 +31,12 @@ void wait_busy(struct spi_device *dev)
 {
         uint16_t timeout = 0;
         uint8_t out;
-        uint8_t cmd = WAIT_CMD;
+        uint8_t cmd = READ_STATUS_REG;
 
         while(1) {
                 sleep(0.5);
                 spi_transfer(dev, &cmd, &out, 1);
-                if ((out & 0x01) == 0x0)
+                if ((out & WIP) == 0x0)
                         break;
                 timeout++;
                 if (timeout >= 400) {
