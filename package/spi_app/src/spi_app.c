@@ -52,7 +52,7 @@ int spi_tx_cmd(struct spi_device *dev, uint8_t reg)
 	int rc;
 
 	dev->cs_change = 0;
-	rc = spi_transfer(dev, &reg, NULL, sizeof(reg));
+	rc = spi_transfer(dev, &reg, NULL, 1);
 	dev->cs_change = cs;
 	
 	return rc;
@@ -85,9 +85,8 @@ int ncmd_reg(struct spi_device *dev, uint8_t reg, uint8_t *buf, int buf_len)
         return rc;
 }
 
-int cmd_reg(struct spi_device *dev, uint8_t reg)
+int cmd_reg(struct spi_device *dev, uint8_t reg, uint8_t data)
 {
-        uint8_t data = 0;
         ncmd_reg(dev, reg, &data, 1);
 	
         return data;
@@ -258,7 +257,7 @@ int main(int argc, char **argv)
 	uint32_t len = 16;
 	uint8_t rd = 0;
 	uint8_t wr = 0;
-	uint32_t addr = 0x00600000;
+	uint32_t addr = 0x00800000;
 	int id = 0;
 	char msg[256] = {0};
 	char device[20] = {0};
@@ -272,7 +271,7 @@ int main(int argc, char **argv)
 	dev.cs_change = 0;
 
 	while (cmd_opt != -1) {
-		cmd_opt = getopt(argc, argv, "ifrwhva:d:s:l:p:m:");
+		cmd_opt = getopt(argc, argv, "ifrwhva:d:s:l:m:");
 
 		switch (cmd_opt) {
 			case 'a':
@@ -314,7 +313,7 @@ int main(int argc, char **argv)
 			case 'w':
 				wr = 1;
 				break;
-				
+
 			case 'v':
 				verbose = 1;
 				break;
@@ -332,6 +331,9 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (argc <= 1)
+		return 0;
+
 	if (verbose) {
 		printf("device = %s\n", dev.filename);
 		printf("speed = %d HZ\n", dev.speed);
@@ -347,8 +349,10 @@ int main(int argc, char **argv)
 
 	if (id) {
 		/* Read ID of SPI Flash */
-		value = cmd_reg(&dev, SPI_ID);
+		value = cmd_reg(&dev, SPI_ID, 0x0);
 		printf("SPI Flash ID = 0x%X\n", value);
+		spi_stop(&dev);
+		return 0;
 	}
 
 	if (wr) {
