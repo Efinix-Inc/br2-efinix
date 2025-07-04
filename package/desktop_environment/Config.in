@@ -58,6 +58,7 @@ config BR2_PACKAGE_DESKTOP_ENVIRONMENT
 	select BR2_PACKAGE_HICOLOR_ICON_THEME
 	select BR2_PACKAGE_PCMANFM
 	select BR2_PACKAGE_VIEWNIOR
+	select BR2_PACKAGE_LEAFPAD
 	
 	help
 	  Contain configuration files for setting up desktop environment
