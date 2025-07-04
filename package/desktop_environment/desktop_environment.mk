@@ -44,6 +44,7 @@ define DESKTOP_ENVIRONMENT_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 $(@D)/config/openbox/environment $(TARGET_DIR)/etc/xdg/openbox/environment
 	$(INSTALL) -D -m 0644 $(@D)/config/windowlist/config.toml $(TARGET_DIR)/root/.config/windowlist/config.toml
 	$(INSTALL) -D -m 0644 $(@D)/keycodes $(TARGET_DIR)/root/.keycodes
+	$(INSTALL) -D -m 0644 $(@D)/mimeapps.list $(TARGET_DIR)/etc/xdg/mimeapps.list
 endef
 
 DESKTOP_ENVIRONMENT_POST_INSTALL_TARGET_HOOKS += DESKTOP_ENVIRONMENT_SETUP_VC
