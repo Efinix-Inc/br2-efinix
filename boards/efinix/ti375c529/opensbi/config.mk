@@ -7,9 +7,21 @@ platform-ldflags-y =
 # Command for platform specific "make run"
 platform-runcmd = echo Miaouuuuu
 
-PLATFORM_RISCV_XLEN = 32
-PLATFORM_RISCV_ABI = ilp32
-PLATFORM_RISCV_ISA = rv32ima
+
+ARCH_BITS := $(shell echo | $(CROSS_COMPILE)gcc -dM -E - < /dev/null | grep __riscv_xlen | awk '{print $$3}')
+
+ifeq ($(ARCH_BITS), 64)
+    PLATFORM_RISCV64 := y
+    PLATFORM_RISCV_XLEN = 64
+    PLATFORM_RISCV_ABI = lp64
+    PLATFORM_RISCV_ISA = rv64ima
+else
+    PLATFORM_RISCV32 := y
+    PLATFORM_RISCV_XLEN = 32
+    PLATFORM_RISCV_ABI = ilp32
+    PLATFORM_RISCV_ISA = rv32ima
+endif
+
 PLATFORM_RISCV_CODE_MODEL = medany
 
 # Blobs to build
