@@ -210,6 +210,10 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
 
 11. Run the [demo](docs/demo.md) applications.
 
+## Known Issues
+
+See [known issues](docs/known_issues.md) document.
+
 ## What's Next?
 
 1. You might want to write you own driver or custom application but do no know how to integrate it with Buildroot. See [kernel module and package](docs/kernel_module_and_packages.md) tutorial.
