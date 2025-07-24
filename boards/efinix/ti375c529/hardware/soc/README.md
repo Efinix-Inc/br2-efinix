@@ -1,6 +1,6 @@
 # Ti375C529 Example Design
 
-This is a defaut example design for Ti375C529 with Efinix Sapphire High Performance SoC. This design is integrated with triple speed ethernet and SD host contoller. The SD host controller and triple speed ethernet are connected to AXI slave 1 and AXI slave 2 respectively. See the table below for more details.
+This is a defaut example design for Ti375C529 with Efinix Sapphire High Performance SoC. This design is integrated with triple speed ethernet and SD host contoller. The SD host controller and triple speed ethernet are connected to AXI slave 1 and AXI slave 2 respectively. Refer to the table below for detailed information on the peripheral address mapping and corresponding interrupt numbers. The example design project can be found under the `soc/ip/EfxSapphireHpSoc_slb/Ti375C529_devkit` within [soc.zip](soc.zip). It includes HDL source files (VHDL/Verilog), constraint files and build scripts.
 
 | Address    | Bus          | Peripheral            | Interrupt number |
 | ---------- | ------------ | --------------------- | ---------------- |

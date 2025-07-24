@@ -10,7 +10,7 @@ This is an example design to showcase the Efinix Sapphire High Performance SoC i
 
 - HDMI display
 
-Project repository: [EmbeddedSystem-Solution](https://github.com/Efinix-Inc/EmbeddedSystem-Solution.git)
+The [unified_hw.zip](unified_hw.zip) file in this directory contains only compiled FPGA bitstream files, typically in `.bit` or `.hex` format, intended for direct hardware configuration. The complete project, including source HDL files, constraints, and build scripts, is available in the  [EmbeddedSystem-Solution](https://github.com/Efinix-Inc/EmbeddedSystem-Solution.git) repository.
 
 ## Modify the bootloader of unified hardware design
 
