@@ -42,7 +42,7 @@ Follow these steps to flash OpenSBI and U-boot.
 
 6. Click `Add Image` to add FPGA bitstream, OpenSBI and U-boot images. Then set the `Flash Address` for each image file. The flash address shown in the table above. Click **Apply** to save the output image.
    
-   <img src="img/combine_programmer.jpg" title="" alt="alt text" width="369">
+   <img title="" src="img/combine_programmer.jpg" alt="alt text" width="393">
 
 7. Program the combine bitstream.
    
