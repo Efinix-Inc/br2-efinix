@@ -26,7 +26,7 @@ BUILDROOT_REPO="https://github.com/buildroot/buildroot.git"
 PROJ_DIR=$PWD
 BR2_EXTERNAL_DIR=$PROJ_DIR
 BR2_DEFCONFIG_DIR="${BR2_EXTERNAL_DIR}/configs"
-BUILDROOT_DEFCONFIG=""
+BR2_DEFCONFIG=""
 
 EFINIX_DIR="$BR2_EXTERNAL_DIR/boards/efinix"
 COMMON_DIR="$EFINIX_DIR/common"
@@ -135,7 +135,7 @@ function sanity_check()
 		devkit_l=$(echo $devkit | tr '[:upper:]' '[:lower:]'| sed 's/^"//;s/"$//')
 		if [[ "$devkit_l" == "$BOARD" ]]; then
 			BOARD=$(echo $devkit_l | tr -d \")
-			BUILDROOT_DEFCONFIG="efinix_"$BOARD"_defconfig"
+			BR2_DEFCONFIG="efinix_"$BOARD"_defconfig"
 			found=true
 			break
 		fi
@@ -236,10 +236,10 @@ EOF
 	fp=$(cat ${SOC_H} | grep FPU | awk  '{print $3}' | head -1)
 	if [[ $fp == 0 ]]; then
 		# disable the floating point
-		echo "INFO: Disable floating point in $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG"
-		sed -i 's/^BR2_RISCV_ISA_CUSTOM_RVF=y/BR2_RISCV_ISA_CUSTOM_RVF=n/g' $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG
-		sed -i 's/^BR2_RISCV_ISA_CUSTOM_RVD=y/BR2_RISCV_ISA_CUSTOM_RVD=n/g' $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG
-		sed -i 's/^BR2_RISCV_ABI_ILP32D=y/BR2_RISCV_ABI_ILP32=y/g' $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG
+		echo "INFO: Disable floating point in $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG"
+		sed -i 's/^BR2_RISCV_ISA_CUSTOM_RVF=y/BR2_RISCV_ISA_CUSTOM_RVF=n/g' $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG
+		sed -i 's/^BR2_RISCV_ISA_CUSTOM_RVD=y/BR2_RISCV_ISA_CUSTOM_RVD=n/g' $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG
+		sed -i 's/^BR2_RISCV_ABI_ILP32D=y/BR2_RISCV_ABI_ILP32=y/g' $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG
 
 		echo "INFO: Disable Linux FPU support in $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config"
 		sed -i 's/^CONFIG_FPU=y/CONFIG_FPU=n/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
@@ -250,8 +250,8 @@ EOF
 	ext_c=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_C | awk '{print $3}' | head -1)
 	if [ $ext_c == 1 ]; then
 		# enable compressed extension flag in buildroot defconfig
-		echo "INFO: Enable compressed extension (RVC) in $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG"
-		sed -i 's/BR2_RISCV_ISA_CUSTOM_RVC=n/BR2_RISCV_ISA_CUSTOM_RVC=y/g' $BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG
+		echo "INFO: Enable compressed extension (RVC) in $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG"
+		sed -i 's/BR2_RISCV_ISA_CUSTOM_RVC=n/BR2_RISCV_ISA_CUSTOM_RVC=y/g' $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG
 		sed -i 's/CONFIG_RISCV_ISA_C=n/CONFIG_RISCV_ISA_C=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
 	fi
 	self_check "Compressed extension support ..." "$ext_c"
@@ -388,12 +388,12 @@ function prepare_buildroot_env()
 	export CONFIG_="BR2"
 	bash $BUILDROOT_DIR/support/kconfig/merge_config.sh -r -m ${defconfig_fragments}
 	unset CONFIG_
-	BUILDROOT_DEFCONFIG="efinix_${BOARD}_${MACHINE_ARCH}_defconfig"
-	mv .config $BR2_DEFCONFIG_DIR/$BUILDROOT_DEFCONFIG
+	BR2_DEFCONFIG="efinix_${BOARD}_${MACHINE_ARCH}_defconfig"
+	mv .config $BR2_DEFCONFIG_DIR/$BR2_DEFCONFIG
 
 	mkdir $BUILD_DIR
 	cd $BUILD_DIR && \
-	make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BUILDROOT_DEFCONFIG
+	make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BR2_DEFCONFIG
 }
 
 function get_cpu_count()
@@ -428,7 +428,6 @@ function set_kernel_config()
 {
 	local kernel_frag_dir="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/kernel"
 	local hw_features=""
-	local br2_defconfig="configs/efinix_${BOARD}_defconfig"
 	local br2_kernel_cfg_keyword="BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES"
 	local br2_linux_kernel_cfg=""
 	local feature
@@ -463,31 +462,29 @@ function set_kernel_config()
 	fi
 
 	echo INFO: $br2_kernel_cfg_keyword=\"$br2_linux_kernel_cfg\"
-	if grep -q ${br2_kernel_cfg_keyword} ${br2_defconfig}; then
-		sed -i "/$br2_kernel_cfg_keyword/c\\$br2_kernel_cfg_keyword=\"$br2_linux_kernel_cfg\"" "${br2_defconfig}"
+	if grep -q ${br2_kernel_cfg_keyword} ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}; then
+		sed -i "/$br2_kernel_cfg_keyword/c\\$br2_kernel_cfg_keyword=\"$br2_linux_kernel_cfg\"" "${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}"
 	else
-		echo "$br2_kernel_cfg_keyword=\"$br2_linux_kernel_cfg\"" >> "${br2_defconfig}"
+		echo "$br2_kernel_cfg_keyword=\"$br2_linux_kernel_cfg\"" >> "${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}"
 	fi
 }
 
 function add_packages()
 {
         title "Add Packages"
-	local br2_defconfig_path="$BR2_EXTERNAL_DIR/configs"
-        local br2_defconfig="$BR2_EXTERNAL_DIR/configs/$BUILDROOT_DEFCONFIG"
 
         if [ $UNIFIED_HW ]; then
-		grep -q EVSOC $br2_defconfig || \
-		cat $br2_defconfig_path/evsoc_fragment >> $br2_defconfig
+		grep -q EVSOC ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
+		cat ${BR2_DEFCONFIG_DIR}/evsoc_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
 	fi
 
         if [ $X11_GRAPHICS ]; then
-                grep -q BR2_PACKAGE_DESKTOP_ENVIRONMENT $br2_defconfig || \
-		cat $br2_defconfig_path/x11_fragment >> $br2_defconfig
+                grep -q BR2_PACKAGE_DESKTOP_ENVIRONMENT ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
+		cat ${BR2_DEFCONFIG_DIR}/x11_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
 
 		# remove EVSOC packages
-		grep -v "EVSOC" $br2_defconfig > ${br2_defconfig}.temp
-		mv ${br2_defconfig}.temp $br2_defconfig
+		grep -v "EVSOC" ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} > ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}.temp
+		mv ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}.temp ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
         fi
 }
 
@@ -644,7 +641,7 @@ if [[ $RECONFIGURE == 1 ]]; then
 			generate_device_tree || return 1
 		fi
 		cd $BUILD_DIR && \
-		make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BUILDROOT_DEFCONFIG
+		make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BR2_DEFCONFIG
 		return 0
 	else
 		echo "ERROR: $BUILD_DIR not exist"
