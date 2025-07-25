@@ -428,10 +428,10 @@ function get_version()
 
 function set_kernel_config()
 {
-	local kernel_frag_dir="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/kernel"
+	local kernel_frag_dir="${COMMON_DIR}/kernel"
 	local hw_features=""
 	local br2_kernel_cfg_keyword="BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES"
-	local br2_linux_kernel_cfg=""
+	local br2_linux_kernel_cfg="$kernel_frag_dir/linux.config $kernel_frag_dir/linux_rv${MACHINE_ARCH}.config"
 	local feature
 
 	# Read from SOC_H to get the hardware features
