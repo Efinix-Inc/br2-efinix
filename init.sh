@@ -25,6 +25,7 @@ BUILDROOT_REPO="https://github.com/buildroot/buildroot.git"
 
 PROJ_DIR=$PWD
 BR2_EXTERNAL_DIR=$PROJ_DIR
+BR2_DEFCONFIG_DIR="${BR2_EXTERNAL_DIR}/configs"
 BUILDROOT_DEFCONFIG=""
 
 EFINIX_DIR="$BR2_EXTERNAL_DIR/boards/efinix"
@@ -69,7 +70,7 @@ function self_check()
 
 function usage()
 {
-	echo "Usage: init.sh [board] [path/to/soc.h] [-c][-d][-r][-a][-e][-u][-s][-x]"
+	echo "Usage: init.sh [board] [path/to/soc.h] [-c][-d][-m][-r][-a][-e][-u][-s][-x]"
 	echo
 	echo "Positional arguments:"
 	echo "	board			Development kit name such as t120f324, ti60f225, ti180j484, ti375c529"
@@ -84,6 +85,7 @@ function usage()
 	echo "	-d			Rename default build directory name"
 	echo "				By default is <board>_build"
 	echo "				Example, if board is ti60f225 then, the name of build directory is 'ti60f225_build'."
+	echo "	-m			Machine architecture type either 32 or 64 bits. Default is 32."
 	echo "	-r			Reconfigure the Buildroot configuration. This option will not regenerate device tree."
 	echo "	-a			Reconfigure the Buildroot configuration and regenerate Linux device tree."
 	echo "	-e                      Generate Linux devcie tree for SoC example design."
@@ -367,6 +369,28 @@ function prepare_buildroot_env()
 {
 	# prepare Buildroot build environment
 	title "Prepare Buildroot Build Environment"
+
+	# merge Buildroot defconfig
+	local defconfig_fragments="$BR2_DEFCONFIG_DIR/riscv${MACHINE_ARCH}_fragment"
+
+	list_fragments=(
+		"base_defconfig"
+		"efinix_${BOARD}_defconfig"
+	)
+
+	for fragment in ${list_fragments[@]};
+	do
+		defconfig_fragments+=" $BR2_DEFCONFIG_DIR/$fragment"
+	done
+
+	echo "DEBUG: defconfig_fragments = $defconfig_fragments"
+
+	export CONFIG_="BR2"
+	bash $BUILDROOT_DIR/support/kconfig/merge_config.sh -r -m ${defconfig_fragments}
+	unset CONFIG_
+	BUILDROOT_DEFCONFIG="efinix_${BOARD}_${MACHINE_ARCH}_defconfig"
+	mv .config $BR2_DEFCONFIG_DIR/$BUILDROOT_DEFCONFIG
+
 	mkdir $BUILD_DIR
 	cd $BUILD_DIR && \
 	make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BUILDROOT_DEFCONFIG
@@ -476,10 +500,11 @@ do
 	shift
 done
 
-while getopts ":d:s:raehuxc" o; do
+while getopts ":d:s:m:raehuxc" o; do
 	case "${o}" in
 		:)
                         echo "ERROR: Option -$OPTARG requires an argument"
+			return 1
                         ;;
 		c)
 			mod_files=$(git status | grep modified | awk '{print $2}')
@@ -496,6 +521,16 @@ while getopts ":d:s:raehuxc" o; do
 		a)
 			RECONFIGURE_ALL=1
 			RECONFIGURE=1
+			;;
+		m)
+			MACHINE_ARCH="${OPTARG}"
+			if [ -z "$MACHINE_ARCH" ]; then
+				MACHINE_ARCH="32"
+			elif [ "$MACHINE_ARCH" != "64" ] && [ "$MACHINE_ARCH" != "32" ]; then
+				echo ERROR: Unsupported machine architecture: ${MACHINE_ARCH}
+				return 1
+			fi
+			echo INFO: Machine architecture: ${MACHINE_ARCH}-bit RISCV
 			;;
 		r)
 			RECONFIGURE=1
@@ -526,6 +561,7 @@ while getopts ":d:s:raehuxc" o; do
 		\?)
 			echo "ERROR: Invalid option -$OPTARG"
 			usage
+			return 1
 			;;
 		esac
 done
@@ -543,7 +579,6 @@ elif [[ ! -f $SOC_H ]]; then
 	echo ERROR: No such file for $SOC_H
 	return 1
 fi
-
 
 # clone sapphire-soc-dt-generator repository
 if [ ! -d $DT_DIR ]; then
