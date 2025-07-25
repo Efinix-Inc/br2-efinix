@@ -491,81 +491,86 @@ function add_packages()
         fi
 }
 
-while [ $# -gt 0 ]
-do
-	case $1 in
-		-*) break
-		;;
-	esac
-	shift
-done
-
-while getopts ":d:s:m:raehuxc" o; do
-	case "${o}" in
-		:)
-                        echo "ERROR: Option -$OPTARG requires an argument"
-			return 1
-                        ;;
-		c)
-			mod_files=$(git status | grep modified | awk '{print $2}')
-			for f in ${mod_files[@]};
-			do
-				git checkout -- $f
-			done
-			echo INFO: Repo reset to the original state
-			return
-			;;
-		d)
-			OPT_DIR=${OPTARG}
-			;;
-		a)
-			RECONFIGURE_ALL=1
-			RECONFIGURE=1
-			;;
-		m)
-			MACHINE_ARCH="${OPTARG}"
-			if [ -z "$MACHINE_ARCH" ]; then
-				MACHINE_ARCH="32"
-			elif [ "$MACHINE_ARCH" != "64" ] && [ "$MACHINE_ARCH" != "32" ]; then
-				echo ERROR: Unsupported machine architecture: ${MACHINE_ARCH}
-				return 1
-			fi
-			echo INFO: Machine architecture: ${MACHINE_ARCH}-bit RISCV
-			;;
-		r)
-			RECONFIGURE=1
-			;;
-		e)
-			EXAMPLE_DESIGN=1
-			;;
-		u)
-			UNIFIED_HW=1
-			EXTRA_HW_FEATURES="mmc,ethernet,"
-			;;
-		s)
-			EXTRA_HW_FEATURES=${OPTARG}
-			;;
-		x)
-			if [ "$UNIFIED_HW" = "1" ]; then
-				X11_GRAPHICS=1
-				EXTRA_HW_FEATURES+="fb,dma,usb,"
-			else
-				echo "ERROR: -x option requires -u to be set first."
-				return
-			fi
-			;;
-		h)
-			usage
-			return
-			;;
-		\?)
-			echo "ERROR: Invalid option -$OPTARG"
-			usage
-			return 1
+function parser()
+{
+	while [ $# -gt 0 ]
+	do
+		case $1 in
+			-*) break
 			;;
 		esac
-done
-shift $((OPTIND-1))
+		shift
+	done
+
+	while getopts ":d:s:m:raehuxc" o; do
+		case "${o}" in
+			:)
+				echo "ERROR: Option -$OPTARG requires an argument"
+				return 1
+				;;
+			c)
+				mod_files=$(git status | grep modified | awk '{print $2}')
+				for f in ${mod_files[@]};
+				do
+					git checkout -- $f
+				done
+				echo INFO: Repo reset to the original state
+				return
+				;;
+			d)
+				OPT_DIR=${OPTARG}
+				;;
+			a)
+				RECONFIGURE_ALL=1
+				RECONFIGURE=1
+				;;
+			m)
+				MACHINE_ARCH="${OPTARG}"
+				if [ -z "$MACHINE_ARCH" ]; then
+					MACHINE_ARCH="32"
+				elif [ "$MACHINE_ARCH" != "64" ] && [ "$MACHINE_ARCH" != "32" ]; then
+					echo ERROR: Unsupported machine architecture: ${MACHINE_ARCH}
+					return 1
+				fi
+				echo INFO: Machine architecture: ${MACHINE_ARCH}-bit RISCV
+				;;
+			r)
+				RECONFIGURE=1
+				;;
+			e)
+				EXAMPLE_DESIGN=1
+				;;
+			u)
+				UNIFIED_HW=1
+				EXTRA_HW_FEATURES="mmc,ethernet,"
+				;;
+			s)
+				EXTRA_HW_FEATURES=${OPTARG}
+				;;
+			x)
+				if [ "$UNIFIED_HW" = "1" ]; then
+					X11_GRAPHICS=1
+					EXTRA_HW_FEATURES+="fb,dma,usb,"
+				else
+					echo "ERROR: -x option requires -u to be set first."
+					return
+				fi
+				;;
+			h)
+				usage
+				return
+				;;
+			\?)
+				echo "ERROR: Invalid option -$OPTARG"
+				usage
+				return 1
+				;;
+			esac
+	done
+	shift $((OPTIND-1))
+}
+
+parser "$@"
 
 if [[ -z $BOARD ]]; then
 	echo ERROR: Board is not defined
