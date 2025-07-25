@@ -646,8 +646,7 @@ if [[ $RECONFIGURE == 1 ]]; then
 			check_soc_configuration || return 1
 			generate_device_tree || return 1
 		fi
-		cd $BUILD_DIR && \
-		make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BR2_DEFCONFIG
+		prepare_buildroot_env || return 1
 		return 0
 	else
 		echo "ERROR: $BUILD_DIR not exist"
