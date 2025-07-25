@@ -6,14 +6,6 @@ BR2_DL_DIR="$(HOME)/.buildroot-dl"
 # Target options
 BR2_riscv=y
 
-# Instruction Set Extensions
-BR2_riscv_custom=y
-BR2_RISCV_ISA_CUSTOM_RVM=y
-BR2_RISCV_ISA_CUSTOM_RVA=y
-BR2_RISCV_ISA_CUSTOM_RVC=y
-BR2_RISCV_ISA_CUSTOM_RVF=y
-BR2_RISCV_ISA_CUSTOM_RVD=y
-
 # Toolchain                                                                                                               
 BR2_TOOLCHAIN_USES_GLIBC=y                                                                                                
 BR2_TOOLCHAIN_BUILDROOT_GLIBC=y                                                                                           
