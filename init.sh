@@ -12,10 +12,12 @@ unset HARDEN_SOC
 unset UNIFIED_HW
 unset EXTRA_HW_FEATURES
 unset X11_GRAPHICS
+unset MACHINE_ARCH
 
 BOARD=$1
 SOC_H=$2
 
+MACHINE_ARCH="32"
 INPUT_FILE="VERSION"
 JSON_FILE="boards/efinix/common/sapphire-soc-dt-generator/config/drivers.json"
 
@@ -523,13 +525,10 @@ function parser()
 				;;
 			m)
 				MACHINE_ARCH="${OPTARG}"
-				if [ -z "$MACHINE_ARCH" ]; then
-					MACHINE_ARCH="32"
-				elif [ "$MACHINE_ARCH" != "64" ] && [ "$MACHINE_ARCH" != "32" ]; then
+				if [ "$MACHINE_ARCH" != "64" ] && [ "$MACHINE_ARCH" != "32" ]; then
 					echo ERROR: Unsupported machine architecture: ${MACHINE_ARCH}
 					return 1
 				fi
-				echo INFO: Machine architecture: ${MACHINE_ARCH}-bit RISCV
 				;;
 			r)
 				RECONFIGURE=1
@@ -581,6 +580,8 @@ elif [[ ! -f $SOC_H ]]; then
 	echo ERROR: No such file for $SOC_H
 	return 1
 fi
+
+echo INFO: Machine architecture: ${MACHINE_ARCH}-bit RISCV
 
 # clone sapphire-soc-dt-generator repository
 if [ ! -d $DT_DIR ]; then
