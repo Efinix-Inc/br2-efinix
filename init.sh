@@ -475,12 +475,17 @@ function add_packages()
 {
         title "Add Packages"
 
+	echo "INFO: Append ${BR2_DEFCONFIG_DIR}/extra_packages_fragment"
+	cat ${BR2_DEFCONFIG_DIR}/extra_packages_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
+
         if [ $UNIFIED_HW ]; then
+		echo "INFO: Append ${BR2_DEFCONFIG_DIR}/evsoc_fragment"
 		grep -q EVSOC ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
 		cat ${BR2_DEFCONFIG_DIR}/evsoc_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
 	fi
 
         if [ $X11_GRAPHICS ]; then
+		echo "INFO: Append ${BR2_DEFCONFIG_DIR}/x11_fragment"
                 grep -q BR2_PACKAGE_DESKTOP_ENVIRONMENT ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
 		cat ${BR2_DEFCONFIG_DIR}/x11_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
 
