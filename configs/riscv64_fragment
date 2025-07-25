@@ -1,0 +1,4 @@
+BR2_RISCV_64=y
+BR2_RISCV_ABI_LP64D=y
+
+BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_64_defconfig"

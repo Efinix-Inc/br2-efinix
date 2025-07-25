@@ -1,0 +1,72 @@
+# Compilation cache
+BR2_CCACHE=y
+BR2_CCACHE_DIR="$(HOME)/.buildroot-ccache"
+BR2_DL_DIR="$(HOME)/.buildroot-dl"
+
+# Target options
+BR2_riscv=y
+
+# Instruction Set Extensions
+BR2_riscv_custom=y
+BR2_RISCV_ISA_CUSTOM_RVM=y
+BR2_RISCV_ISA_CUSTOM_RVA=y
+BR2_RISCV_ISA_CUSTOM_RVC=y
+BR2_RISCV_ISA_CUSTOM_RVF=y
+BR2_RISCV_ISA_CUSTOM_RVD=y
+
+# Toolchain                                                                                                               
+BR2_TOOLCHAIN_USES_GLIBC=y                                                                                                
+BR2_TOOLCHAIN_BUILDROOT_GLIBC=y                                                                                           
+BR2_TOOLCHAIN_BUILDROOT_LIBC="glibc"                                                                                      
+
+# Glibc Options                                                                                                           
+BR2_PACKAGE_GLIBC=y
+
+# GCC
+BR2_GCC_VERSION_8_X=y
+BR2_OPTIMIZE_2=y
+BR2_TOOLCHAIN_BUILDROOT_CXX=y
+BR2_GCC_ENABLE_OPENMP=y
+BR2_GCC_CROSS_CXX=y
+BR2_INSTALL_LIBSTDCPP=y
+
+# System
+BR2_TARGET_GENERIC_GETTY=y
+BR2_TARGET_GENERIC_GETTY_PORT="ttySL0"
+BR2_TARGET_GENERIC_GETTY_BAUDRATE_115200=y
+
+# Filesystem
+BR2_TARGET_ROOTFS_CPIO=y
+BR2_TARGET_ROOTFS_EXT2=y
+BR2_TARGET_ROOTFS_EXT2_SIZE="200M"
+
+BR2_PACKAGE_HOST_GENIMAGE=y
+
+# Linux headers
+BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_5_10=y
+
+# Kernel
+BR2_LINUX_KERNEL=y
+BR2_LINUX_KERNEL_CUSTOM_VERSION=y
+BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE="5.10.0"
+BR2_LINUX_KERNEL_PATCH="$(BR2_EXTERNAL_EFINIX_PATH)/patches/linux/v5.10"
+BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
+BR2_LINUX_KERNEL_VMLINUX=y
+BR2_LINUX_KERNEL_DTS_SUPPORT=y
+
+# Rootfs customisation
+BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/rootfs_overlay"
+BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/post_build.sh"
+BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/post_create_fs.sh"
+
+# U-BOOT
+BR2_TARGET_UBOOT=y
+BR2_TARGET_ROOTFS_CPIO_UIMAGE=y
+BR2_TARGET_UBOOT_BUILD_SYSTEM_KCONFIG=y
+BR2_TARGET_UBOOT_USE_CUSTOM_CONFIG=y
+
+# OPENSBI
+BR2_TARGET_OPENSBI=y
+
+# Patches
+BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_EFINIX_PATH)/patches/"
