@@ -10,6 +10,7 @@ unset OPT_DIR
 unset EXAMPLE_DESIGN
 unset HARDEN_SOC
 unset UNIFIED_HW
+unset HW_FEATURES
 unset EXTRA_HW_FEATURES
 unset X11_GRAPHICS
 unset MACHINE_ARCH
@@ -17,6 +18,7 @@ unset MACHINE_ARCH
 BOARD=$1
 SOC_H=$2
 
+HW_FEATURES=""
 MACHINE_ARCH="32"
 INPUT_FILE="VERSION"
 JSON_FILE="boards/efinix/common/sapphire-soc-dt-generator/config/drivers.json"
@@ -190,7 +192,7 @@ function check_soc_configuration()
 	# append addresses for AXI interconnect to soc.h
 	if [ $UNIFIED_HW ] || [ $EXAMPLE_DESIGN ]; then
 
-		sed -i '/SYSTEM_AXI_A_BMB/d' $SOC_H
+		#sed -i '/SYSTEM_AXI_A_BMB/d' $SOC_H
 		echo INFO: Append addresses for AXI interconnect
 		if [[ $BOARD = "ti375c529" || $BOARD = "ti375n1156" ]]; then
 			grep -q SYSTEM_AXI_SLAVE $SOC_H || \
@@ -266,6 +268,112 @@ EOF
 		sed -i "s/$ddr_size/$phy_ddr_size/g" $SOC_H
 	fi
 }
+
+
+function generate_device_tree() {
+	local base_cmd="python3 $DT_DIR/device_tree_generator.py -m $MACHINE_ARCH"
+	local end_cmd="$SOC_H $BOARD"
+
+	local linux_dt_config="$DT_DIR/config/linux"
+	local uboot_dt_config="$DT_DIR/config/uboot"
+
+	local override_linux_dt=""
+	local override_uboot_dt=""
+	local hw_features=()
+
+	# Set override config paths
+	if [ "$UNIFIED_HW" ]; then
+		override_linux_dt="$linux_dt_config/unified_hw"
+		override_uboot_dt="$uboot_dt_config/unified_hw"
+	elif [ "$EXAMPLE_DESIGN" ]; then
+		override_linux_dt="$linux_dt_config/example_design"
+		override_uboot_dt="$uboot_dt_config/example_design"
+	fi
+
+	# Parse extra hardware features
+	[ -n "$HW_FEATURES" ] && IFS=',' read -ra hw_features <<< "$HW_FEATURES"
+
+	# Helper to build device tree command
+	build_dt_cmd() {
+	local type=$1
+	local config_dir=$2
+	local generic_dir="$config_dir/generic"
+	local override_dir=$3
+	local cmd="$base_cmd -c $config_dir/drivers.json -c $config_dir/peripherals.json"
+
+	contains_feature() {
+		local search=$1
+		for f in "${hw_features[@]}"; do
+			[ "$f" == "$search" ] && return 0
+		done
+		return 1
+	}
+
+	for feature in "${hw_features[@]}"; do
+		case "$feature" in
+		spi)
+			if ! contains_feature "mmc"; then
+				cmd+=" -c $generic_dir/spi-mmc.json"
+			fi
+			[ "$type" == "linux" ] && cmd+=" -c $generic_dir/spi-nor.json"
+			;;
+		gpio) [ "$type" = "linux" ] && cmd+=" -c $generic_dir/gpio_led.json" ;;
+		ethernet)
+			[ "$type" = "linux" ] && {
+				cmd+=" -c $generic_dir/ethernet.json"
+				[ -n "$override_dir" ] && cmd+=" -c $override_dir/ethernet.json"
+			}
+			;;
+		mmc)
+			cmd+=" -c $generic_dir/sdhc.json"
+			[ -n "$override_dir" ] && cmd+=" -c $override_dir/sdhc.json"
+			;;
+		fb)
+			[ "$type" = "linux" ] && {
+				cmd+=" -c $generic_dir/framebuffer.json"
+				[ -n "$override_dir" ] && cmd+=" -c $override_dir/framebuffer.json"
+			}
+			;;
+		usb)
+			[ "$type" = "linux" ] && {
+				cmd+=" -c $generic_dir/usb.json"
+				[ -n "$override_dir" ] && cmd+=" -c $override_dir/usb.json"
+			}
+			;;
+		evsoc)
+			if [ "$type" = "linux" ]; then
+				cmd+=" -c $generic_dir/evsoc.json"
+				cp "$SOC_H" "$PROJ_DIR/kernel_modules/evsoc/src/soc.h"
+			fi
+			;;
+	    esac
+	done
+
+	echo "$cmd $end_cmd $type"
+	}
+
+	# Generate U-Boot Device Tree
+	title "Generate U-Boot Device Tree"
+	local uboot_cmd
+	uboot_cmd=$(build_dt_cmd "uboot" "$uboot_dt_config" "$override_uboot_dt")
+	echo -e "DEBUG: Uboot device tree cmd:\n${uboot_cmd// -c /\\\n  -c }"
+	eval "$uboot_cmd" || return 1
+	echo "INFO: Copying $DT_DIR/output/uboot/$MACHINE_ARCH/uboot.dts to $EFINIX_DIR/$BOARD/u-boot/uboot.dts"
+	cp $DT_DIR/output/uboot/$MACHINE_ARCH/uboot.dts $EFINIX_DIR/$BOARD/u-boot/uboot.dts
+
+	# Generate Linux Device Tree
+	title "Generate Linux Device Tree"
+	local linux_cmd
+	linux_cmd=$(build_dt_cmd "linux" "$linux_dt_config" "$override_linux_dt")
+	echo -e "DEBUG: Linux device tree cmd:\n${linux_cmd// -c /\\\n  -c }"
+	eval "$linux_cmd" || return 1
+
+	echo "INFO: Copying $DT_DIR/output/linux/$MACHINE_ARCH/sapphire.dtsi to $COMMON_DIR/dts/sapphire.dtsi"
+	cp $DT_DIR/output/linux/$MACHINE_ARCH/sapphire.dtsi $COMMON_DIR/dts/sapphire.dtsi
+	echo "INFO: Copying $DT_DIR/output/linux/$MACHINE_ARCH/linux.dts to $EFINIX_DIR/$BOARD/linux/linux.dts"
+	cp $DT_DIR/output/linux/$MACHINE_ARCH/linux.dts $EFINIX_DIR/$BOARD/linux/linux.dts
+}
+
 
 function generate_device_tree()
 {
@@ -443,8 +551,13 @@ function set_kernel_config()
 		if grep -i -q $feature $SOC_H; then
 			echo INFO: hardware feature: $feature
 			br2_linux_kernel_cfg+=" $kernel_frag_dir/$feature.config"
+			HW_FEATURES+="$feature,"
 		fi
 	done
+
+	HW_FEATURES+="${EXTRA_HW_FEATURES}"
+
+	echo "HW_FEATURES = $HW_FEATURES"
 
 	if [ -n "${EXTRA_HW_FEATURES}" ]; then
 		IFS=',' read -ra hw_features <<< "${EXTRA_HW_FEATURES}"
@@ -561,15 +674,15 @@ function parser()
 				;;
 			u)
 				UNIFIED_HW=1
-				EXTRA_HW_FEATURES="mmc,ethernet,"
+				EXTRA_HW_FEATURES="mmc,ethernet,evsoc,"
 				;;
 			s)
-				EXTRA_HW_FEATURES=${OPTARG}
+				EXTRA_HW_FEATURES+=${OPTARG}
 				;;
 			x)
 				if [ "$UNIFIED_HW" = "1" ]; then
 					X11_GRAPHICS=1
-					EXTRA_HW_FEATURES+="fb,dma,usb,"
+					EXTRA_HW_FEATURES="mmc,ethernet,fb,dma,usb,"
 				else
 					echo "ERROR: -x option requires -u to be set first."
 					return
