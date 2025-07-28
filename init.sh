@@ -446,20 +446,38 @@ function set_kernel_config()
 		fi
 	done
 
-	if [ ! -z ${EXTRA_HW_FEATURES} ]; then
+	if [ -n "${EXTRA_HW_FEATURES}" ]; then
 		IFS=',' read -ra hw_features <<< "${EXTRA_HW_FEATURES}"
 
 		for feature in "${hw_features[@]}"; do
 			echo INFO: hardware feature: $feature
 
-			[ "$feature" = "spi" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/spi.config"
-			[ "$feature" = "i2c" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/i2c.config"
-			[ "$feature" = "gpio" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/gpio.config"
-			[ "$feature" = "mmc" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/mmc.config"
-			[ "$feature" = "ethernet" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/ethernet.config"
-			[ "$feature" = "dma" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/dma.config"
-			[ "$feature" = "fb" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/framebuffer.config"
-			[ "$feature" = "usb" ] && br2_linux_kernel_cfg+=" $kernel_frag_dir/usb.config"
+			case "$feature" in
+			spi)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/spi.config"
+				;;
+			i2c)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/i2c.config"
+				;;
+			gpio)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/gpio.config"
+				;;
+			mmc)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/mmc.config"
+				;;
+			ethernet)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/ethernet.config"
+				;;
+			dma)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/dma.config"
+				;;
+			fb)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/framebuffer.config"
+				;;
+			usb)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/usb.config"
+				;;
+			esac
 		done
 	fi
 
