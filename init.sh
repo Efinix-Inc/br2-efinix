@@ -299,7 +299,7 @@ function generate_device_tree() {
 	local config_dir=$2
 	local generic_dir="$config_dir/generic"
 	local override_dir=$3
-	local cmd="$base_cmd -c $config_dir/drivers.json -c $config_dir/peripherals.json"
+	local cmd="$base_cmd -c $config_dir/drivers.json -c $config_dir/peripherals.json -c $DT_DIR/config/boards/$BOARD/memory.json"
 
 	contains_feature() {
 		local search=$1
