@@ -21,7 +21,7 @@ SOC_H=$2
 HW_FEATURES=""
 MACHINE_ARCH="32"
 INPUT_FILE="VERSION"
-JSON_FILE="boards/efinix/common/sapphire-soc-dt-generator/config/drivers.json"
+JSON_FILE="boards/efinix/common/sapphire-soc-dt-generator/config/default.json"
 
 substr=""
 buildroot_version=''
