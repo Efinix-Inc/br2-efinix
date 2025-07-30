@@ -63,6 +63,16 @@ function title()
 	echo -e "\n${BLACK}${BG_WHITE}>>> $1 ${NC}"
 }
 
+function pr_err()
+{
+	echo -e "${RED}ERROR${NC}: $1"
+}
+
+function pr_info()
+{
+	echo -e "${GREEN}INFO${NC}: $1"
+}
+
 function self_check()
 {
 	if [ $2 -eq 0 ]; then
@@ -146,15 +156,15 @@ function sanity_check()
 	done
 
 	if [[ $found == false ]]; then
-		echo ERROR: board $BOARD is not supported
+		pr_err "board $BOARD is not supported"
 		return 1
 	fi
 
 	if [[ $UNIFIED_HW ]]; then
 		if [[ $BOARD == "ti375c529" || $BOARD == "ti180j484" || $BOARD == "ti375n1156" ]]; then
-			echo INFO: board $BOARD support unified hardware design
+			pr_info "board $BOARD support unified hardware design"
 		else
-			echo ERROR: board $BOARD does not support unified hardware design
+			pr_err "board $BOARD does not support unified hardware design"
 			return 1;
 		fi
 	fi
@@ -193,7 +203,7 @@ function check_soc_configuration()
 	if [ $UNIFIED_HW ] || [ $EXAMPLE_DESIGN ]; then
 
 		#sed -i '/SYSTEM_AXI_A_BMB/d' $SOC_H
-		echo INFO: Append addresses for AXI interconnect
+		pr_info "Append addresses for AXI interconnect"
 		if [[ $BOARD = "ti375c529" || $BOARD = "ti375n1156" ]]; then
 			grep -q SYSTEM_AXI_SLAVE $SOC_H || \
 			cat <<-EOF >> $SOC_H
@@ -240,12 +250,12 @@ EOF
 	fp=$(cat ${SOC_H} | grep FPU | awk  '{print $3}' | head -1)
 	if [[ $fp == 0 ]]; then
 		# disable the floating point
-		echo "INFO: Disable floating point in $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG"
+		pr_info "Disable floating point in $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG"
 		sed -i 's/^BR2_RISCV_ISA_CUSTOM_RVF=y/BR2_RISCV_ISA_CUSTOM_RVF=n/g' $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG
 		sed -i 's/^BR2_RISCV_ISA_CUSTOM_RVD=y/BR2_RISCV_ISA_CUSTOM_RVD=n/g' $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG
 		sed -i 's/^BR2_RISCV_ABI_ILP32D=y/BR2_RISCV_ABI_ILP32=y/g' $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG
 
-		echo "INFO: Disable Linux FPU support in $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config"
+		pr_info "Disable Linux FPU support in $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config"
 		sed -i 's/^CONFIG_FPU=y/CONFIG_FPU=n/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
 	fi
 	self_check "Floating point support ..." "$fp"
@@ -254,7 +264,7 @@ EOF
 	ext_c=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_C | awk '{print $3}' | head -1)
 	if [ $ext_c == 1 ]; then
 		# enable compressed extension flag in buildroot defconfig
-		echo "INFO: Enable compressed extension (RVC) in $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG"
+		pr_info "Enable compressed extension (RVC) in $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG"
 		sed -i 's/BR2_RISCV_ISA_CUSTOM_RVC=n/BR2_RISCV_ISA_CUSTOM_RVC=y/g' $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG
 		sed -i 's/CONFIG_RISCV_ISA_C=n/CONFIG_RISCV_ISA_C=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
 	fi
@@ -358,7 +368,7 @@ function generate_device_tree() {
 	uboot_cmd=$(build_dt_cmd "uboot" "$uboot_dt_config" "$override_uboot_dt")
 	echo -e "DEBUG: Uboot device tree cmd:\n${uboot_cmd// -c /\\\n  -c }"
 	eval "$uboot_cmd" || return 1
-	echo "INFO: Copying $DT_DIR/output/uboot/$MACHINE_ARCH/uboot.dts to $EFINIX_DIR/$BOARD/u-boot/uboot.dts"
+	pr_info "Copying $DT_DIR/output/uboot/$MACHINE_ARCH/uboot.dts to $EFINIX_DIR/$BOARD/u-boot/uboot.dts"
 	cp $DT_DIR/output/uboot/$MACHINE_ARCH/uboot.dts $EFINIX_DIR/$BOARD/u-boot/uboot.dts
 
 	# Generate Linux Device Tree
@@ -368,9 +378,9 @@ function generate_device_tree() {
 	echo -e "DEBUG: Linux device tree cmd:\n${linux_cmd// -c /\\\n  -c }"
 	eval "$linux_cmd" || return 1
 
-	echo "INFO: Copying $DT_DIR/output/linux/$MACHINE_ARCH/sapphire.dtsi to $COMMON_DIR/dts/sapphire.dtsi"
+	pr_info "Copying $DT_DIR/output/linux/$MACHINE_ARCH/sapphire.dtsi to $COMMON_DIR/dts/sapphire.dtsi"
 	cp $DT_DIR/output/linux/$MACHINE_ARCH/sapphire.dtsi $COMMON_DIR/dts/sapphire.dtsi
-	echo "INFO: Copying $DT_DIR/output/linux/$MACHINE_ARCH/linux.dts to $EFINIX_DIR/$BOARD/linux/linux.dts"
+	pr_info "Copying $DT_DIR/output/linux/$MACHINE_ARCH/linux.dts to $EFINIX_DIR/$BOARD/linux/linux.dts"
 	cp $DT_DIR/output/linux/$MACHINE_ARCH/linux.dts $EFINIX_DIR/$BOARD/linux/linux.dts
 }
 
@@ -448,7 +458,7 @@ function set_kernel_config()
 
 	for feature in "${base_features[@]}"; do
 		if grep -i -q $feature $SOC_H; then
-			echo INFO: hardware feature: $feature
+			pr_info "hardware feature: $feature"
 			br2_linux_kernel_cfg+=" $kernel_frag_dir/$feature.config"
 			HW_FEATURES+="$feature,"
 		fi
@@ -462,7 +472,7 @@ function set_kernel_config()
 		IFS=',' read -ra hw_features <<< "${EXTRA_HW_FEATURES}"
 
 		for feature in "${hw_features[@]}"; do
-			echo INFO: hardware feature: $feature
+			pr_info "hardware feature: $feature"
 
 			case "$feature" in
 			spi)
@@ -493,7 +503,7 @@ function set_kernel_config()
 		done
 	fi
 
-	echo INFO: $br2_kernel_cfg_keyword=\"$br2_linux_kernel_cfg\"
+	pr_info "$br2_kernel_cfg_keyword=\"$br2_linux_kernel_cfg\""
 	if grep -q ${br2_kernel_cfg_keyword} ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}; then
 		sed -i "/$br2_kernel_cfg_keyword/c\\$br2_kernel_cfg_keyword=\"$br2_linux_kernel_cfg\"" "${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}"
 	else
@@ -505,17 +515,17 @@ function add_packages()
 {
         title "Add Packages"
 
-	echo "INFO: Append ${BR2_DEFCONFIG_DIR}/extra_packages_fragment"
+	pr_info "Append ${BR2_DEFCONFIG_DIR}/extra_packages_fragment"
 	cat ${BR2_DEFCONFIG_DIR}/extra_packages_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
 
         if [ $UNIFIED_HW ]; then
-		echo "INFO: Append ${BR2_DEFCONFIG_DIR}/evsoc_fragment"
+		pr_info "Append ${BR2_DEFCONFIG_DIR}/evsoc_fragment"
 		grep -q EVSOC ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
 		cat ${BR2_DEFCONFIG_DIR}/evsoc_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
 	fi
 
         if [ $X11_GRAPHICS ]; then
-		echo "INFO: Append ${BR2_DEFCONFIG_DIR}/x11_fragment"
+		pr_info "Append ${BR2_DEFCONFIG_DIR}/x11_fragment"
                 grep -q BR2_PACKAGE_DESKTOP_ENVIRONMENT ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
 		cat ${BR2_DEFCONFIG_DIR}/x11_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
 
@@ -539,7 +549,7 @@ function parser()
 	while getopts ":d:s:m:raehuxc" o; do
 		case "${o}" in
 			:)
-				echo "ERROR: Option -$OPTARG requires an argument"
+				pr_err "Option -$OPTARG requires an argument"
 				return 1
 				;;
 			c)
@@ -548,7 +558,7 @@ function parser()
 				do
 					git checkout -- $f
 				done
-				echo INFO: Repo reset to the original state
+				pr_info "Repo reset to the original state"
 				return
 				;;
 			d)
@@ -561,7 +571,7 @@ function parser()
 			m)
 				MACHINE_ARCH="${OPTARG}"
 				if [ "$MACHINE_ARCH" != "64" ] && [ "$MACHINE_ARCH" != "32" ]; then
-					echo ERROR: Unsupported machine architecture: ${MACHINE_ARCH}
+					pr_err "Unsupported machine architecture: ${MACHINE_ARCH}"
 					return 1
 				fi
 				;;
@@ -583,8 +593,8 @@ function parser()
 					X11_GRAPHICS=1
 					EXTRA_HW_FEATURES="mmc,ethernet,fb,dma,usb,"
 				else
-					echo "ERROR: -x option requires -u to be set first."
-					return
+					pr_err "-x option requires -u to be set first."
+					return 1
 				fi
 				;;
 			h)
@@ -592,8 +602,7 @@ function parser()
 				return
 				;;
 			\?)
-				echo "ERROR: Invalid option -$OPTARG"
-				usage
+				pr_err "Invalid option -$OPTARG"
 				return 1
 				;;
 			esac
@@ -604,19 +613,19 @@ function parser()
 parser "$@"
 
 if [[ -z $BOARD ]]; then
-	echo ERROR: Board is not defined
+	pr_err "Board is not defined"
 	return 1
 fi
 
 if [[ -z $SOC_H ]]; then
-	echo ERROR: soc.h is not defined
+	pr_err "soc.h is not defined"
 	return 1
 elif [[ ! -f $SOC_H ]]; then
-	echo ERROR: No such file for $SOC_H
+	pr_err "No such file for $SOC_H"
 	return 1
 fi
 
-echo INFO: Machine architecture: ${MACHINE_ARCH}-bit RISCV
+pr_info "Machine architecture: ${MACHINE_ARCH}-bit RISCV"
 
 # clone sapphire-soc-dt-generator repository
 if [ ! -d $DT_DIR ]; then
@@ -632,8 +641,8 @@ if [ ! -d $DT_DIR ]; then
         fi
 
 	if [ ! $? -eq 0 ]; then
-		echo ERROR: Failed to clone $DT_REPO
-		echo Check you internet connection
+		pr_err "Failed to clone $DT_REPO"
+		pr_err "Check you internet connection"
 		return 1
 	fi
 fi
@@ -679,7 +688,7 @@ if [[ $RECONFIGURE == 1 ]]; then
 		prepare_buildroot_env || return 1
 		return 0
 	else
-		echo "ERROR: $BUILD_DIR not exist"
+		pr_err "$BUILD_DIR not exist"
 		return 1
 	fi
 fi
@@ -694,7 +703,7 @@ if [ ! -d $BUILDROOT_DIR ]; then
 	# clone buildroot repository
 	title "Clone Buildroot repository"
 	if [[ ! -z $buildroot_version ]]; then
-		echo Using Buildroot $buildroot_version
+		pr_info "Using Buildroot $buildroot_version"
 		git clone $BUILDROOT_REPO -b $buildroot_version
 	else
 		echo Using Buildroot master/main branch
@@ -702,8 +711,8 @@ if [ ! -d $BUILDROOT_DIR ]; then
 	fi
 
 	if [ ! $? -eq 0 ]; then
-		echo ERROR: Failed to clone $BUILDROOT_REPO
-		echo Check you internet connection
+		pr_err "Failed to clone $BUILDROOT_REPO"
+		pr_err "Check you internet connection"
 		return 1
 	fi
 
@@ -717,7 +726,7 @@ fi || return 1
 
 title "Copy soc.h file to OpenSBI directory"
 # copy soc.h to opensbi directory. Opensbi has dependency on soc.h.
-echo "INFO: copy $SOC_H to $OPENSBI_DIR/soc.h"
+pr_info "copy $SOC_H to $OPENSBI_DIR/soc.h"
 cp $SOC_H $OPENSBI_DIR/soc.h
 SOC_H=$OPENSBI_DIR/soc.h
 
