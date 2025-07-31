@@ -1,0 +1,36 @@
+From ef2b6b85b6beb2d7d937fff9ca4b627174c9a0e4 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Thu, 31 Jul 2025 13:18:46 +0800
+Subject: [PATCH] package/htop: upgrade 3.0.5 -> 3.1.0
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ package/htop/htop.hash | 2 +-
+ package/htop/htop.mk   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/package/htop/htop.hash b/package/htop/htop.hash
+index 34d95eb7a1..20f46573ae 100644
+--- a/package/htop/htop.hash
++++ b/package/htop/htop.hash
+@@ -1,3 +1,3 @@
+ # Locally calculated
+-sha256  123476d56a5e6a219654eebb6b2ec747dfa364f39c01a6475bf8030a25c81bff  htop-ce6d60e7def146c13d0b8bca4642e7401a0a8995.tar.gz
++sha256	200a4f9331d0e5048bf9bda6a8dee38248c557e471b9e57ff3784853efd613a9  htop-3.1.0.tar.gz
+ sha256  c228cc14df980a23ea0c3c9ac957b904dd6a8514f6283db403de22e9179471be  COPYING
+diff --git a/package/htop/htop.mk b/package/htop/htop.mk
+index bb2bcb29ae..c66fc39559 100644
+--- a/package/htop/htop.mk
++++ b/package/htop/htop.mk
+@@ -9,7 +9,7 @@
+ # was also changed (the build process requires `HTOP_AUTORECONF = YES` now). We
+ # use commit hash instead of git tag here to avoid breaking existing source
+ # caches
+-HTOP_VERSION = ce6d60e7def146c13d0b8bca4642e7401a0a8995
++HTOP_VERSION = 3.1.0
+ HTOP_SITE = $(call github,htop-dev,htop,$(HTOP_VERSION))
+ HTOP_DEPENDENCIES = ncurses
+ HTOP_AUTORECONF = YES
+-- 
+2.43.0
+
