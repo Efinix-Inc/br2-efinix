@@ -1,18 +1,18 @@
-From 6d73722cd0b977b7dcb8728cc784f8f3668c209c Mon Sep 17 00:00:00 2001
+From a4e42acf39c3438a33fcd0edd1ea255c0052d658 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Thu, 11 Aug 2022 11:34:46 +0800
 Subject: [PATCH] riscv/cpu: add more information to show on cpuinfo
 
 Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
- arch/riscv/kernel/cpu.c | 25 ++++++++++++++++++++++++-
- 1 file changed, 24 insertions(+), 1 deletion(-)
+ arch/riscv/kernel/cpu.c | 27 ++++++++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
 
 diff --git a/arch/riscv/kernel/cpu.c b/arch/riscv/kernel/cpu.c
-index 6d59e6906fdd..97232f02a4c3 100644
+index 6d59e6906fdd..2cc5016570aa 100644
 --- a/arch/riscv/kernel/cpu.c
 +++ b/arch/riscv/kernel/cpu.c
-@@ -102,14 +102,37 @@ static void c_stop(struct seq_file *m, void *v)
+@@ -102,14 +102,39 @@ static void c_stop(struct seq_file *m, void *v)
  {
  }
  
@@ -33,23 +33,26 @@ index 6d59e6906fdd..97232f02a4c3 100644
  	const char *compat, *isa, *mmu;
 -
 +	const char *board, *cpu_name;
-+	unsigned int icache, dcache;
++	unsigned int icache, dcache, l2_cache;
 +	unsigned int freq;
 +
-+	if (!of_property_read_string(node, "board", &board));
++	if (!of_property_read_string(node, "board", &board))
 +		seq_printf(m, "board name\t: %s\n", board);
-+	if (!of_property_read_string(node, "cpu-name", &cpu_name));
++	if (!of_property_read_string(node, "cpu-name", &cpu_name))
 +		seq_printf(m, "cpu name\t: %s\n", cpu_name);
  	seq_printf(m, "processor\t: %lu\n", cpu_id);
  	seq_printf(m, "hart\t\t: %lu\n", cpuid_to_hartid_map(cpu_id));
-+	if (!of_property_read_u32(node, "clock-frequency", &freq));
++	if (!of_property_read_u32(node, "clock-frequency", &freq))
 +		seq_printf(m, "cpu MHz\t\t: %u\n", to_mhz(freq));
-+	if (!of_property_read_u32(node, "i-cache-size", &icache));
++	if (!of_property_read_u32(node, "i-cache-size", &icache))
 +		seq_printf(m, "i-cache-size\t: %u KB\n", to_kb(icache));
-+	if (!of_property_read_u32(node, "d-cache-size", &dcache));
++	if (!of_property_read_u32(node, "d-cache-size", &dcache))
 +                seq_printf(m, "d-cache-size \t: %u KB\n", to_kb(dcache));
++	if (!of_property_read_u32(node, "l2-cache-size", &l2_cache))
++		seq_printf(m, "l2-cache-size \t: %u KB\n", to_kb(l2_cache));
  	if (!of_property_read_string(node, "riscv,isa", &isa))
  		print_isa(m, isa);
  	if (!of_property_read_string(node, "mmu-type", &mmu))
 -- 
-2.17.1
+2.43.0
+
