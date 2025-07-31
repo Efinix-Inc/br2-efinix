@@ -35,19 +35,37 @@ void bspMain()
 {
     configure_uart();
 
-#ifndef SPINAL_SIM
+#ifdef __riscv_xlen
+#if __riscv_xlen == 64
+    bsp_printf_s("RISC-V: 64 bit\r\n");
+#elif __riscv_xlen == 32
+    bsp_printf_s("RISC-V: 32 bit\r\n");
+#endif
+#endif
+
+    bsp_printf_s("Compiled: ");
+    bsp_printf_s(__DATE__);
+    bsp_printf_s(" ");
+    bsp_printf_s(__TIME__);
+    bsp_printf_s("\r\n");
+
     spiFlash_init(SPI, SPI_CS);
     spiFlash_wake(SPI, SPI_CS);
     bsp_printf_s("OpenSBI copy\r\n");
     spiFlash_f2m(SPI, SPI_CS, OPENSBI_FLASH, OPENSBI_MEMORY, OPENSBI_SIZE);
     bsp_printf_s("U-Boot copy\r\n");
     spiFlash_f2m(SPI, SPI_CS, UBOOT_SBI_FLASH, UBOOT_MEMORY, UBOOT_SIZE);
-#endif
 
     bsp_printf_s("Payload boot\r\n");
+
+#if __riscv_xlen == 64
+    void (*userMain)(u64, u64, u64) = (void (*)(u64, u64, u64))OPENSBI_MEMORY;
+#elif __riscv_xlen == 32
     void (*userMain)(u32, u32, u32) = (void (*)(u32, u32, u32))OPENSBI_MEMORY;
-    #ifdef SMP
+#endif
+
+#ifdef SMP
     smp_unlock(userMain);
-    #endif
+#endif
     userMain(0, 0, 0);
 }
