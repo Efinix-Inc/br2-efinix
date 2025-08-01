@@ -466,8 +466,6 @@ function set_kernel_config()
 
 	HW_FEATURES+="${EXTRA_HW_FEATURES}"
 
-	echo "HW_FEATURES = $HW_FEATURES"
-
 	if [ -n "${EXTRA_HW_FEATURES}" ]; then
 		IFS=',' read -ra hw_features <<< "${EXTRA_HW_FEATURES}"
 
