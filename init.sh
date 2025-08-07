@@ -452,7 +452,7 @@ function set_kernel_config()
 	local feature
 
 	# Read from SOC_H to get the hardware features
-	local base_features=("spi" "i2c" "gpio")
+	local base_features=("spi" "i2c" "gpio" "watchdog")
 
 	title "Set Kernel Configuration"
 
@@ -496,6 +496,9 @@ function set_kernel_config()
 				;;
 			usb)
 				br2_linux_kernel_cfg+=" $kernel_frag_dir/usb.config"
+				;;
+			watchdog|wdt)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/watchdog.config"
 				;;
 			esac
 		done
