@@ -1,0 +1,141 @@
+From 3b31706b7734f6a301576c03803c2869d011eaf0 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Mon, 11 Aug 2025 16:00:05 +0800
+Subject: [PATCH] drivers: add u-boot efinix watchdog driver
+
+---
+ drivers/watchdog/Kconfig      |  8 +++
+ drivers/watchdog/Makefile     |  1 +
+ drivers/watchdog/efinix_wdt.c | 92 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 101 insertions(+)
+ create mode 100644 drivers/watchdog/efinix_wdt.c
+
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 602ccbe41c0..901306469f8 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -238,6 +238,14 @@ config WDT_XILINX
+ 	  Select this to enable Xilinx window watchdog timer, which can be found on
+ 	  Xilinx Versal Platforms.
+ 
++config WDT_EFINIX
++	bool "Efinix watchdog timer support"
++	#select HW_WATCHDOG
++	#depends on WDT
++	imply WATCHDOG
++	help
++	  Enable the watchdog driver support on Efinix SoC.
++
+ config WDT_TANGIER
+ 	bool "Intel Tangier watchdog timer support"
+ 	depends on WDT && INTEL_MID
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 6e70c7ae19c..af6e2b07e1a 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -36,3 +36,4 @@ obj-$(CONFIG_WDT_SP805) += sp805_wdt.o
+ obj-$(CONFIG_WDT_STM32MP) += stm32mp_wdt.o
+ obj-$(CONFIG_WDT_TANGIER) += tangier_wdt.o
+ obj-$(CONFIG_WDT_XILINX) += xilinx_wwdt.o
++obj-$(CONFIG_WDT_EFINIX) += efinix_wdt.o
+diff --git a/drivers/watchdog/efinix_wdt.c b/drivers/watchdog/efinix_wdt.c
+new file mode 100644
+index 00000000000..2f9309d532b
+--- /dev/null
++++ b/drivers/watchdog/efinix_wdt.c
+@@ -0,0 +1,92 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Support for watchdog on Efinix Inc SoC
++ *
++ * Copyright (C) 2025 Efinix Inc
++ */
++
++#include <common.h>
++#include <wdt.h>
++#include <asm/io.h>
++#include <dm.h>
++#include <dm/device_compat.h>
++
++#define EFX_WDT_DEFAULT_TIME	60	/* in seconds */
++#define EFX_WDT_MAX_TIME	3600U
++#define EFX_WDT_RESET		0xAD68E70D	/* Magic number to reset the watchdog */
++
++#define EFX_WDT_HEARTBEAT	0x00
++#define EFX_WDT_EN		0x04
++#define EFX_WDT_EN_COUNTER_0	(1 << 0)
++#define EFX_WDT_EN_COUNTER_1	(1 << 1)
++#define EFX_WDT_PRESCALER	0x40
++#define EFX_WDT_COUNTER_0	0x80
++#define EFX_WDT_COUNTER_1	0x84
++#define EFX_WDT_COUNTER_0_VAL	0xc0
++#define EFX_WDT_COUNTER_1_VAL	0xc4
++
++struct efx_wdt_dev {
++	void __iomem *base;
++};
++
++static int efx_wdt_reset(struct udevice *dev)
++{
++	struct efx_wdt_dev *wdev = dev_get_priv(dev);
++	debug("%s: Reset the watchdog\n", __func__);
++	writel(EFX_WDT_RESET, wdev->base + EFX_WDT_HEARTBEAT);
++	return 0;
++}
++
++static int efx_wdt_start(struct udevice *dev, u64 timeout_ms,
++			 ulong flags)
++{
++	struct efx_wdt_dev *wdev = dev_get_priv(dev);
++
++	efx_wdt_reset(dev);
++	debug("%s: Start the watchdog, timeout_ms=%llu\n", __func__, timeout_ms);
++	writel(timeout_ms, wdev->base + EFX_WDT_COUNTER_1);	
++	writel(EFX_WDT_EN_COUNTER_1, wdev->base + EFX_WDT_EN);
++
++	return 0;
++}
++
++static const struct wdt_ops efx_wdt_ops = {
++	.start = efx_wdt_start,
++	.reset = efx_wdt_reset,
++};
++
++static int efx_wdt_probe(struct udevice *dev)
++{
++	struct efx_wdt_dev *wdev = dev_get_priv(dev);
++	unsigned long clk_f;
++	unsigned int prescaler;
++
++	debug("%s\n", __func__);
++	wdev->base = dev_read_addr_ptr(dev);
++	if (!wdev->base) {
++		dev_info(dev, "Failed to get base address of watchdog device\n");
++		return -ENOENT;
++	}
++
++	clk_f = dev_read_u32_default(dev, "clock-frequency", 200000000); 
++
++	prescaler = (clk_f / 1000) -1;
++	writel(prescaler, wdev->base + EFX_WDT_PRESCALER);
++
++	dev_info(dev, "Successfully register watchdog driver\n");
++	return 0;
++}
++
++static const struct udevice_id efx_wdt_ids[] = {
++	{ .compatible = "efx,efx-wdt" },
++	{ }
++};
++
++U_BOOT_DRIVER(efx_wdt) = {
++	.name = "efx-watchdog",
++	.id = UCLASS_WDT,
++	.of_match = efx_wdt_ids,
++	.ops = &efx_wdt_ops,
++	.probe = efx_wdt_probe,
++	.priv_auto = sizeof(struct efx_wdt_dev),
++};
+-- 
+2.43.0
+
