@@ -1,0 +1,27 @@
+From 05207706f2eea8ecb489096b6908a9ac9ef94452 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Mon, 11 Aug 2025 10:43:53 +0800
+Subject: [PATCH] drivers/timer: add Kconfig for sifive timer
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/timer/Kconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/timer/Kconfig b/drivers/timer/Kconfig
+index 80743a25519..9ed65feedeb 100644
+--- a/drivers/timer/Kconfig
++++ b/drivers/timer/Kconfig
+@@ -227,4 +227,9 @@ config MCHP_PIT64B_TIMER
+ 	  Select this to enable support for Microchip 64-bit periodic
+ 	  interval timer.
+ 
++config SIFIVE_CLINT
++	bool "Clint timer"
++	depends on TIMER
++	help
++	  Clint timer for RISC-V platform.
+ endmenu
+-- 
+2.43.0
+
