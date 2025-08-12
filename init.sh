@@ -356,6 +356,11 @@ function generate_device_tree() {
 				cp "$SOC_H" "$PROJ_DIR/kernel_modules/evsoc/src/soc.h"
 			fi
 			;;
+		watchdog)
+			if [ "$type" = "uboot" ]; then
+				cmd+=" -c $generic_dir/watchdog.json"
+			fi
+			;;
 	    esac
 	done
 
