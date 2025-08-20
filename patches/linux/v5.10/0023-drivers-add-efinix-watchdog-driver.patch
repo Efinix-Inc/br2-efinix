@@ -1,13 +1,13 @@
-From 1c42e81048795a2f847accd57749a6edcb3d3486 Mon Sep 17 00:00:00 2001
+From a2624b35d4dee64cc7b1b61d6229111460e5f8c3 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
-Date: Thu, 7 Aug 2025 17:54:07 +0800
+Date: Thu, 21 Aug 2025 09:47:51 +0800
 Subject: [PATCH] drivers: add efinix watchdog driver
 
 ---
  drivers/watchdog/Kconfig   |   9 ++
  drivers/watchdog/Makefile  |   1 +
- drivers/watchdog/efx_wdt.c | 269 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 279 insertions(+)
+ drivers/watchdog/efx_wdt.c | 297 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 307 insertions(+)
  create mode 100644 drivers/watchdog/efx_wdt.c
 
 diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
@@ -41,10 +41,10 @@ index 071a2e50be98..8e8dba19d5da 100644
 +obj-$(CONFIG_EFINIX_WATCHDOG) += efx_wdt.o
 diff --git a/drivers/watchdog/efx_wdt.c b/drivers/watchdog/efx_wdt.c
 new file mode 100644
-index 000000000000..be69d3b1735d
+index 000000000000..e9fbc24abf63
 --- /dev/null
 +++ b/drivers/watchdog/efx_wdt.c
-@@ -0,0 +1,269 @@
+@@ -0,0 +1,297 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Support for watchdog on Efinix Inc SoC
@@ -69,11 +69,14 @@ index 000000000000..be69d3b1735d
 +#define EFX_WDT_DEFAULT_TIME	60	/* in seconds */
 +#define EFX_WDT_MAX_TIME	3600U
 +#define EFX_WDT_RESET		0xAD68E70D	/* Magic number to reset the watchdog */
++#define EFX_WDT_UNLOCK		0x3C21B925	/* Magic number to unlock the watchdog */
++#define EFX_WDT_LOCK		0x3C21B924	/* Magic number to lock the watchdog */
++#define EFX_WDT_ENA_COUNTER_0	(1 << 0)
++#define EFX_WDT_ENA_COUNTER_1	(1 << 1)
 +
 +#define EFX_WDT_HEARTBEAT	0x00
-+#define EFX_WDT_EN		0x04
-+#define EFX_WDT_EN_COUNTER_0	(1 << 0)
-+#define EFX_WDT_EN_COUNTER_1	(1 << 1)
++#define EFX_WDT_ENABLE		0x04
++#define EFX_WDT_DISABLED	0x08
 +#define EFX_WDT_PRESCALER	0x40
 +#define EFX_WDT_COUNTER_0	0x80
 +#define EFX_WDT_COUNTER_1	0x84
@@ -107,6 +110,16 @@ index 000000000000..be69d3b1735d
 +		   WDIOF_PRETIMEOUT,
 +};
 +
++static void efx_wdt_unlock(struct efx_wdt_dev *wdev)
++{
++	writel(EFX_WDT_UNLOCK, wdev->base + EFX_WDT_HEARTBEAT);
++}
++
++static void efx_wdt_lock(struct efx_wdt_dev *wdev)
++{
++	writel(EFX_WDT_LOCK, wdev->base + EFX_WDT_HEARTBEAT);
++}
++
 +static void efx_wdt_set_counter_limit(struct efx_wdt_dev *wdev, unsigned int limit, int counter)
 +{
 +	unsigned int value;
@@ -118,14 +131,18 @@ index 000000000000..be69d3b1735d
 +		counter_reg = EFX_WDT_COUNTER_1;
 +
 +	value = (limit * 1000) + 1;
++	efx_wdt_unlock(wdev);
 +	writel(value, wdev->base + counter_reg);
++	efx_wdt_lock(wdev);
 +}
 +
 +static int efx_wdt_start(struct watchdog_device *wdog)
 +{
 +	struct efx_wdt_dev *wdev = (struct efx_wdt_dev *)watchdog_get_drvdata(wdog);
 +
-+	writel(EFX_WDT_EN_COUNTER_0 | EFX_WDT_EN_COUNTER_1 , wdev->base + EFX_WDT_EN);
++	efx_wdt_unlock(wdev);
++	writel(EFX_WDT_ENA_COUNTER_0 | EFX_WDT_ENA_COUNTER_1 , wdev->base + EFX_WDT_ENABLE);
++	efx_wdt_lock(wdev);
 +	set_bit(WDOG_HW_RUNNING | WDOG_ACTIVE, &wdog->status);
 +	return 0;
 +}
@@ -142,7 +159,9 @@ index 000000000000..be69d3b1735d
 +{
 +	struct efx_wdt_dev *wdev = (struct efx_wdt_dev *)watchdog_get_drvdata(wdog);
 +
-+	writel(0, wdev->base + EFX_WDT_EN);
++	efx_wdt_unlock(wdev);
++	writel(EFX_WDT_ENA_COUNTER_0 | EFX_WDT_ENA_COUNTER_1, wdev->base + EFX_WDT_DISABLED);
++	efx_wdt_lock(wdev);
 +	set_bit(WDOG_STOP_ON_UNREGISTER, &wdog->status);
 +	return 0;
 +}
@@ -184,8 +203,11 @@ index 000000000000..be69d3b1735d
 +{
 +	struct efx_wdt_dev *wdev = (struct efx_wdt_dev *)watchdog_get_drvdata(wdog);
 +	efx_wdt_stop(wdog);
++	efx_wdt_ping(wdog);
 +	efx_wdt_set_counter_limit(wdev, wdog->min_timeout, 1);
-+	writel(EFX_WDT_EN_COUNTER_1, wdev->base + EFX_WDT_EN);
++	efx_wdt_unlock(wdev);
++	writel(EFX_WDT_ENA_COUNTER_1, wdev->base + EFX_WDT_ENABLE);
++	efx_wdt_lock(wdev);
 +	return 0;
 +}
 +
@@ -194,7 +216,7 @@ index 000000000000..be69d3b1735d
 +	struct watchdog_device *wdog = (struct watchdog_device *)dev;
 +	struct efx_wdt_dev *wdev = (struct efx_wdt_dev *)watchdog_get_drvdata(wdog);
 +
-+	writel(~(EFX_WDT_EN_COUNTER_0), wdev->base + EFX_WDT_EN);
++	writel(~(EFX_WDT_ENA_COUNTER_0), wdev->base + EFX_WDT_ENABLE);
 +	watchdog_notify_pretimeout(wdog);
 +
 +	return IRQ_HANDLED;
@@ -216,8 +238,7 @@ index 000000000000..be69d3b1735d
 +	struct efx_wdt_dev *wdev;
 +	struct watchdog_device *wdog;
 +	int irq, ret;
-+	unsigned int clk_rate;
-+	unsigned int prescaler;
++	unsigned int clk_rate, prescaler;
 +
 +	wdev = devm_kzalloc(dev, sizeof(*wdev), GFP_KERNEL);
 +	if (!wdev)
@@ -274,6 +295,8 @@ index 000000000000..be69d3b1735d
 +	efx_wdt_set_timeout(wdog, wdog->timeout);
 +	efx_wdt_set_pretimeout(wdog, wdog->timeout / 2);
 +
++	efx_wdt_stop(wdog);
++
 +	ret = devm_watchdog_register_device(dev, wdog);
 +	if (ret) {
 +		dev_err(dev, "Failed to register watchdog driver\n");
@@ -281,6 +304,8 @@ index 000000000000..be69d3b1735d
 +	}
 +
 +	dev_info(dev, "Successfully register watchdog driver\n");
++
++	efx_wdt_lock(wdev);
 +
 +	return 0;
 +}
@@ -290,8 +315,11 @@ index 000000000000..be69d3b1735d
 +	struct watchdog_device *wdog = (struct watchdog_device *)platform_get_drvdata(pdev);
 +	struct efx_wdt_dev *wdev = (struct efx_wdt_dev *)watchdog_get_drvdata(wdog);
 +	efx_wdt_stop(wdog);
++	efx_wdt_ping(wdog);
 +	efx_wdt_set_counter_limit(wdev, wdog->min_timeout, 1);
-+	writel(EFX_WDT_EN_COUNTER_1, wdev->base + EFX_WDT_EN);
++	efx_wdt_unlock(wdev);
++	writel(EFX_WDT_ENA_COUNTER_1, wdev->base + EFX_WDT_ENABLE);
++	efx_wdt_lock(wdev);
 +}
 +
 +static const struct of_device_id efx_wdt_ids[] = {
