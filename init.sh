@@ -21,11 +21,7 @@ SOC_H=$2
 HW_FEATURES=""
 MACHINE_ARCH="32"
 INPUT_FILE="VERSION"
-JSON_FILE="boards/efinix/common/sapphire-soc-dt-generator/config/default.json"
-
 substr=""
-buildroot_version=''
-BUILDROOT_REPO="https://github.com/buildroot/buildroot.git"
 
 PROJ_DIR=$PWD
 BR2_EXTERNAL_DIR=$PROJ_DIR
@@ -35,7 +31,7 @@ BR2_DEFCONFIG=""
 EFINIX_DIR="$BR2_EXTERNAL_DIR/boards/efinix"
 COMMON_DIR="$EFINIX_DIR/common"
 DT_DIR="$COMMON_DIR/sapphire-soc-dt-generator"
-DT_REPO="https://github.com/Efinix-Inc/sapphire-soc-dt-generator.git"
+JSON_FILE="$DT_DIR/config/default.json"
 
 # Text colors
 WHITE='\033[0;37m'
@@ -434,18 +430,32 @@ function get_cpu_count()
 	done
 }
 
-function get_version()
+function get_column()
 {
 	# Read the VERSION file to get version
-
+	local column="$1"
+	local substr="$2"
 	local arr=()
 	while IFS= read -r line; do
 		if [[ $line == *$substr* ]]; then
 			IFS=' ' read -r -a arr <<< "$line"
 		fi
 	done < $INPUT_FILE
+	echo ${arr[$column]}
+}
 
-	version=${arr[1]}
+function get_version()
+{
+	local substr="$1"
+	version=$(get_column "1" "$substr")
+	echo $version
+}
+
+function get_repo_url()
+{
+	local substr="$1"
+	repo_url=$(get_column "0" "$substr")
+	echo $repo_url
 }
 
 function set_kernel_config()
@@ -635,10 +645,10 @@ pr_info "Machine architecture: ${MACHINE_ARCH}-bit RISCV"
 
 # clone sapphire-soc-dt-generator repository
 if [ ! -d $DT_DIR ]; then
-	title "Cloning sapphire-soc-dt-generator Repository"
-        substr="sapphire-soc-dt-generator"
-        get_version $substr
-        dt_version=$version
+	dt_name="sapphire-soc-dt-generator"
+	DT_REPO=$(get_repo_url "$dt_name")
+	dt_version=$(get_version "$dt_name")
+	title "Cloning $DT_REPO $dt_version"
 
         if [ ! -z $dt_version ]; then
                 git clone $DT_REPO -b $dt_version $DT_DIR
@@ -701,13 +711,11 @@ fi
 
 mkdir -p $WORKSPACE_DIR
 
-substr="buildroot"
-get_version $substr
-buildroot_version=$version
-
 if [ ! -d $BUILDROOT_DIR ]; then
 	# clone buildroot repository
-	title "Clone Buildroot repository"
+	BUILDROOT_REPO=$(get_repo_url "buildroot")
+	buildroot_version=$(get_version "buildroot")
+	title "Clone $BUILDROOT_REPO $buildroot_version"
 	if [[ ! -z $buildroot_version ]]; then
 		pr_info "Using Buildroot $buildroot_version"
 		git clone $BUILDROOT_REPO -b $buildroot_version
