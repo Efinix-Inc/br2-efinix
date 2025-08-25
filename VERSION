@@ -1,8 +1,8 @@
 2021.05.10
 
-buildroot 2021.05.3
-u-boot 2021.04
-opensbi 0.9
-Linux kernel 5.10
+https://github.com/buildroot/buildroot 2021.05.3
+https://github.com/u-boot/u-boot 2021.04
+https://github.com/riscv-software-src/opensbi 0.9
+Linux 5.10.147
 gcc 8.4
-sapphire-soc-dt-generator v3.0
+https://github.com/Efinix-Inc/sapphire-soc-dt-generator v3.0
