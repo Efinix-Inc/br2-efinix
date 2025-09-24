@@ -1,5 +1,7 @@
 config BR2_PACKAGE_HSETROOT
 	bool "hsetroot"
 	select BR2_PACKAGE_IMLIB2
+	select BR2_PACKAGE_IMLIB2_JPEG
+	select BR2_PACKAGE_IMLIB2_PNG
 	help
 	  Yet another wallpaper application
