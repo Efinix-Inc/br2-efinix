@@ -1,13 +1,13 @@
-From be9815c5021edf37742f1bb2e27c656f37bc8d9e Mon Sep 17 00:00:00 2001
+From 1e2db29ae85d299fe2e27c3b1478c90981a398eb Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Wed, 19 Feb 2025 13:27:43 +0800
-Subject: [PATCH] fb: add Efinix framebuffer driver
+Subject: [PATCH 1/2] fb: add Efinix framebuffer driver
 
 ---
  drivers/video/fbdev/Kconfig  |   9 +
  drivers/video/fbdev/Makefile |   1 +
- drivers/video/fbdev/fb_efx.c | 450 +++++++++++++++++++++++++++++++++++
- 3 files changed, 460 insertions(+)
+ drivers/video/fbdev/fb_efx.c | 548 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 558 insertions(+)
  create mode 100644 drivers/video/fbdev/fb_efx.c
 
 diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
@@ -44,10 +44,10 @@ index 477b9624b703..feebff39ec92 100644
  obj-$(CONFIG_FB_UVESA)            += uvesafb.o
 diff --git a/drivers/video/fbdev/fb_efx.c b/drivers/video/fbdev/fb_efx.c
 new file mode 100644
-index 000000000000..cec3555ddfb8
+index 000000000000..9c07bad08ba2
 --- /dev/null
 +++ b/drivers/video/fbdev/fb_efx.c
-@@ -0,0 +1,450 @@
+@@ -0,0 +1,548 @@
 +#include <linux/module.h>
 +#include <linux/fb.h>
 +#include <linux/io.h>
@@ -92,6 +92,13 @@ index 000000000000..cec3555ddfb8
 +	struct dma_chan *chan;
 +	dma_addr_t dma_display_buff_io;
 +	struct completion transfer_ok;
++	size_t nents;
++	struct scatterlist *sg;
++	struct page **pages;
++	size_t segments;
++
++	struct efxfb_params *params;
++	struct platform_device *pdev;
 +};
 +
 +static const struct fb_fix_screeninfo efxfb_fix = {
@@ -209,7 +216,7 @@ index 000000000000..cec3555ddfb8
 +	if (par->fb_transfer_mode == 1)
 +		info->fix.smem_start = par->dma_display_buff_io;
 +	else if (par->fb_transfer_mode == 2)
-+		info->fix.smem_start = par->display_buf;
++		info->fix.smem_start = (uintptr_t)page_to_phys(vmalloc_to_page(par->display_buf));
 +
 +	info->fix.smem_len = par->fb_size;
 +	info->fix.line_length = params->stride;
@@ -258,102 +265,187 @@ index 000000000000..cec3555ddfb8
 +                        info->var.bits_per_pixel, info->fix.line_length);
 +}
 +
-+static int efxfb_dma_init_vmalloc_sg_cyclic(struct platform_device *pdev, struct efxfb_par *par)
++static int efxfb_init_scatterlist_vmalloc(struct efxfb_par *par, void *buf_addr, enum dma_transfer_direction direction)
 +{
-+	struct dma_chan *chan;
++	struct device *dev = &par->pdev->dev;
++	struct scatterlist *sg;
++	struct page **pages;
++	size_t segments = par->segments;
++	size_t i;
++	int ret;
++
++	if (!is_vmalloc_addr(buf_addr) || (uintptr_t)buf_addr & (PAGE_SIZE - 1)) {
++		dev_err(dev, "Buffer address is not vmalloc or not page-aligned\n");
++		return -EINVAL;
++	}
++
++	// Allocate page array
++	pages = kcalloc(segments, sizeof(*pages), GFP_KERNEL);
++	if (!pages) {
++		dev_err(dev, "Failed to allocate page array\n");
++		return -ENOMEM;
++	}
++	par->pages = pages;
++
++	// Allocate scatterlist
++	sg = kcalloc(segments, sizeof(*sg), GFP_KERNEL);
++	if (!sg) {
++		dev_err(dev, "Failed to allocate scatterlist\n");
++		ret = -ENOMEM;
++		goto err_free_pages;
++	}
++	sg_init_table(sg, segments);
++	par->sg = sg;
++
++	// Get pages for vmalloc buffer
++	for (i = 0; i < segments; i++) {
++		pages[i] = vmalloc_to_page(buf_addr + i * PAGE_SIZE);
++		if (!pages[i]) {
++			dev_err(dev, "Failed to get page for vmalloc buffer\n");
++			ret = -ENOMEM;
++			goto err_free_sg;
++		}
++		// Initialize and populate scatterlist
++		sg_set_page(&sg[i], pages[i], PAGE_SIZE, 0);
++	}
++
++	par->nents = dma_map_sg(dev, sg, segments, direction);
++	if (par->nents <= 0) {
++		dev_err(dev, "Failed to map scatterlist with vmalloc buffer\n");
++		ret = -EIO;
++		if (par->nents > 0) {
++			dma_unmap_sg(dev, sg, segments, direction);
++		}
++		goto err_free_sg;
++	}
++
++	dma_sync_sg_for_device(dev, sg, par->nents, direction);
++
++	return 0;
++
++err_free_sg:
++	kfree(par->sg);
++	par->sg = NULL;
++err_free_pages:
++	kfree(par->pages);
++	par->pages = NULL;
++	return ret;
++}
++
++static int efxfb_dma_init_vmalloc_sg_cyclic(struct efxfb_par *par)
++{
++	struct device *dev = &par->pdev->dev;
 +	struct dma_async_tx_descriptor *tx = NULL;
 +	dma_cookie_t cookie;
++	int ret;
++	unsigned int flags = DMA_CTRL_REUSE;
 +
 +	par->display_buf = vmalloc(par->fb_size);
 +	if (!par->display_buf) {
-+		dev_err(&pdev->dev, "Failed to allocate memory using vmalloc\n");
++		dev_err(dev, "Failed to allocate memory using vmalloc\n");
 +		return -ENOMEM;
 +	}
 +
-+	chan = dma_request_chan(&pdev->dev, "display");
-+	if (!chan) {
-+		dev_err(&pdev->dev, "Failed to request DMA channel for display\n");
-+		vfree(par->display_buf);
-+		return -ENODEV;
++	// Calculate number of pages
++	par->segments = DIV_ROUND_UP(par->fb_size, PAGE_SIZE);
++	ret = efxfb_init_scatterlist_vmalloc(par, par->display_buf, DMA_MEM_TO_DEV);
++	if (ret)
++		return ret;
++
++	par->chan = dma_request_chan(dev, "display");
++	if (!par->chan) {
++		dev_err(dev, "Failed to request DMA channel for display\n");
++		ret = PTR_ERR(par->chan);
++		goto err_unmap_sg;
 +	}
 +
-+	par->chan = chan;
-+
-+	tx = dmaengine_prep_dma_cyclic(chan, (dma_addr_t)par->display_buf,
-+				par->fb_size, PAGE_SIZE, DMA_MEM_TO_DEV, 0);
++	tx = dmaengine_prep_slave_sg(par->chan, par->sg, par->nents, DMA_MEM_TO_DEV, flags);
 +	if (!tx) {
-+		dev_err(&pdev->dev, "Failed to prepare DMA cyclic descriptor\n");
-+		goto err_prep_vmem;
++		dev_err(dev, "Failed to prepare DMA descriptor\n");
++		ret = -EIO;
++		goto err_release_chan;
 +	}
 +
 +	cookie = dmaengine_submit(tx);
 +	if (dma_submit_error(cookie)) {
-+                dev_err(&pdev->dev, "Failed to submit DMA transfer\n", __func__);
-+		goto err_prep_vmem;
++                dev_err(dev, "Failed to submit DMA transfer\n");
++		ret = -EIO;
++		goto err_release_chan;
 +        }
-+	dma_async_issue_pending(chan);
++	dma_async_issue_pending(par->chan);
 +
 +	return 0;
 +
-+err_prep_vmem:
-+	dma_release_channel(chan);
++err_release_chan:
++	dma_release_channel(par->chan);
++	par->chan = NULL;
++err_unmap_sg:
++	dma_unmap_sg(dev, par->sg, par->nents, DMA_MEM_TO_DEV);
++	kfree(par->sg);
++	par->sg = NULL;
++	kfree(par->pages);
++	par->pages = NULL;
 +	vfree(par->display_buf);
-+	return -EIO;
++	par->display_buf = NULL;
++	return ret;
 +}
 +
-+static int efxfb_dma_init_kmalloc_sg_cyclic(struct platform_device *pdev, struct efxfb_par *par)
++static int efxfb_dma_init_kmalloc_sg_cyclic(struct efxfb_par *par)
 +{
-+	struct device_node *np = pdev->dev.of_node;
++	struct device *dev = &par->pdev->dev;
 +	struct dma_chan *chan;
 +	struct dma_async_tx_descriptor *tx = NULL;
 +	dma_cookie_t cookie;
 +	int ret;
++	size_t period_len = par->params->stride;
++	unsigned long flags = 0;
 +
-+	par->display_buf = devm_kzalloc(&pdev->dev, par->fb_size, GFP_KERNEL);
-+        if (!par->display_buf) {
-+                dev_err(&pdev->dev, "Failed to request memory region\n");
-+                return -ENOMEM;
-+        }
-+
-+	par->dma_display_buff_io = dma_map_single(&pdev->dev,
-+				par->display_buf, par->fb_size, DMA_TO_DEVICE);
-+        ret = dma_mapping_error(&pdev->dev, par->dma_display_buff_io);
-+        if (ret) {
-+                dev_err(&pdev->dev, "DMA mapping error: %d\n", ret);
-+                return ret;
++	par->display_buf = dma_alloc_coherent(dev, par->fb_size,
++					      &par->dma_display_buff_io,
++					      GFP_KERNEL);
++	if (!par->display_buf) {
++		dev_err(dev, "Failed to request memory region\n");
++		return -ENOMEM;
 +	}
 +
-+	chan = dma_request_chan(&pdev->dev, "display");
-+	if (!chan) {
-+		dev_err(&pdev->dev, "Failed to request DMA channel\n");
-+		return -ENODEV;
++	chan = dma_request_chan(dev, "display");
++	if (IS_ERR(chan)) {
++		ret = PTR_ERR(chan);
++		dev_err(dev, "Failed to request DMA channel: %d\n", ret);
++		chan = NULL;
++		goto err_free_buf;
 +	}
 +
 +	par->chan = chan;
 +
-+	tx = dmaengine_prep_dma_cyclic(chan, par->dma_display_buff_io,
-+					par->fb_size, par->fb_size, DMA_MEM_TO_DEV, 0);
++	tx = dmaengine_prep_dma_cyclic(chan, par->dma_display_buff_io, par->fb_size,
++				       period_len, DMA_MEM_TO_DEV, flags);
 +	if (!tx) {
-+		dev_err(&pdev->dev, "Failed to prepare DMA transfer\n");
++		dev_err(dev, "Failed to prepare DMA transfer\n");
++		ret = -ENOMEM;
 +		goto err_prep;
 +	}
 +
 +	cookie = dmaengine_submit(tx);
 +	if (dma_submit_error(cookie)) {
-+                dev_err(&pdev->dev, "Failed to submit DMA transfer\n", __func__);
++		dev_err(dev, "Failed to submit DMA transfer\n");
++		ret = -EIO;
 +		goto err_prep;
-+        }
++	}
 +
-+	dev_info(&pdev->dev, "Start DMA transfer for framebuffer\n");
++	dev_info(dev, "Start DMA transfer for framebuffer\n");
 +	dma_async_issue_pending(chan);
 +
 +	return 0;
 +
 +err_prep:
-+	dma_release_channel(chan);
-+	dma_unmap_single(&pdev->dev, par->dma_display_buff_io,
-+			par->fb_size, DMA_TO_DEVICE);
-+	return -EIO;
++	dma_release_channel(par->chan);
++	par->chan = NULL;
++err_free_buf:
++	dma_free_coherent(dev, par->fb_size, par->display_buf, par->dma_display_buff_io);
++	par->display_buf = NULL;
++
++	return ret;
 +}
 +
 +static int efxfb_probe(struct platform_device *pdev)
@@ -373,6 +465,8 @@ index 000000000000..cec3555ddfb8
 +	if (!par)
 +		return -ENOMEM;
 +
++	par->pdev = pdev;
++	par->params = &params;
 +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 +	if (!res) {
 +		dev_err(&pdev->dev, "No memory resource\n");
@@ -388,22 +482,23 @@ index 000000000000..cec3555ddfb8
 +	par->fb_size = params.stride * params.height;
 +	if (!par->fb_size) {
 +		dev_err(&pdev->dev, "Framebuffer size should not be 0\n");
-+		return -EINVAL;
++		ret = -EINVAL;
++		goto error_fb_release;
 +	}
 +
 +	if (par->fb_size < EFX_MAX_FB_SIZE) {
 +		par->fb_transfer_mode = 1;
-+		ret = efxfb_dma_init_kmalloc_sg_cyclic(pdev, par);
++		ret = efxfb_dma_init_kmalloc_sg_cyclic(par);
 +		info->screen_buffer = par->display_buf;
 +		efxfb_ops.fb_mmap = NULL;
 +
 +	} else {
 +		par->fb_transfer_mode = 2;
-+		ret = efxfb_dma_init_vmalloc_sg_cyclic(pdev, par);
++		ret = efxfb_dma_init_vmalloc_sg_cyclic(par);
 +		info->screen_base = (char __iomem *)par->display_buf;
 +	}
 +
-+	if (ret)
++	if (ret < 0)
 +		goto error_fb_release;
 +
 +	platform_set_drvdata(pdev, info);
@@ -427,12 +522,6 @@ index 000000000000..cec3555ddfb8
 +	return 0;
 +
 +error_fb_release:
-+	dma_release_channel(par->chan);
-+	if (par->fb_transfer_mode == 1)
-+		dma_unmap_single(&pdev->dev, par->dma_display_buff_io, par->fb_size, DMA_TO_DEVICE);
-+	else if (par->fb_transfer_mode == 2)
-+		vfree(par->display_buf);
-+
 +	framebuffer_release(info);
 +	return ret;
 +}
@@ -443,13 +532,22 @@ index 000000000000..cec3555ddfb8
 +	struct efxfb_par *par = info->par;
 +	struct dma_chan *chan = par->chan;
 +
-+	if (chan)
++	if (chan) {
 +		dma_release_channel(chan);
++		chan = NULL;
++	}
 +
-+	if (par->fb_transfer_mode == 1)
-+		dma_unmap_single(&pdev->dev, par->dma_display_buff_io, par->fb_size, DMA_TO_DEVICE);
-+	else if (par->fb_transfer_mode == 2)
++	if (par->fb_transfer_mode == 1) {
++		dma_free_coherent(&pdev->dev, par->fb_size, par->display_buf, par->dma_display_buff_io);
++	} else if (par->fb_transfer_mode == 2) {
++		dma_unmap_sg(&pdev->dev, par->sg, par->nents, DMA_MEM_TO_DEV);
++		kfree(par->sg);
++		par->sg = NULL;
++		kfree(par->pages);
++		par->pages = NULL;
 +		vfree(par->display_buf);
++		par->display_buf = NULL;
++	}
 +
 +	unregister_framebuffer(info);
 +	framebuffer_release(info);
@@ -499,5 +597,5 @@ index 000000000000..cec3555ddfb8
 +MODULE_DESCRIPTION("Efinix framebuffer driver");
 +MODULE_LICENSE("GPL v2");
 -- 
-2.17.1
+2.43.0
 
