@@ -206,25 +206,43 @@ function check_soc_configuration()
 		sed -i '/SYSTEM_AXI_A_BMB/d' $SOC_H
 		pr_info "Append addresses for AXI interconnect"
 		if [[ $BOARD = "ti375c529" || $BOARD = "ti375n1156" ]]; then
-			grep -q SYSTEM_AXI_SLAVE $SOC_H || \
-			cat <<-EOF >> $SOC_H
-			#define SYSTEM_AXI_SLAVE_0_IO_CTRL 0xe8000000
-			#define SYSTEM_AXI_SLAVE_0_IO_CTRL_SIZE 0x1000000
-			#define SYSTEM_AXI_SLAVE_1_IO_CTRL 0xe9000000
-			#define SYSTEM_AXI_SLAVE_1_IO_CTRL_SIZE 0x10000
-			#define SYSTEM_AXI_SLAVE_2_IO_CTRL 0xe9100000
-			#define SYSTEM_AXI_SLAVE_2_IO_CTRL_SIZE 0x10000
-			#define SYSTEM_AXI_SLAVE_3_IO_CTRL 0xe9200000
-			#define SYSTEM_AXI_SLAVE_3_io_CTRL_SIZE 0x10000
-			#define SYSTEM_AXI_A_BMB 0xe8000000
-			#define SYSTEM_AXI_A_BMB_SIZE 0x1000000
-			#define SYSTEM_AXI_B_BMB 0xe9000000
-			#define SYSTEM_AXI_B_BMB_SIZE 0x10000
-			#define SYSTEM_AXI_C_BMB 0xe9100000
-			#define SYSTEM_AXI_C_BMB_SIZE 0x10000
-			#define SYSTEM_AXI_D_BMB 0xe9200000
-			#define SYSTEM_AXI_D_BMB_SIZE 0x10000
-EOF
+			if [[ $MACHINE_ARCH = 64 ]]; then
+				grep -q SYSTEM_AXI_SLAVE $SOC_H || \
+				cat <<-EOF >> $SOC_H
+				#define SYSTEM_AXI_SLAVE_0_IO_CTRL 0xe8000000
+				#define SYSTEM_AXI_SLAVE_0_IO_CTRL_SIZE 0x800000
+				#define SYSTEM_AXI_SLAVE_1_IO_CTRL 0xe8800000
+				#define SYSTEM_AXI_SLAVE_1_IO_CTRL_SIZE 0x10000
+				#define SYSTEM_AXI_SLAVE_2_IO_CTRL 0xe8810000
+				#define SYSTEM_AXI_SLAVE_2_IO_CTRL_SIZE 0x10000
+				#define SYSTEM_AXI_A_BMB 0xe8000000
+				#define SYSTEM_AXI_A_BMB_SIZE 0x800000
+				#define SYSTEM_AXI_B_BMB 0xe8800000
+				#define SYSTEM_AXI_B_BMB_SIZE 0x10000
+				#define SYSTEM_AXI_C_BMB 0xe8810000
+				#define SYSTEM_AXI_C_BMB_SIZE 0x10000
+				EOF
+			else
+				grep -q SYSTEM_AXI_SLAVE $SOC_H || \
+				cat <<-EOF >> $SOC_H
+				#define SYSTEM_AXI_SLAVE_0_IO_CTRL 0xe8000000
+				#define SYSTEM_AXI_SLAVE_0_IO_CTRL_SIZE 0x1000000
+				#define SYSTEM_AXI_SLAVE_1_IO_CTRL 0xe9000000
+				#define SYSTEM_AXI_SLAVE_1_IO_CTRL_SIZE 0x10000
+				#define SYSTEM_AXI_SLAVE_2_IO_CTRL 0xe9100000
+				#define SYSTEM_AXI_SLAVE_2_IO_CTRL_SIZE 0x10000
+				#define SYSTEM_AXI_SLAVE_3_IO_CTRL 0xe9200000
+				#define SYSTEM_AXI_SLAVE_3_io_CTRL_SIZE 0x10000
+				#define SYSTEM_AXI_A_BMB 0xe8000000
+				#define SYSTEM_AXI_A_BMB_SIZE 0x1000000
+				#define SYSTEM_AXI_B_BMB 0xe9000000
+				#define SYSTEM_AXI_B_BMB_SIZE 0x10000
+				#define SYSTEM_AXI_C_BMB 0xe9100000
+				#define SYSTEM_AXI_C_BMB_SIZE 0x10000
+				#define SYSTEM_AXI_D_BMB 0xe9200000
+				#define SYSTEM_AXI_D_BMB_SIZE 0x10000
+				EOF
+			fi
 		elif [ $BOARD = "ti180j484" ]; then
 			grep -q SYSTEM_AXI_SLAVE $SOC_H || \
 			cat <<-EOF >> $SOC_H
@@ -294,11 +312,11 @@ function generate_device_tree() {
 
 	# Set override config paths
 	if [ "$UNIFIED_HW" ]; then
-		override_linux_dt="$linux_dt_config/unified_hw"
-		override_uboot_dt="$uboot_dt_config/unified_hw"
+		override_linux_dt="$linux_dt_config/$MACHINE_ARCH/unified_hw"
+		override_uboot_dt="$uboot_dt_config/$MACHINE_ARCH/unified_hw"
 	elif [ "$EXAMPLE_DESIGN" ]; then
-		override_linux_dt="$linux_dt_config/example_design"
-		override_uboot_dt="$uboot_dt_config/example_design"
+		override_linux_dt="$linux_dt_config/$MACHINE_ARCH/example_design"
+		override_uboot_dt="$uboot_dt_config/$MACHINE_ARCH/example_design"
 	fi
 
 	# Parse extra hardware features
