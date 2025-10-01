@@ -1,17 +1,17 @@
-From e7bb9c23042f7a5dca78ae14e570b3dc8ebe365c Mon Sep 17 00:00:00 2001
+From 8278d2e2509dde7df0fb5f5f356f5ecca03f35c7 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Thu, 13 Feb 2025 16:41:50 +0800
-Subject: [PATCH 2/2] dma: add Efinix DMA controller driver
+Subject: [PATCH] dma: add Efinix DMA controller driver
 
 ---
  drivers/dma/Kconfig   |   7 +
  drivers/dma/Makefile  |   1 +
- drivers/dma/efx_dma.c | 869 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 877 insertions(+)
+ drivers/dma/efx_dma.c | 889 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 897 insertions(+)
  create mode 100644 drivers/dma/efx_dma.c
 
 diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index 90284ffda58a..af471ee70861 100644
+index 033a48ce8952..63bad704adb6 100644
 --- a/drivers/dma/Kconfig
 +++ b/drivers/dma/Kconfig
 @@ -186,6 +186,13 @@ config DW_AXI_DMAC
@@ -29,7 +29,7 @@ index 90284ffda58a..af471ee70861 100644
  	bool "Cirrus Logic EP93xx DMA support"
  	depends on ARCH_EP93XX || COMPILE_TEST
 diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index 948a8da05f8b..79181a9938fe 100644
+index 4477fec3f6af..1d9c1dbe5279 100644
 --- a/drivers/dma/Makefile
 +++ b/drivers/dma/Makefile
 @@ -29,6 +29,7 @@ obj-$(CONFIG_DMA_SUN6I) += sun6i-dma.o
@@ -42,10 +42,10 @@ index 948a8da05f8b..79181a9938fe 100644
  obj-$(CONFIG_FSL_EDMA) += fsl-edma.o fsl-edma-common.o
 diff --git a/drivers/dma/efx_dma.c b/drivers/dma/efx_dma.c
 new file mode 100644
-index 000000000000..64d3a42885d7
+index 000000000000..06d56714faf6
 --- /dev/null
 +++ b/drivers/dma/efx_dma.c
-@@ -0,0 +1,869 @@
+@@ -0,0 +1,889 @@
 +#include <linux/platform_device.h>
 +#include <linux/module.h>
 +#include <linux/interrupt.h>
@@ -131,8 +131,6 @@ index 000000000000..64d3a42885d7
 +	size_t segments; // Number of DMA descriptor
 +	bool cyclic; // True for cyclic transfer
 +	enum dma_transfer_direction direction;
-+	dma_addr_t src_addr;
-+	dma_addr_t dst_addr;
 +	struct scatterlist *sg;
 +        struct page **pages;
 +};
@@ -434,7 +432,7 @@ index 000000000000..64d3a42885d7
 +}
 +
 +static void efx_dma_hw_desc_address_control(struct efx_dma_chan *dchan,
-+			struct efx_dma_desc *desc, dma_addr_t buf_addr,
++			struct efx_dma_desc *desc, dma_addr_t src_addr, dma_addr_t dst_addr,
 +			size_t period_len, struct scatterlist *sg, size_t i)
 +{
 +	struct efx_dma_hw_desc *hw_desc = desc->hw_desc;
@@ -449,7 +447,7 @@ index 000000000000..64d3a42885d7
 +		segment_addr = sg_dma_address(sg);
 +	} else {
 +		buf_len = period_len - 1;
-+		segment_addr = buf_addr + i * period_len;
++		segment_addr = src_addr + i * period_len;
 +	}
 +
 +	hw_desc->control = (u32)(control | buf_len);
@@ -470,12 +468,12 @@ index 000000000000..64d3a42885d7
 +		hw_desc->src_addr = segment_addr;
 +		hw_desc->dst_addr = 0;
 +	} else if (desc->direction == DMA_MEM_TO_MEM) {
-+		hw_desc->src_addr = segment_addr;
-+		hw_desc->dst_addr = segment_addr + period_len;
++		hw_desc->src_addr = src_addr + i * period_len;
++		hw_desc->dst_addr = dst_addr + i * period_len;
 +	}
 +}
 +
-+static int efx_dma_hw_desc_init(struct dma_chan *chan, dma_addr_t buf_addr,
++static int efx_dma_hw_desc_init(struct dma_chan *chan, dma_addr_t src_addr, dma_addr_t dst_addr,
 +				   struct scatterlist *sg, size_t len, size_t period_len,
 +				   enum dma_transfer_direction direction, bool cyclic)
 +{
@@ -494,7 +492,7 @@ index 000000000000..64d3a42885d7
 +                if (!desc) {
 +                        ret = -ENOMEM;
 +                        dev_err(dev, "Failed to allocate memory for descriptor\n");
-+                        goto err_free_desc_init_v5;
++                        goto err_free_desc_init;
 +                }
 +
 +                desc->cyclic = cyclic;
@@ -509,7 +507,7 @@ index 000000000000..64d3a42885d7
 +                    dev_err(dev, "Failed to allocate memory for hw descriptor\n");
 +                        kfree(desc);
 +                        ret = -ENOMEM;
-+                        goto err_free_desc_init_v5;
++                        goto err_free_desc_init;
 +                }
 +                desc->hw_desc = hw_desc;
 +
@@ -520,7 +518,7 @@ index 000000000000..64d3a42885d7
 +		// Set the scatterlist pointer for sg mode. For cylic, sgl is NULL
 +		sgl = sg ? &sg[i] : NULL;
 +		// Configure the hw descriptor addresses and control
-+		efx_dma_hw_desc_address_control(dchan, desc, buf_addr, period_len, sgl, i);
++		efx_dma_hw_desc_address_control(dchan, desc, src_addr, dst_addr, period_len, sgl, i);
 +
 +                // Chain descriptor
 +                if (prev_desc)
@@ -538,7 +536,7 @@ index 000000000000..64d3a42885d7
 +	efx_dma_dump_pending_list(chan);
 +        return 0;
 +
-+err_free_desc_init_v5:
++err_free_desc_init:
 +        efx_dma_free_hw_desc_chain(chan);
 +        return ret;
 +
@@ -570,7 +568,7 @@ index 000000000000..64d3a42885d7
 +	}
 +
 +	// Initialize hardware descriptor. Set cyclic to false
-+	ret = efx_dma_hw_desc_init(chan, 0, sg, sg_len, 0, direction, cyclic);
++	ret = efx_dma_hw_desc_init(chan, 0, 0, sg, sg_len, 0, direction, cyclic);
 +	if (ret) {
 +		dev_err(dev, "Failed to initialize hardware descriptor\n");
 +		return NULL;
@@ -606,7 +604,7 @@ index 000000000000..64d3a42885d7
 +	if (unlikely(!chan || !buf_addr || buf_len == 0 || period_len > buf_len))
 +		return NULL;
 +
-+	ret = efx_dma_hw_desc_init(chan, buf_addr, NULL, segments, period_len, direction, true);
++	ret = efx_dma_hw_desc_init(chan, buf_addr, 0, NULL, segments, period_len, direction, true);
 +	if (ret)
 +		return NULL;
 +
@@ -626,14 +624,36 @@ index 000000000000..64d3a42885d7
 +				unsigned long flags)
 +{
 +	struct efx_dma_chan *dchan = to_efx_dma_chan(chan);
-+	struct efx_dma_desc *desc;
++	struct efx_dma_desc *desc = NULL;
++	struct device *dev = dchan->priv->dev;
 +	size_t segments;
 +	int ret;
 +
-+	pr_info("%s\n", __func__);
 +	// Validate input
 +	if (unlikely(!chan || !dst_addr || !src_addr || !len))
 +		return NULL;
++
++	if (len < PAGE_SIZE)
++		segments = 1;
++	else
++		segments = (len / PAGE_SIZE);
++
++	// Increase segments by 1 to include the last status of the descriptor
++	segments += 1;
++
++	ret = efx_dma_hw_desc_init(chan, src_addr, dst_addr, NULL, len, segments, DMA_MEM_TO_MEM, false);
++	if (ret) {
++		return NULL;
++	}
++
++	// Get head descriptor
++	desc = dchan->head_desc;
++	if (!desc) {
++		dev_err(dev, "No head descriptor found\n");
++		return NULL;
++	}
++
++	dchan->vchan.cyclic = &desc->vdesc;
 +
 +	return vchan_tx_prep(&dchan->vchan, &desc->vdesc, flags);
 +}
