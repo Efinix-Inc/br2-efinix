@@ -1,0 +1,57 @@
+From 358aee9519a4b5e9d06e91936f740aa83ff461c1 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Wed, 12 Jan 2022 09:24:55 +0800
+Subject: [PATCH 4/5] drivers: update API of vexriscv serial driver
+
+Some API have been rename. Update the driver as well.
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/serial/serial_riscv_sbi.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/serial/serial_riscv_sbi.c b/drivers/serial/serial_riscv_sbi.c
+index acfd88ca0c..dab734bebc 100644
+--- a/drivers/serial/serial_riscv_sbi.c
++++ b/drivers/serial/serial_riscv_sbi.c
+@@ -46,7 +46,7 @@ static int riscv_sbi_getc(struct udevice *dev)
+ {
+ 	struct riscv_sbi_uart_platdata *platdata;
+ 
+-  platdata = dev_get_platdata(dev);
++  platdata = dev_get_plat(dev);
+   if (platdata->getc_buffer == -1) platdata->getc_buffer = sbi_console_getchar();
+   if (platdata->getc_buffer == -1)
+     return -EAGAIN;
+@@ -65,7 +65,7 @@ static int riscv_sbi_putc(struct udevice *dev, const char ch)
+ static int riscv_sbi_pending(struct udevice *dev, bool input)
+ {
+   struct riscv_sbi_uart_platdata *platdata;
+-  platdata = dev_get_platdata(dev);
++  platdata = dev_get_plat(dev);
+ 
+   if(platdata->getc_buffer == -1) platdata->getc_buffer = sbi_console_getchar();
+   return platdata->getc_buffer != -1 ? 1 : 0;
+@@ -114,7 +114,7 @@ static int riscv_sbi_probe(struct udevice *dev)
+ {
+   struct riscv_sbi_uart_platdata *platdata;
+ 
+-  platdata = dev_get_platdata(dev);
++  platdata = dev_get_plat(dev);
+   platdata->getc_buffer = -1;
+ 
+   debug("!!!%s:%d\n",__func__,__LINE__);
+@@ -150,8 +150,8 @@ U_BOOT_DRIVER(riscv_sbi_serial) = {
+ 	.id	= UCLASS_SERIAL,
+ #if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+ 	.of_match = riscv_sbi_of_match,
+-	.ofdata_to_platdata = riscv_sbi_ofdata_to_platdata,
+-	.platdata_auto_alloc_size = sizeof(struct riscv_sbi_uart_platdata),
++	.of_to_plat = riscv_sbi_ofdata_to_platdata,
++	.plat_auto = sizeof(struct riscv_sbi_uart_platdata),
+ #endif
+ 	.bind = riscv_sbi_bind,
+ 	.probe = riscv_sbi_probe,
+-- 
+2.17.1
+

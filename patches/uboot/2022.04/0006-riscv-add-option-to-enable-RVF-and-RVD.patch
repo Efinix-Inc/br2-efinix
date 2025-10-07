@@ -1,0 +1,68 @@
+From 15a1d0189f2d7ecacda2fc88afdd96a281cf1188 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Tue, 24 Jun 2025 09:49:22 +0800
+Subject: [PATCH] riscv: add option to enable RVF and RVD
+
+GCC 12.3.0 require to explicitly defined RISC-V zifencei and zicsr extension
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ arch/riscv/Kconfig  | 12 ++++++++++++
+ arch/riscv/Makefile | 11 ++++++++++-
+ 2 files changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/arch/riscv/Kconfig b/arch/riscv/Kconfig
+index 674e5089072..2b67a438846 100644
+--- a/arch/riscv/Kconfig
++++ b/arch/riscv/Kconfig
+@@ -158,6 +158,18 @@ config RISCV_ISA_C
+ config RISCV_ISA_A
+ 	def_bool y
+ 
++config RISCV_ISA_F
++	bool "Emit floating-point instructions"
++	default n
++	help
++	  Add "f" to the ISA subsets.
++
++config RISCV_ISA_D
++	bool "Emit double floating-point instruction"
++	default n
++	help
++	  Add "d" to the ISA subsets.
++
+ config 32BIT
+ 	bool
+ 
+diff --git a/arch/riscv/Makefile b/arch/riscv/Makefile
+index 0b80eb8d864..260ac7fc42b 100644
+--- a/arch/riscv/Makefile
++++ b/arch/riscv/Makefile
+@@ -17,6 +17,14 @@ endif
+ ifeq ($(CONFIG_RISCV_ISA_C),y)
+ 	ARCH_C = c
+ endif
++ifeq ($(CONFIG_RISCV_ISA_F),y)
++	ARCH_F = f
++	ABI = ilp32f
++ifeq ($(CONFIG_RISCV_ISA_D),y)
++        ARCH_D = d
++        ABI = ilp32d
++endif
++endif
+ ifeq ($(CONFIG_CMODEL_MEDLOW),y)
+ 	CMODEL = medlow
+ endif
+@@ -24,7 +32,8 @@ ifeq ($(CONFIG_CMODEL_MEDANY),y)
+ 	CMODEL = medany
+ endif
+ 
+-ARCH_FLAGS = -march=$(ARCH_BASE)$(ARCH_A)$(ARCH_C) -mabi=$(ABI) \
++ARCH_ZI = _zifencei_zicsr
++ARCH_FLAGS = -march=$(ARCH_BASE)$(ARCH_A)$(ARCH_F)$(ARCH_D)$(ARCH_C)$(ARCH_ZI) -mabi=$(ABI) \
+ 	     -mcmodel=$(CMODEL)
+ 
+ PLATFORM_CPPFLAGS	+= $(ARCH_FLAGS)
+-- 
+2.43.0
+

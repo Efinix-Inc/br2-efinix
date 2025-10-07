@@ -1,0 +1,461 @@
+From 4570681012d91f0193e081bcbc9e4f106f363cd3 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Sun, 5 May 2024 23:12:36 +0800
+Subject: [PATCH 1/3] driver/mmc: clean up the efx_sdhost.c code
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/mmc/efx_sdhost.c | 148 ++-------------------------------------
+ 1 file changed, 4 insertions(+), 144 deletions(-)
+
+diff --git a/drivers/mmc/efx_sdhost.c b/drivers/mmc/efx_sdhost.c
+index da6b0e86dc..3e167b1962 100644
+--- a/drivers/mmc/efx_sdhost.c
++++ b/drivers/mmc/efx_sdhost.c
+@@ -115,27 +115,11 @@ static void efx_sdhost_set_clock(struct efx_sd_host *host, unsigned int clock)
+         // enable clock
+         int div = 0;
+         int real_div = div;
+-        int actual_clock;
+         u32 val;
+ 
+-	printf("%s\n\r", __func__);
+-        printf("%s: clock = %d Hz\n\r", __func__, clock);
+-        printf("%s: host->max_clk = %d Hz\n\r", __func__, host->max_clk);
+-        printf("%s: host->clock = %d Hz\n\r", __func__, host->clock);
+-	printf("%s: host->ioaddr = 0x%x\n\r", __func__, host->ioaddr);
+-
+-	val = readl(host->ioaddr + 0x0);
+-	printf("%s: [0x0] = %d\n\r", __func__, val);
+-
+-	val = readl(host->ioaddr + EFX_SDHCI_BASE_REG_0);
+-	printf("%s: [0x4] = 0x%x\n\r", __func__, val);
+-
+         writel(0, host->ioaddr + EFX_SDHCI_BASE_REG_0);
+ 
+         if (clock == 0) {
+-                //writel(0, host->ioaddr + EFX_SDHCI_BASE_REG_0);
+-                val = readl(host->ioaddr + EFX_SDHCI_BASE_REG_0);
+-                printf("%s: return base reg 0 = 0x%x\n\r", __func__, val);
+                 return;
+         }
+ 
+@@ -145,18 +129,8 @@ static void efx_sdhost_set_clock(struct efx_sd_host *host, unsigned int clock)
+         }
+         real_div = div;
+ 
+-        printf("%s: read_div = %d\n\r", __func__, real_div);
+-
+-        if (real_div) {
+-                actual_clock = host->max_clk / real_div;
+-                //host->mmc->actual_clock = actual_clock;
+-                printf("%s: actual_clock = %d\n\r", __func__, actual_clock);
+-        }
+-
+         writel((EFX_CLK_EN | real_div), host->ioaddr + EFX_SDHCI_BASE_REG_0);
+         udelay(10);
+-        val = readl(host->ioaddr + EFX_SDHCI_BASE_REG_0);
+-        printf("%s: base reg 0 = 0x%x\n\r", __func__, val);
+ }
+ 
+ static u32 efx_sdhost_wait_sdcmd_complete(struct efx_sd_host *host)
+@@ -165,20 +139,17 @@ static u32 efx_sdhost_wait_sdcmd_complete(struct efx_sd_host *host)
+ 	int ret;
+ 	int timeout_us = SDHST_TIMEOUT_MAX_USEC;
+ 
+-	printf("%s:\n\r", __func__);
+ 	ret = readl_poll_timeout(host->ioaddr + EFX_SDHCI_NORMAL_INT,
+ 				 value,
+ 				 (value & 0x1),
+ 				 timeout_us);
+ 
+ 	if (ret == -ETIMEDOUT) {
+-		printf("%s: timeout (%d us)\n", __func__, timeout_us);
+ 		return -ETIMEDOUT;
+ 	}
+ 
+ 	// clear interrupt
+ 	writel(0x1, host->ioaddr + EFX_SDHCI_NORMAL_INT);
+-	printf("%s: clear pending interrupt [0x130] = 0x1\n\r", __func__);
+ 
+ 	return value;
+ }
+@@ -189,30 +160,17 @@ static u32 efx_sdhost_wait_data(struct efx_sd_host *host)
+ 	int ret;
+ 	int timeout_us = SDHST_TIMEOUT_MAX_USEC;
+ 
+-	printf("%s:\n\r", __func__);
+-
+-	value = readl(host->ioaddr + 0x124);
+-	printf("%s: [0x124] = 0x%x\n\r", __func__, value);
+-
+-	value = readl(host->ioaddr + 0x130);
+-	printf("%s: [0x130] = 0x%x\n\r", __func__, value);
+-
+ 	ret = readl_poll_timeout(host->ioaddr + EFX_SDHCI_NORMAL_INT,
+ 				value,
+ 				(value & EFX_SDHCI_INT_DATA_MASK),
+-				// EFX_SDHCI_INT_SPACE_AVAIL | EFX_SDHCI_INT_DATA_AVAIL
+-				//((value & EFX_SDHCI_INT_SPACE_AVAIL) || (value & EFX_SDHCI_INT_DATA_AVAIL)),
+ 				timeout_us);
+ 
+ 	if (ret == -ETIMEDOUT) {
+-		printf("%s: timeout (%d us). value = 0x%x\n", __func__, timeout_us, value);
+ 		return -ETIMEDOUT;
+ 	}
+ 
+ 	// clear interrupt
+ 	writel(value, host->ioaddr + EFX_SDHCI_NORMAL_INT);
+-	printf("%s: clear pending interrupt [0x130] = 0x%x\n\r", __func__, value);
+-
+ 
+ 	return value;
+ }
+@@ -223,20 +181,18 @@ static u32 efx_sdhost_wait_transfer_complete(struct efx_sd_host *host)
+ 	int ret;
+ 	int timeout_us = SDHST_TIMEOUT_MAX_USEC;
+ 
+-	printf("%s:\n\r", __func__);
+ 	ret = readl_poll_timeout(host->ioaddr + EFX_SDHCI_NORMAL_INT,
+ 				 value,
+ 				 (value & 0x2),
+ 				 timeout_us);
+ 
+ 	if (ret == -ETIMEDOUT) {
+-		printf("%s: timeout (%d us)\n", __func__, timeout_us);
+ 		return -ETIMEDOUT;
+ 	}
+ 
+ 	// clear interrupt
+ 	writel(0x2, host->ioaddr + EFX_SDHCI_NORMAL_INT);
+-	printf("%s: clear pending interrupt [0x130] = 0x2\n\r", __func__);
++
+ 	return value;
+ }
+ 
+@@ -250,32 +206,17 @@ static void efx_sdhost_read_block_pio(struct efx_sd_host *host)
+ 
+ 	blksize = host->data->blocksize;
+ 
+-	/*
+-	switch (host->cmd->cmdidx) {
+-	case 17:
+-	case 18:
+-	case 24:
+-	case 25:
+-		blksize = 512;
+-		break;
+-	}
+-	*/
+-
+ 	blks = host->data->blocks;
+ 
+-	printf("%s: blksize = %d, blks = %d\n\r", __func__, blksize, blks);
+-
+ 	while (blks--) {
+ 		while (readl(host->ioaddr + EFX_SDHCI_PRESENT) & EFX_SDHCI_DATA_AVAILABLE)
+ 			break;
+ 
+ 		for (int i = 0; i < (blksize / 4); i++) {
+ 			value = readl(host->ioaddr + 0x120);
+-			//printf("%s: [buf=0x%x] [0x120] = 0x%x\n\r", __func__, buf, value);
+ 
+ 			/* ACMD51 is a special case */
+ 			if (host->cmd->cmdidx == 51) {
+-				printf("%s: CMD%d\n\r", __func__, host->cmd->cmdidx);
+ 				value = __be32_to_cpu(value);
+ 			}
+ 			memcpy(buf, &value, sizeof(value));
+@@ -286,7 +227,6 @@ static void efx_sdhost_read_block_pio(struct efx_sd_host *host)
+ 
+ static void efx_sdhost_write_block_pio(struct efx_sd_host *host)
+ {
+-	printf("%s:\n\r", __func__);
+ }
+ 
+ static void efx_sdhost_transfer_pio(struct efx_sd_host *host)
+@@ -294,25 +234,17 @@ static void efx_sdhost_transfer_pio(struct efx_sd_host *host)
+ 	u32 mask;
+ 	u32 status;
+ 
+-	//printf("%s: host->blocks = %d, host->data->flags = 0x%x\n\r", __func__, host->blocks, host->data->flags);
+-	printf("%s: host->blocks = %d\n\r", __func__, host->blocks);
+-
+ 	if (host->data->flags & MMC_DATA_READ) {
+ 		mask = EFX_SDHCI_DATA_AVAILABLE;
+-		printf("%s: EFX_SDHCI_DATA_AVAILABLE\n\r", __func__);
+ 	}
+ 	else {
+ 		mask = EFX_SDHCI_SPACE_AVAILABLE;
+-		printf("%s: EFX_SDHCI_SPACE_AVAILABLE\n\r", __func__);
+ 	}
+ 
+ 	status = readl(host->ioaddr + 0x124);
+-	printf("%s: [0x124] = 0x%x\n\r", __func__, status);
+ 
+ 	while (readl(host->ioaddr + EFX_SDHCI_PRESENT) & mask) {
+-		printf("%s: host->blocks = %d\n\r", __func__, host->blocks);
+ 		status = readl(host->ioaddr + EFX_SDHCI_PRESENT);
+-		printf("%s: [0x124] = 0x%x\n\r", __func__, status);
+ 
+ 		if (host->data->flags & MMC_DATA_READ)
+ 			efx_sdhost_read_block_pio(host);
+@@ -326,11 +258,9 @@ static void efx_sdhost_transfer_pio(struct efx_sd_host *host)
+ 	}
+ 
+ 	status = readl(host->ioaddr + 0x130);
+-	printf("%s: 0x130 = 0x%x\n\r", __func__, status);
+ 
+ 	efx_sdhost_wait_transfer_complete(host);
+ 
+-	printf("%s: PIO transfer complete\n\r", __func__);
+ }
+ 
+ static void efx_sdhost_prepare_data(struct efx_sd_host *host, struct mmc_cmd *cmd,
+@@ -338,9 +268,6 @@ static void efx_sdhost_prepare_data(struct efx_sd_host *host, struct mmc_cmd *cm
+ {
+ 	u32 blks;
+ 
+-	printf("%s:\n\r", __func__);
+-	WARN_ON(host->data);
+-
+ 	host->data = data;
+ 	if (!data)
+ 		return;
+@@ -348,7 +275,6 @@ static void efx_sdhost_prepare_data(struct efx_sd_host *host, struct mmc_cmd *cm
+ 	/* Use PIO transfer */
+ 	host->blocks = data->blocks;
+ 	blks = (data->blocks << 16) | data->blocksize;
+-	printf("%s: [0x%x] = blks = 0x%x\n\r", __func__, host->ioaddr + EFX_SDHCI_BLOCKS, blks);
+ 
+ 	writel(blks, host->ioaddr + EFX_SDHCI_BLOCKS);
+ }
+@@ -359,14 +285,15 @@ static u32 efx_sdhost_read_wait_sdcmd(struct efx_sd_host *host)
+ 	int ret;
+ 	int timeout_us = SDHST_TIMEOUT_MAX_USEC;
+ 
+-	printf("%s:\n\r", __func__);
+ 	ret = readl_poll_timeout(host->ioaddr + 0x8,
+ 				value,
+ 				!(value & 0x1),
+ 				timeout_us);
+ 
+-	if (ret == -ETIMEDOUT)
++	if (ret == -ETIMEDOUT) {
+ 		printf("%s: timeout (%d us)\n", __func__, timeout_us);
++		return ret;
++	}
+ 
+ 	return value;
+ }
+@@ -381,11 +308,6 @@ static int efx_sdhost_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
+ 	u16 mode;
+ 	u32 status;
+ 
+-	printf("%s\n\r", __func__);
+-	printf("%s: cmdidx = CMD%d, data = 0x%x\n\r", __func__, cmd->cmdidx, data);
+-
+-	WARN_ON(host->cmd);
+-
+ 	if ((cmd->resp_type & MMC_RSP_136) && (cmd->resp_type & MMC_RSP_BUSY)) {
+ 		printf("Unsupported response type!\n");
+ 		return -EINVAL;
+@@ -399,45 +321,27 @@ static int efx_sdhost_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
+ 
+ 	host->cmd = cmd;
+ 
+-	status = readl(host->ioaddr + 0x124);
+-	printf("%s: [0x124] = 0x%x\n\r", __func__, status);
+-
+-	status = readl(host->ioaddr + 0x130);
+-	printf("%s: [0x130] = 0x%x\n\r", __func__, status);
+-
+ 	writel(0xff0073, host->ioaddr + 0x134);
+-	status = readl(host->ioaddr + 0x134);
+-	printf("%s: [0x134] = 0x%x\n", __func__, status);
+-
+ 	writel(0xff0073, host->ioaddr + 0x138);
+-	status = readl(host->ioaddr + 0x138);
+-	printf("%s: [0x138] = 0x%x\n", __func__, status);
+ 
+ 	efx_sdhost_prepare_data(host, cmd, data);
+ 
+-	printf("%s: [0x%x] = cmd->cmdarg = 0x%x\n\r", __func__, host->ioaddr + EFX_SDHCI_ARG1, cmd->cmdarg);
+ 	writel(cmd->cmdarg, host->ioaddr + EFX_SDHCI_ARG1);
+ 
+-	//sdcmd = cmd->cmdidx & 0x3f;
+-
+ 	host->use_busy = false;
+ 	/* configure command register */
+ 	if (!(cmd->resp_type & MMC_RSP_PRESENT)) {
+ 		flags |= EFX_SDHCI_CMD_RESP_NONE;
+-		printf("%s: flags = 0x%x\n\r", __func__, flags);
+ 	} else {
+ 		if (cmd->resp_type & MMC_RSP_136) {
+ 			flags |= EFX_SDHCI_CMD_RESP_LONG;
+-			printf("%s: flags = 0x%x\n\r", __func__, flags);
+ 		}
+ 		else if (cmd->resp_type & MMC_RSP_BUSY) {
+ 			flags |= EFX_SDHCI_CMD_RESP_SHORT_BUSY;
+ 			host->use_busy = true;
+-			printf("%s: flags = 0x%x\n\r", __func__, flags);
+ 		}
+ 		else {
+ 			flags |= EFX_SDHCI_CMD_RESP_SHORT;
+-			printf("%s: flags = 0x%x\n\r", __func__, flags);
+ 		}
+ 	}
+ 
+@@ -450,7 +354,6 @@ static int efx_sdhost_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
+ 	case MMC_CMD_WRITE_MULTIPLE_BLOCK:
+ 	case SD_CMD_APP_SD_STATUS:
+ 		flags |= EFX_SDHCI_CMD_DATA;
+-		printf("%s: flags = 0x%x\n\r", __func__, flags);
+ 		break;
+ 	}
+ 
+@@ -471,33 +374,17 @@ static int efx_sdhost_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
+ 	} else {
+ 		/* clear Auto CMD settings for no data CMDs */
+ 		value = readl(host->ioaddr + 0x10c) & 0xffff;
+-		printf("%s: readl[0x%x] = 0x%x\n\r", __func__, host->ioaddr + 0x10c, value);
+ 		mode |= value & ~(EFX_SDHCI_TRNS_AUTO_CMD12 | EFX_SDHCI_TRNS_AUTO_CMD23);
+-		printf("%s: mode = 0x%x\n\r", __func__, mode);
+ 	}
+ 
+-	printf("%s: cmd->cmdidx = 0x%x, flags = 0x%x, mode = 0x%x\n\r",
+-			__func__, cmd->cmdidx, flags, mode);
+-
+-	status = readl(host->ioaddr + 0x124);
+-	printf("%s: 0x124 = 0x%x\n\r", __func__, status);
+-
+ 	sdcmd = (EFX_SDHCI_MAKE_CMD(cmd->cmdidx, flags) << 16) | mode;
+-	printf("%s: MAKE_CMD = 0x%x\n\r", __func__, sdcmd);
+ 
+ 	sdcmd = ((cmd->cmdidx & 0x3f) << 24) | (flags << 16) | mode;
+ 
+-	printf("%s: [0x%x] = sdcmd = 0x%x\n\r", __func__, host->ioaddr + EFX_SDHCI_TRANS_CMD, sdcmd);
+ 	writel(sdcmd, host->ioaddr + EFX_SDHCI_TRANS_CMD);
+ 
+ 	efx_sdhost_wait_sdcmd_complete(host);
+ 
+-	status = readl(host->ioaddr + 0x130);
+-	printf("%s: [0x130] = 0x%x\n\r", __func__, status);
+-
+-	status = readl(host->ioaddr + 0x124);
+-	printf("%s: 0x124 = 0x%x\n\r", __func__, status);
+-
+ 	if (cmd->resp_type & MMC_RSP_PRESENT) {
+ 		if (cmd->resp_type & MMC_RSP_136) {
+ 			cmd->response[0] = readl(host->ioaddr + EFX_SDHCI_RSP0);
+@@ -511,18 +398,9 @@ static int efx_sdhost_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
+ 
+ 	if (data) {
+ 		efx_sdhost_wait_data(host);
+-		status = readl(host->ioaddr + 0x130);
+-		printf("%s: [0x130] = 0x%x\n\r", __func__, status);
+-
+ 		efx_sdhost_transfer_pio(host);
+ 	}
+ 
+-	status = readl(host->ioaddr + 0x124);
+-	printf("%s: [0x124] = 0x%x\n\r", __func__, status);
+-
+-	status = readl(host->ioaddr + 0x130);
+-	printf("%s: [0x130] = 0x%x\n\n\r", __func__, status);
+-
+ 	return 0;
+ }
+ 
+@@ -531,10 +409,6 @@ static int efx_sdhost_set_ios(struct udevice *dev)
+ 	struct efx_sd_host *host = dev_get_priv(dev);
+ 	struct mmc *mmc = mmc_get_mmc_dev(dev);
+ 
+-	printf("%s: mmc->bus_width = %d\n\r", __func__, mmc->bus_width);
+-	printf("%s: mmc->clock = %d\n\r", __func__, mmc->clock);
+-	printf("%s: host->clock = %d\n\r", __func__, host->clock);
+-
+ 	if (!mmc->clock || mmc->clock != host->clock) {
+ 		efx_sdhost_set_clock(host, mmc->clock);
+ 		host->clock = mmc->clock;	
+@@ -546,8 +420,6 @@ static int efx_sdhost_set_ios(struct udevice *dev)
+ 	else
+ 		host->hcfg &= ~SDHCI_4_BITS;
+ 
+-	printf("%s: host->ioaddr = 0x%x, host->hcfg = 0x%x\n\r", __func__, host->ioaddr, host->hcfg);
+-
+ 	writel(host->hcfg, host->ioaddr + EFX_SDHCI_HOST_CTRL);
+ 
+ 	return 0;
+@@ -558,14 +430,12 @@ static int efx_sdhost_get_cd(struct udevice *dev)
+ 	/* Efinix SD host does not support SD card detection.
+ 	 * Set to 1 to always detect
+ 	 */
+-	printf("%s: 1\n\r", __func__);
+ 	return 1;
+ }
+ 
+ static int efx_sdhost_get_wp(struct udevice *dev)
+ {
+ 	/* write-enable */
+-	printf("%s: 0\n\r", __func__);
+ 	return 0;
+ }
+ 
+@@ -574,21 +444,15 @@ static void efx_sdhost_add_host(struct efx_sd_host *host)
+ 	struct mmc_config *cfg = &host->plat->cfg;
+ 
+ 	cfg->f_max = host->max_clk;
+-	//cfg->f_min = host->max_clk / SDCDIV_MAX_CDIV;
+ 	cfg->f_min = host->max_clk / 4;
+ 	cfg->b_max = 65535;
+ 
+-	printf("%s: f_max = %d, f_min = %d\n\r", __func__, cfg->f_max, cfg->f_min);
+-
+ 	/* host controller capabilities */
+ 	cfg->host_caps = MMC_MODE_4BIT;// | MMC_MODE_HS;
+ 
+ 	/* report supported voltage ranges */
+ 	cfg->voltages = MMC_VDD_32_33 | MMC_VDD_33_34;
+ 
+-	/* set interrupt enable */
+-	//host->hcfg = SDHCFG_BUSY_IRPT_EN;
+-
+ 	efx_sdhost_reset_internal(host);
+ }
+ 
+@@ -599,7 +463,6 @@ static int efx_sdhost_probe(struct udevice *dev)
+ 	struct mmc *mmc = mmc_get_mmc_dev(dev);
+ 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
+ 
+-	printf("%s\n\r", __func__);
+ 	host->dev = dev;
+ 	host->mmc = mmc;
+ 	host->plat = plat;
+@@ -608,7 +471,6 @@ static int efx_sdhost_probe(struct udevice *dev)
+ 
+ 	host->phys_addr = dev_read_addr(dev);
+ 	if (host->phys_addr == FDT_ADDR_T_NONE) {
+-		printf("error: host->phys_addr\n\r");
+ 		return -EINVAL;
+ 	}
+ 
+@@ -619,7 +481,6 @@ static int efx_sdhost_probe(struct udevice *dev)
+ 	host->max_clk = efx_sdhost_mmc_clock();
+ 	efx_sdhost_add_host(host);
+ 
+-	printf("%s: OK\n\r", __func__);
+ 	return 0;
+ }
+ 
+@@ -639,7 +500,6 @@ static int efx_sdhost_bind(struct udevice *dev)
+ {
+ 	struct efx_sd_plat *plat = dev_get_plat(dev);
+ 
+-	printf("%s\n\r", __func__);
+ 	return mmc_bind(dev, &plat->mmc, &plat->cfg);
+ }
+ 
+-- 
+2.17.1
+

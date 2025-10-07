@@ -1,0 +1,31 @@
+From 1b2a1b20d9b4d5e135149b97a518830f9e7204e4 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Sun, 5 May 2024 23:15:07 +0800
+Subject: [PATCH 2/3] driver/mmc: fix checking the buffer read enable for
+ efx_sdhost.c
+
+The driver should keep waiting for the buffer read enable bit
+before proceed with the read transaction.
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/mmc/efx_sdhost.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/efx_sdhost.c b/drivers/mmc/efx_sdhost.c
+index 3e167b1962..6ed045e6a3 100644
+--- a/drivers/mmc/efx_sdhost.c
++++ b/drivers/mmc/efx_sdhost.c
+@@ -209,8 +209,7 @@ static void efx_sdhost_read_block_pio(struct efx_sd_host *host)
+ 	blks = host->data->blocks;
+ 
+ 	while (blks--) {
+-		while (readl(host->ioaddr + EFX_SDHCI_PRESENT) & EFX_SDHCI_DATA_AVAILABLE)
+-			break;
++		while ((readl(host->ioaddr + EFX_SDHCI_PRESENT) & EFX_SDHCI_DATA_AVAILABLE) != 0x800);
+ 
+ 		for (int i = 0; i < (blksize / 4); i++) {
+ 			value = readl(host->ioaddr + 0x120);
+-- 
+2.17.1
+
