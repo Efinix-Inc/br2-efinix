@@ -338,6 +338,10 @@ function generate_device_tree() {
 		return 1
 	}
 
+	if [ "$type" == "linux" ]; then
+		cmd+=" -c $generic_dir/reserved_memory.json"
+	fi
+
 	for feature in "${hw_features[@]}"; do
 		case "$feature" in
 		spi)
