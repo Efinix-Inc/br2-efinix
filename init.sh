@@ -357,6 +357,10 @@ function generate_device_tree() {
 			cmd+=" -c $generic_dir/sdhc.json"
 			[ -n "$override_dir" ] && cmd+=" -c $override_dir/sdhc.json"
 			;;
+		emmc)
+			cmd+=" -c $generic_dir/emmc.json"
+			[ -n "$override_dir" ] && cmd+=" -c $override_dir/emmc.json"
+			;;
 		fb)
 			[ "$type" = "linux" ] && {
 				cmd+=" -c $generic_dir/framebuffer.json"
