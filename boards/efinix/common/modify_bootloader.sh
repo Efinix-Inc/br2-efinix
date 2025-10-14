@@ -10,22 +10,33 @@ RISCV_IDE=$3
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 BR2_DIR=${SCRIPT_DIR//"/boards/efinix/common"}
-DT_REPO="https://github.com/Efinix-Inc/sapphire-soc-dt-generator.git"
-DT_DIR="$SCRIPT_DIR/sapphire-soc-dt-generator"
+
+function get_column()
+{
+	# Read the VERSION file to get version
+	local column="$1"
+	local substr="$2"
+	local arr=()
+	while IFS= read -r line; do
+		if [[ $line == *$substr* ]]; then
+			IFS=' ' read -r -a arr <<< "$line"
+		fi
+	done < $BR2_DIR/VERSION
+	echo ${arr[$column]}
+}
+
+function get_repo_url()
+{
+	local substr="$1"
+	repo_url=$(get_column "0" "$substr")
+	echo $repo_url
+}
 
 function get_version()
 {
-        # Read the VERSION file to get version
-	local version_file=$BR2_DIR/VERSION
-
-        local arr=()
-        while IFS= read -r line; do
-                if [[ $line == *$substr* ]]; then
-                        IFS=' ' read -r -a arr <<< "$line"
-                fi
-        done < $version_file
-
-        version=${arr[1]}
+	local substr="$1"
+	version=$(get_column "1" "$substr")
+	echo $version
 }
 
 function usage()
@@ -100,13 +111,14 @@ if [[ -z $RISCV_IDE ]]; then
 fi
 
 DEVKIT=$(echo $DEVKIT | tr '[:upper:]' '[:lower:]')
-JSON_FILE="sapphire-soc-dt-generator/config/drivers.json"
+JSON_FILE="sapphire-soc-dt-generator/config/default.json"
 
 if [ ! -f $JSON_FILE ]; then
 # clone sapphire-soc-dt-generator repository
-        substr="sapphire-soc-dt-generator"
-        get_version $substr
-        dt_version=$version
+	dt_name="sapphire-soc-dt-generator"
+	DT_REPO=$(get_repo_url "$dt_name")
+	dt_version=$(get_version "$dt_name")
+	DT_DIR="$SCRIPT_DIR/$dt_name"
 
         if [ ! -z $dt_version ]; then
                 git clone $DT_REPO -b $dt_version $DT_DIR
