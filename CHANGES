@@ -1,3 +1,32 @@
+br2-efinix 2021.05.10,
+
+	Add desktop environment packages for enabling X11 graphics
+	Add repo URL for unified hardware design for Ti180J484 and Ti375C529
+	Update SoC example design for supported boards
+	Add optional argument to reset the repo
+	Remove any usage of -p optional argument in init.sh script
+	Rewrite modify_bootloader.sh script to handle different file structure
+	Add -x optional argument to enable X11 graphics in init.sh script
+	Standardize printing error message in init.sh script
+	Standardize linux configuration for each supported device
+	Add hard coded AXI interconnecte addresses for unified hardware design
+	Remove ethernet example design for Ti180J484
+	Generate device tree for u-boot
+	Add Linux framebuffer driver
+	Add Linux DMA driver
+	Add llama.cpp AI framework package
+	Add fir_filter application which uses RISC-V custom instruction
+	Add spi_app demo to read and write to spi flash device
+
+	Issue resolved
+	Remove workaround to generate device tree for spi and mmc
+	Fix generation of device tree for soc example design
+	patches/buildroot: copy font-awesome to standard font location
+	patches/buildroot: enable selection of startup-notification version 0.12
+	Change the printing API for bootloader
+	Add error handling in case of script failed
+	Fix step to install jinja2 python package
+
 br2-efinix 2021.05.9,
 
 	Add support for Ti375C529 development board
