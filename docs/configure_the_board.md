@@ -6,10 +6,11 @@ If the devkit connected to existing local network, DHCP server would assign the 
 
 1. Boot up the devkit with Linux
 
-2. Set the IP address
+2. Set the IP address and update routing table
    
    ```bash
    ifconfig eth0 192.168.5.2 up
+   route add -net 192.168.5.0 netmask 255.255.255.0 dev eth0
    ```
 
 3. On host, set the IP address such as `192.168.5.3`
