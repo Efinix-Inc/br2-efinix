@@ -1,4 +1,4 @@
-From a39b230e7125cc3aa0bf7ac9204d14f9ea6a48ab Mon Sep 17 00:00:00 2001
+From 59ec16c42cd965e45b2d8c045134b7907a8efea4 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Mon, 23 Jun 2025 23:45:52 +0800
 Subject: [PATCH] board/vexriscv: add support for saxon vexriscv board
@@ -7,11 +7,11 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
  arch/riscv/Kconfig            |   3 +
  arch/riscv/dts/Makefile       |   1 +
- board/vexriscv/saxon/Kconfig  |  22 ++++++++
+ board/vexriscv/saxon/Kconfig  |  25 +++++++++
  board/vexriscv/saxon/Makefile |   5 ++
  board/vexriscv/saxon/saxon.c  | 101 ++++++++++++++++++++++++++++++++++
- include/configs/saxon.h       |  33 +++++++++++
- 6 files changed, 165 insertions(+)
+ include/configs/saxon.h       |  32 +++++++++++
+ 6 files changed, 167 insertions(+)
  create mode 100644 board/vexriscv/saxon/Kconfig
  create mode 100644 board/vexriscv/saxon/Makefile
  create mode 100644 board/vexriscv/saxon/saxon.c
@@ -52,10 +52,10 @@ index 5c15a0f303a..b3d79904be0 100644
  
 diff --git a/board/vexriscv/saxon/Kconfig b/board/vexriscv/saxon/Kconfig
 new file mode 100644
-index 00000000000..7557fc12a25
+index 00000000000..5278b2704f7
 --- /dev/null
 +++ b/board/vexriscv/saxon/Kconfig
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,25 @@
 +if TARGET_VEXRISCV_SAXON
 +
 +config SYS_BOARD
@@ -72,6 +72,9 @@ index 00000000000..7557fc12a25
 +
 +config SYS_TEXT_BASE
 +       default 0x80000000
++
++config SYS_LOAD_ADDR
++       default 0x1040000
 +
 +config BOARD_SPECIFIC_OPTIONS # dummy
 +       def_bool y
@@ -198,10 +201,10 @@ index 00000000000..9832c63ffde
 +#endif /* CONFIG_SPL_BUILD */
 diff --git a/include/configs/saxon.h b/include/configs/saxon.h
 new file mode 100644
-index 00000000000..41c181dd898
+index 00000000000..96b873ceeb1
 --- /dev/null
 +++ b/include/configs/saxon.h
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,32 @@
 +/* SPDX-License-Identifier: GPL-2.0+ */
 +/*
 + * Copyright (C) 2019 roman3017 <rbacik@hotmail.com>
@@ -215,7 +218,6 @@ index 00000000000..41c181dd898
 +
 +/* assuming Text Base is not bottom of memory for INIT_SP to work */
 +//#define CONFIG_SYS_LOAD_ADDR CONFIG_SYS_TEXT_BASE
-+#define CONFIG_SYS_LOAD_ADDR 0x01040000
 +#define CONFIG_SYS_INIT_SP_ADDR CONFIG_SYS_LOAD_ADDR
 +//#define CONFIG_SYS_MALLOC_LEN SZ_256K
 +#define CONFIG_EXTRA_ENV_SETTINGS "initrd_high=0xffffffff\0" \
