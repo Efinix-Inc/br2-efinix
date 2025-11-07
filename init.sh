@@ -795,7 +795,11 @@ if [ ! -d $BUILDROOT_DIR ]; then
 	title "Apply Patch"
 	# apply out of tree patches for buildroot
 	git -C $BUILDROOT_DIR reset --hard $buildroot_version
-	git -C $BUILDROOT_DIR am $BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version/*patch
+	if [ -d $BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version ]; then
+		git -C $BUILDROOT_DIR am $BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version/*patch
+	else
+		pr_info "$BR2_EXTERNAL_DIR/patches/buildroot/$buildroot_version not exists. Skipping patch"
+	fi
 fi || return 1
 
 title "Copy soc.h file to OpenSBI directory"
