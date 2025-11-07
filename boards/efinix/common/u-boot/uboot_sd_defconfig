@@ -1,6 +1,6 @@
 # SD Card specific settings
 CONFIG_DISTRO_DEFAULTS=y
-CONFIG_BOOTCOMMAND="load mmc 0:1 0x00400000 uImage;load mmc 0:1 0x00CF0000 linux.dtb;bootm 0x00400000 - 0x00CF0000"
+CONFIG_BOOTCOMMAND="load mmc 0:1 0x00400000 uImage;load mmc 0:1 0x04000000 linux.dtb;bootm 0x00400000 - 0x04000000"
 
 # Environment stored in FAT on SD card
 CONFIG_ENV_IS_IN_FAT=y
