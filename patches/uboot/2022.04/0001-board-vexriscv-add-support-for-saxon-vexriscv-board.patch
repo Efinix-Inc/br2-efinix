@@ -1,4 +1,4 @@
-From 59ec16c42cd965e45b2d8c045134b7907a8efea4 Mon Sep 17 00:00:00 2001
+From d48f97d1af883b7f111d6d53315aec299a2dac7a Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Mon, 23 Jun 2025 23:45:52 +0800
 Subject: [PATCH] board/vexriscv: add support for saxon vexriscv board
@@ -10,8 +10,8 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
  board/vexriscv/saxon/Kconfig  |  25 +++++++++
  board/vexriscv/saxon/Makefile |   5 ++
  board/vexriscv/saxon/saxon.c  | 101 ++++++++++++++++++++++++++++++++++
- include/configs/saxon.h       |  32 +++++++++++
- 6 files changed, 167 insertions(+)
+ include/configs/saxon.h       |  33 +++++++++++
+ 6 files changed, 168 insertions(+)
  create mode 100644 board/vexriscv/saxon/Kconfig
  create mode 100644 board/vexriscv/saxon/Makefile
  create mode 100644 board/vexriscv/saxon/saxon.c
@@ -201,10 +201,10 @@ index 00000000000..9832c63ffde
 +#endif /* CONFIG_SPL_BUILD */
 diff --git a/include/configs/saxon.h b/include/configs/saxon.h
 new file mode 100644
-index 00000000000..96b873ceeb1
+index 00000000000..f5b6f06b4e5
 --- /dev/null
 +++ b/include/configs/saxon.h
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,33 @@
 +/* SPDX-License-Identifier: GPL-2.0+ */
 +/*
 + * Copyright (C) 2019 roman3017 <rbacik@hotmail.com>
@@ -218,6 +218,7 @@ index 00000000000..96b873ceeb1
 +
 +/* assuming Text Base is not bottom of memory for INIT_SP to work */
 +//#define CONFIG_SYS_LOAD_ADDR CONFIG_SYS_TEXT_BASE
++#define CONFIG_SYS_BOOTM_LEN    (64 << 20)
 +#define CONFIG_SYS_INIT_SP_ADDR CONFIG_SYS_LOAD_ADDR
 +//#define CONFIG_SYS_MALLOC_LEN SZ_256K
 +#define CONFIG_EXTRA_ENV_SETTINGS "initrd_high=0xffffffff\0" \
