@@ -233,6 +233,8 @@ function check_soc_configuration()
 				#define SYSTEM_AXI_SLAVE_2_IO_CTRL_SIZE 0x10000
 				#define SYSTEM_AXI_SLAVE_3_IO_CTRL 0xe9200000
 				#define SYSTEM_AXI_SLAVE_3_io_CTRL_SIZE 0x10000
+				#define SYSTEM_AXI_SLAVE_4_IO_CTRL 0xe9300000
+				#define SYSTEM_AXI_SLAVE_4_IO_CTRL_SIZE 0x10000
 				#define SYSTEM_AXI_A_BMB 0xe8000000
 				#define SYSTEM_AXI_A_BMB_SIZE 0x1000000
 				#define SYSTEM_AXI_B_BMB 0xe9000000
@@ -241,6 +243,8 @@ function check_soc_configuration()
 				#define SYSTEM_AXI_C_BMB_SIZE 0x10000
 				#define SYSTEM_AXI_D_BMB 0xe9200000
 				#define SYSTEM_AXI_D_BMB_SIZE 0x10000
+				#define SYSTEM_AXI_E_BMB 0xe9300000
+				#define SYSTEM_AXI_E_BMB_SIZE 0x10000
 				EOF
 			fi
 		elif [ $BOARD = "ti180j484" ]; then
@@ -345,7 +349,7 @@ function generate_device_tree() {
 	for feature in "${hw_features[@]}"; do
 		case "$feature" in
 		spi)
-			if ! contains_feature "mmc"; then
+			if ! contains_feature "sdhc"; then
 				cmd+=" -c $generic_dir/spi-mmc.json"
 			fi
 			[ "$type" == "linux" ] && cmd+=" -c $generic_dir/spi-nor.json"
@@ -357,7 +361,7 @@ function generate_device_tree() {
 				[ -n "$override_dir" ] && cmd+=" -c $override_dir/ethernet.json"
 			}
 			;;
-		mmc)
+		sdhc)
 			cmd+=" -c $generic_dir/sdhc.json"
 			[ -n "$override_dir" ] && cmd+=" -c $override_dir/sdhc.json"
 			;;
@@ -547,8 +551,8 @@ function set_kernel_config()
 			gpio)
 				br2_linux_kernel_cfg+=" $kernel_frag_dir/gpio.config"
 				;;
-			mmc)
-				br2_linux_kernel_cfg+=" $kernel_frag_dir/mmc.config"
+			sdhc)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/sdhc.config"
 				;;
 			ethernet)
 				br2_linux_kernel_cfg+=" $kernel_frag_dir/ethernet.config"
@@ -652,7 +656,8 @@ function parser()
 				;;
 			u)
 				UNIFIED_HW=1
-				EXTRA_HW_FEATURES="mmc,ethernet,evsoc,"
+				USE_EMMC_BOOT=1
+				EXTRA_HW_FEATURES="sdhc,ethernet,evsoc,emmc,"
 				;;
 			s)
 				EXTRA_HW_FEATURES+=${OPTARG}
@@ -660,7 +665,7 @@ function parser()
 			x)
 				if [ "$UNIFIED_HW" = "1" ]; then
 					X11_GRAPHICS=1
-					EXTRA_HW_FEATURES="mmc,ethernet,fb,dma,usb,"
+					EXTRA_HW_FEATURES="sdhc,ethernet,fb,dma,usb,emmc,"
 				else
 					pr_err "-x option requires -u to be set first."
 					return 1
@@ -727,11 +732,11 @@ if [ $EXAMPLE_DESIGN ]; then
 	fi
 
 	if [[ "$BOARD" = "ti375n1156" ]]; then
-		EXTRA_HW_FEATURES+="mmc,ethernet,"
+		EXTRA_HW_FEATURES+="sdhc,ethernet,"
 	fi
 
 	if [[ "$BOARD" = "ti375c529" ]]; then
-		EXTRA_HW_FEATURES+="mmc,ethernet,emmc,"
+		EXTRA_HW_FEATURES+="sdhc,ethernet,emmc,"
 	fi
 fi
 
