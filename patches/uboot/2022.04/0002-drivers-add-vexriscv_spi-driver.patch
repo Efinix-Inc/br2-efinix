@@ -1,7 +1,7 @@
-From 288f5314ac426d325dfc2bed94491950a8732ebe Mon Sep 17 00:00:00 2001
+From 28b1a2b6bd293448000427c48074dad61074e685 Mon Sep 17 00:00:00 2001
 From: Dolu1990 <charles.papon.90@gmail.com>
 Date: Fri, 7 Jan 2022 16:06:25 +0800
-Subject: [PATCH 2/5] drivers: add vexriscv_spi driver
+Subject: [PATCH] drivers: add vexriscv_spi driver
 
 Signed-off-by: Dolu1990 <charles.papon.90@gmail.com>
 Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
@@ -13,10 +13,10 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
  create mode 100644 drivers/spi/vexriscv_spi.c
 
 diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 1494c91763..d04972d6d2 100644
+index 423a7571411..34d810cbe8b 100644
 --- a/drivers/spi/Kconfig
 +++ b/drivers/spi/Kconfig
-@@ -429,6 +429,14 @@ config UNIPHIER_SPI
+@@ -457,6 +457,14 @@ config UNIPHIER_SPI
  	  be used to access SPI chips on platforms embedding this
  	  UniPhier IP core.
  
@@ -32,10 +32,10 @@ index 1494c91763..d04972d6d2 100644
  	bool "Xilinx SPI driver"
  	help
 diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
-index cfe4fae1d4..c4b99f49dd 100644
+index 7f43f843ca9..31b3a84afa2 100644
 --- a/drivers/spi/Makefile
 +++ b/drivers/spi/Makefile
-@@ -64,6 +64,7 @@ obj-$(CONFIG_TEGRA20_SFLASH) += tegra20_sflash.o
+@@ -69,6 +69,7 @@ obj-$(CONFIG_TEGRA20_SFLASH) += tegra20_sflash.o
  obj-$(CONFIG_TEGRA20_SLINK) += tegra20_slink.o
  obj-$(CONFIG_TEGRA210_QSPI) += tegra210_qspi.o
  obj-$(CONFIG_UNIPHIER_SPI) += uniphier_spi.o
@@ -45,7 +45,7 @@ index cfe4fae1d4..c4b99f49dd 100644
  obj-$(CONFIG_ZYNQ_QSPI) += zynq_qspi.o
 diff --git a/drivers/spi/vexriscv_spi.c b/drivers/spi/vexriscv_spi.c
 new file mode 100644
-index 0000000000..ade6ca7889
+index 00000000000..97431096188
 --- /dev/null
 +++ b/drivers/spi/vexriscv_spi.c
 @@ -0,0 +1,341 @@
@@ -157,9 +157,9 @@ index 0000000000..ade6ca7889
 +{
 +	debug("!!!%s:%d\n",__func__,__LINE__);
 +	struct udevice *bus = dev->parent;
-+	struct vexriscv_spi_platdata *plat = dev_get_platdata(bus);
++	struct vexriscv_spi_platdata *plat = dev_get_plat(bus);
 +	struct spi_slave *priv = dev_get_parent_priv(dev);
-+	struct dm_spi_slave_platdata *slave = dev_get_parent_platdata(priv->dev);
++	struct dm_spi_slave_plat *slave = dev_get_parent_plat(priv->dev);
 +	debug("!!!%s:%d %d %d\n",__func__,__LINE__,plat->cs,slave->cs);
 +	//if (plat->cs != -1)
 +	//	return -EINVAL;
@@ -171,7 +171,7 @@ index 0000000000..ade6ca7889
 +{
 +	debug("!!!%s:%d\n",__func__,__LINE__);
 +	struct udevice *bus = dev->parent;
-+	struct vexriscv_spi_platdata *plat = dev_get_platdata(bus);
++	struct vexriscv_spi_platdata *plat = dev_get_plat(bus);
 +	plat->cs = -1;
 +	return 0;
 +}
@@ -179,9 +179,9 @@ index 0000000000..ade6ca7889
 +static int vexriscv_spi_ofdata_to_platdata(struct udevice *dev)
 +{
 +	debug("!!!%s:%d\n",__func__,__LINE__);
-+	struct vexriscv_spi_platdata *plat = dev_get_platdata(dev);
++	struct vexriscv_spi_platdata *plat = dev_get_plat(dev);
 +
-+	plat->regs = (void *)dev_read_addr(dev);
++	plat->regs = (struct vexriscv_spi_regs *)dev_read_addr(dev);
 +	if (!plat->regs) {
 +		printf("%s: could not map device address\n", __func__);
 +		return -EINVAL;
@@ -207,7 +207,7 @@ index 0000000000..ade6ca7889
 +static int vexriscv_spi_probe(struct udevice *dev)
 +{
 +	debug("!!!%s:%d\n",__func__,__LINE__);
-+	struct vexriscv_spi_platdata *plat = dev_get_platdata(dev);
++	struct vexriscv_spi_platdata *plat = dev_get_plat(dev);
 +
 +#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
 +	plat->cs = -1;
@@ -234,7 +234,7 @@ index 0000000000..ade6ca7889
 +{
 +	//debug("!!!%s:%d\n",__func__,__LINE__);
 +	struct udevice *bus = dev->parent;
-+	struct vexriscv_spi_platdata *plat = dev_get_platdata(bus);
++	struct vexriscv_spi_platdata *plat = dev_get_plat(bus);
 +	const u8 *tx_ptr = dout;
 +	u8 *rx_ptr = din;
 +	u32 len = (bitlen + 7) / 8;
@@ -256,7 +256,7 @@ index 0000000000..ade6ca7889
 +				ptr = rx_ptr + count;
 +				end = ptr + burst;
 +				if(rx_ptr) {while(ptr != end) {*ptr++ = spi_spinal_lib_rsp(plat);}}
-+				else {while(ptr != end) {ptr++; volatile x = spi_spinal_lib_rsp(plat);}}
++				else {while(ptr != end) {ptr++; volatile u32 x = spi_spinal_lib_rsp(plat);}}
 +				count += burst;
 +				token += burst;
 +			}
@@ -293,7 +293,7 @@ index 0000000000..ade6ca7889
 +static int vexriscv_spi_set_speed(struct udevice *dev, uint speed)
 +{
 +	debug("!!!%s:%d %x\n",__func__,__LINE__,speed);
-+	struct vexriscv_spi_platdata *plat = dev_get_platdata(dev);
++	struct vexriscv_spi_platdata *plat = dev_get_plat(dev);
 +	speed = min(plat->max_hz, speed);
 +	u32 clk_divider = (plat->clock/speed/2)-1;
 +	writel(clk_divider, &plat->regs->clk_div);
@@ -303,7 +303,7 @@ index 0000000000..ade6ca7889
 +static int vexriscv_spi_set_mode(struct udevice *dev, uint mode)
 +{
 +	debug("!!!%s:%d %x\n",__func__,__LINE__,mode);
-+	struct vexriscv_spi_platdata *plat = dev_get_platdata(dev);
++	struct vexriscv_spi_platdata *plat = dev_get_plat(dev);
 +	u32 config = 0;
 +
 +	plat->mode = mode;
@@ -331,7 +331,7 @@ index 0000000000..ade6ca7889
 +			  struct spi_cs_info *info)
 +{
 +	debug("!!!%s:%d\n",__func__,__LINE__);
-+	struct vexriscv_spi_platdata *plat = dev_get_platdata(dev);
++	struct vexriscv_spi_platdata *plat = dev_get_plat(dev);
 +
 +	if (cs < plat->num_cs)
 +		return 0;
@@ -362,8 +362,8 @@ index 0000000000..ade6ca7889
 +	.id	= UCLASS_SPI,
 +#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
 +	.of_match = vexriscv_spi_ids,
-+	.ofdata_to_platdata = vexriscv_spi_ofdata_to_platdata,
-+	.platdata_auto_alloc_size	= sizeof(struct vexriscv_spi_platdata),
++	.of_to_plat = vexriscv_spi_ofdata_to_platdata,
++	.plat_auto	= sizeof(struct vexriscv_spi_platdata),
 +#else
 +	.bind = vexriscv_spi_bind,
 +#endif /* OF_CONTROL && !OF_PLATDATA */
@@ -391,5 +391,5 @@ index 0000000000..ade6ca7889
 +};
 +#endif
 -- 
-2.17.1
+2.43.0
 

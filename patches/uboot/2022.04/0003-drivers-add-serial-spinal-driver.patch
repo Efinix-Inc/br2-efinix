@@ -1,9 +1,8 @@
-From 35fbaf4478f6161028b3e6021ddce32adba6756a Mon Sep 17 00:00:00 2001
-From: Dolu1990 <charles.papon.90@gmail.com>
-Date: Fri, 7 Jan 2022 16:40:11 +0800
-Subject: [PATCH 3/5] driver: add vexriscv serial driver
+From ab59455e9feae95eeb7f404820fa579509246982 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Wed, 12 Nov 2025 20:12:32 +0800
+Subject: [PATCH] drivers: add serial spinal driver
 
-Signed-off-by: Dolu1990 <charles.papon.90@gmail.com>
 Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
  drivers/serial/Kconfig            |  14 +++
@@ -13,12 +12,12 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
  create mode 100644 drivers/serial/serial_riscv_sbi.c
 
 diff --git a/drivers/serial/Kconfig b/drivers/serial/Kconfig
-index 24413d14f9..4d833ebf48 100644
+index 345d1881f55..8391eb121ae 100644
 --- a/drivers/serial/Kconfig
 +++ b/drivers/serial/Kconfig
-@@ -381,6 +381,14 @@ config DEBUG_UART_SIFIVE
- 	  will need to provide parameters to make this work. The driver will
- 	  be available until the real driver-model serial is running.
+@@ -530,6 +530,14 @@ config DEBUG_UART_NS16550_CHECK_ENABLED
+ 	  Note that this does not work for every ns16550-compatible UART and
+ 	  so has to be enabled carefully or you might notice lost characters.
  
 +config DEBUG_UART_RISCV_SBI
 +       bool "RISC-V SBI UART"
@@ -28,12 +27,12 @@ index 24413d14f9..4d833ebf48 100644
 +         will need to provide parameters to make this work. The driver will
 +         be available until the real driver-model serial is running.
 +
- config DEBUG_UART_STM32
- 	bool "STMicroelectronics STM32"
- 	depends on STM32_SERIAL
-@@ -817,6 +825,12 @@ config SIFIVE_SERIAL
- 	help
- 	  This driver supports the SiFive UART. If unsure say N.
+ config ALTERA_JTAG_UART
+ 	bool "Altera JTAG UART support"
+ 	depends on DM_SERIAL
+@@ -935,6 +943,12 @@ config XEN_SERIAL
+ 	  If built without DM support, then requires Xen
+ 	  to be built with CONFIG_VERBOSE_DEBUG.
  
 +config RISCV_SBI_SERIAL
 +       bool "RISC-V SBI UART support"
@@ -41,24 +40,24 @@ index 24413d14f9..4d833ebf48 100644
 +       help
 +         This driver supports the RISC-V SVI UART. If unsure say N.
 +
- config STI_ASC_SERIAL
- 	bool "STMicroelectronics on-chip UART"
- 	depends on DM_SERIAL && ARCH_STI
+ choice
+ 	prompt "Console port"
+ 	default 8xx_CONS_SMC1
 diff --git a/drivers/serial/Makefile b/drivers/serial/Makefile
-index 92bcb30b85..d596a8d12f 100644
+index 52e70aa1917..685945928f3 100644
 --- a/drivers/serial/Makefile
 +++ b/drivers/serial/Makefile
-@@ -71,6 +71,7 @@ obj-$(CONFIG_OMAP_SERIAL) += serial_omap.o
- obj-$(CONFIG_MTK_SERIAL) += serial_mtk.o
- obj-$(CONFIG_MT7620_SERIAL) += serial_mt7620.o
+@@ -76,6 +76,7 @@ obj-$(CONFIG_MT7620_SERIAL) += serial_mt7620.o
+ obj-$(CONFIG_HTIF_CONSOLE) += serial_htif.o
  obj-$(CONFIG_SIFIVE_SERIAL) += serial_sifive.o
-+obj-$(CONFIG_RISCV_SBI_SERIAL) += serial_riscv_sbi.o
  obj-$(CONFIG_XEN_SERIAL) += serial_xen.o
++obj-$(CONFIG_RISCV_SBI_SERIAL) += serial_riscv_sbi.o
  
  ifndef CONFIG_SPL_BUILD
+ obj-$(CONFIG_USB_TTY) += usbtty.o
 diff --git a/drivers/serial/serial_riscv_sbi.c b/drivers/serial/serial_riscv_sbi.c
 new file mode 100644
-index 0000000000..acfd88ca0c
+index 00000000000..dab734bebca
 --- /dev/null
 +++ b/drivers/serial/serial_riscv_sbi.c
 @@ -0,0 +1,172 @@
@@ -110,7 +109,7 @@ index 0000000000..acfd88ca0c
 +{
 +	struct riscv_sbi_uart_platdata *platdata;
 +
-+  platdata = dev_get_platdata(dev);
++  platdata = dev_get_plat(dev);
 +  if (platdata->getc_buffer == -1) platdata->getc_buffer = sbi_console_getchar();
 +  if (platdata->getc_buffer == -1)
 +    return -EAGAIN;
@@ -129,7 +128,7 @@ index 0000000000..acfd88ca0c
 +static int riscv_sbi_pending(struct udevice *dev, bool input)
 +{
 +  struct riscv_sbi_uart_platdata *platdata;
-+  platdata = dev_get_platdata(dev);
++  platdata = dev_get_plat(dev);
 +
 +  if(platdata->getc_buffer == -1) platdata->getc_buffer = sbi_console_getchar();
 +  return platdata->getc_buffer != -1 ? 1 : 0;
@@ -178,7 +177,7 @@ index 0000000000..acfd88ca0c
 +{
 +  struct riscv_sbi_uart_platdata *platdata;
 +
-+  platdata = dev_get_platdata(dev);
++  platdata = dev_get_plat(dev);
 +  platdata->getc_buffer = -1;
 +
 +  debug("!!!%s:%d\n",__func__,__LINE__);
@@ -214,8 +213,8 @@ index 0000000000..acfd88ca0c
 +	.id	= UCLASS_SERIAL,
 +#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
 +	.of_match = riscv_sbi_of_match,
-+	.ofdata_to_platdata = riscv_sbi_ofdata_to_platdata,
-+	.platdata_auto_alloc_size = sizeof(struct riscv_sbi_uart_platdata),
++	.of_to_plat = riscv_sbi_ofdata_to_platdata,
++	.plat_auto = sizeof(struct riscv_sbi_uart_platdata),
 +#endif
 +	.bind = riscv_sbi_bind,
 +	.probe = riscv_sbi_probe,
@@ -235,5 +234,5 @@ index 0000000000..acfd88ca0c
 +};
 +#endif /*!CONFIG_IS_ENABLED(OF_CONTROL) || CONFIG_IS_ENABLED(OF_PLATDATA)*/
 -- 
-2.17.1
+2.43.0
 
