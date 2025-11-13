@@ -1,4 +1,4 @@
-From ab59455e9feae95eeb7f404820fa579509246982 Mon Sep 17 00:00:00 2001
+From 884b0ed1d1c5a793b12ce22669db534240348f18 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Wed, 12 Nov 2025 20:12:32 +0800
 Subject: [PATCH] drivers: add serial spinal driver
@@ -7,8 +7,8 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
  drivers/serial/Kconfig            |  14 +++
  drivers/serial/Makefile           |   1 +
- drivers/serial/serial_riscv_sbi.c | 172 ++++++++++++++++++++++++++++++
- 3 files changed, 187 insertions(+)
+ drivers/serial/serial_riscv_sbi.c | 170 ++++++++++++++++++++++++++++++
+ 3 files changed, 185 insertions(+)
  create mode 100644 drivers/serial/serial_riscv_sbi.c
 
 diff --git a/drivers/serial/Kconfig b/drivers/serial/Kconfig
@@ -57,10 +57,10 @@ index 52e70aa1917..685945928f3 100644
  obj-$(CONFIG_USB_TTY) += usbtty.o
 diff --git a/drivers/serial/serial_riscv_sbi.c b/drivers/serial/serial_riscv_sbi.c
 new file mode 100644
-index 00000000000..dab734bebca
+index 00000000000..8761c765a9d
 --- /dev/null
 +++ b/drivers/serial/serial_riscv_sbi.c
-@@ -0,0 +1,172 @@
+@@ -0,0 +1,170 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Copyright (C) 2019 dolu1990 <charles.papon.90@gmail.com>
@@ -89,8 +89,6 @@ index 00000000000..dab734bebca
 +
 +  sbi_console_putchar(ch);
 +}
-+
-+DEBUG_UART_FUNCS
 +
 +#endif /* CONFIG_DEBUG_UART_riscv_sbi */
 +
