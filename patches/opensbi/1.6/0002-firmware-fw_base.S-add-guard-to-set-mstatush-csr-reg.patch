@@ -1,0 +1,141 @@
+From 65996bb87debb5c286e5be6cc1d413834b61d917 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Thu, 13 Nov 2025 13:29:46 +0800
+Subject: [PATCH] firmware/fw_base.S: add guard to set mstatush csr register
+
+RV32 Sapphire SoC does not implement mstatush csr register.
+Use this guard to avoid illegal instruction during early boot.
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ firmware/fw_base.S          | 26 ++++++++++++++++++++------
+ lib/sbi/sbi_expected_trap.S |  9 +++++++++
+ lib/sbi/sbi_hart.c          |  7 ++++++-
+ 3 files changed, 35 insertions(+), 7 deletions(-)
+
+diff --git a/firmware/fw_base.S b/firmware/fw_base.S
+index d027e5e2..9eab86c4 100644
+--- a/firmware/fw_base.S
++++ b/firmware/fw_base.S
+@@ -17,6 +17,16 @@
+ #define BOOT_LOTTERY_ACQUIRED		1
+ #define BOOT_STATUS_BOOT_HART_DONE	1
+ 
++/* Provide defaults if not passed via AFLAGS/CFLAGS */
++#ifndef PLATFORM_HAVE_MSTATUSH
++#define PLATFORM_HAVE_MSTATUSH		0
++#endif
++
++/* Set to 1 if your core implements hypervisor ext */
++#ifndef HAVE_HEXT
++#define HAVE_HEXT			0
++#endif
++
+ .macro	MOV_3R __d0, __s0, __d1, __s1, __d2, __s2
+ 	add	\__d0, \__s0, zero
+ 	add	\__d1, \__s1, zero
+@@ -33,8 +43,12 @@
+ 
+ .macro CLEAR_MDT tmp
+ #if __riscv_xlen == 32
+-	li 	\tmp, MSTATUSH_MDT
+-	csrc	CSR_MSTATUSH, \tmp
++	#if PLATFORM_HAVE_MSTATUSH
++	li      \tmp, MSTATUSH_MDT
++	csrc    CSR_MSTATUSH, \tmp
++	#else
++	li 	\tmp, 0
++	#endif
+ #else
+ 	li 	\tmp, MSTATUS_MDT
+ 	csrc	CSR_MSTATUS, \tmp
+@@ -662,7 +676,7 @@ _trap_handler_hyp:
+ 	TRAP_SAVE_AND_SETUP_SP_T0
+ 
+ #if __riscv_xlen == 32
+-	TRAP_SAVE_MEPC_MSTATUS 1
++	TRAP_SAVE_MEPC_MSTATUS PLATFORM_HAVE_MSTATUSH
+ #else
+ 	TRAP_SAVE_MEPC_MSTATUS 0
+ #endif
+@@ -670,9 +684,9 @@ _trap_handler_hyp:
+ 	TRAP_SAVE_GENERAL_REGS_EXCEPT_SP_T0
+ 
+ #if __riscv_xlen == 32
+-	TRAP_SAVE_INFO 1 1
++	TRAP_SAVE_INFO HAVE_HEXT PLATFORM_HAVE_MSTATUSH
+ #else
+-	TRAP_SAVE_INFO 0 1
++	TRAP_SAVE_INFO HAVE_HEXT 0
+ #endif
+ 
+ 	TRAP_CALL_C_ROUTINE
+@@ -680,7 +694,7 @@ _trap_handler_hyp:
+ 	TRAP_RESTORE_GENERAL_REGS_EXCEPT_A0_T0
+ 
+ #if __riscv_xlen == 32
+-	TRAP_RESTORE_MEPC_MSTATUS 1
++	TRAP_RESTORE_MEPC_MSTATUS PLATFORM_HAVE_MSTATUSH
+ #else
+ 	TRAP_RESTORE_MEPC_MSTATUS 0
+ #endif
+diff --git a/lib/sbi/sbi_expected_trap.S b/lib/sbi/sbi_expected_trap.S
+index 99dede5f..f6896585 100644
+--- a/lib/sbi/sbi_expected_trap.S
++++ b/lib/sbi/sbi_expected_trap.S
+@@ -10,6 +10,11 @@
+ #include <sbi/riscv_asm.h>
+ #include <sbi/sbi_trap.h>
+ 
++
++#ifndef PLATFORM_HAVE_MSTATUSH
++#define PLATFORM_HAVE_MSTATUSH		0
++#endif
++
+ 	/*
+ 	 * We assume that faulting instruction is 4-byte long and blindly
+ 	 * increment SEPC by 4.
+@@ -50,8 +55,12 @@ __sbi_expected_trap_hext:
+ 
+ 	/* Extract GVA bit from MSTATUS or MSTATUSH */
+ #if __riscv_xlen == 32
++	#if PLATFORM_HAVE_MSTATUSH
+ 	csrr	a4, CSR_MSTATUSH
+ 	srli	a4, a4, MSTATUSH_GVA_SHIFT
++	#else
++	li	a4, 0
++	#endif
+ #else
+ 	csrr	a4, CSR_MSTATUS
+ 	srli	a4, a4, MSTATUS_GVA_SHIFT
+diff --git a/lib/sbi/sbi_hart.c b/lib/sbi/sbi_hart.c
+index 0451fcb5..8ca48d87 100644
+--- a/lib/sbi/sbi_hart.c
++++ b/lib/sbi/sbi_hart.c
+@@ -1029,7 +1029,10 @@ sbi_hart_switch_mode(unsigned long arg0, unsigned long arg1,
+ 		     bool next_virt)
+ {
+ #if __riscv_xlen == 32
+-	unsigned long val, valH;
++	unsigned long val;
++	#if PLATFORM_HAVE_MSTATUS
++	unsigned long valH;
++	#endif
+ #else
+ 	unsigned long val;
+ #endif
+@@ -1054,9 +1057,11 @@ sbi_hart_switch_mode(unsigned long arg0, unsigned long arg1,
+ 	val = INSERT_FIELD(val, MSTATUS_MPIE, 0);
+ #if __riscv_xlen == 32
+ 	if (misa_extension('H')) {
++	#if PLATFORM_HAVE_MSTATUS
+ 		valH = csr_read(CSR_MSTATUSH);
+ 		valH = INSERT_FIELD(valH, MSTATUSH_MPV, next_virt);
+ 		csr_write(CSR_MSTATUSH, valH);
++	#endif
+ 	}
+ #else
+ 	if (misa_extension('H'))
+-- 
+2.43.0
+

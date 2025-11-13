@@ -1,0 +1,173 @@
+From 8cc9a8991180c6c895763e9f5d66068766a4f69a Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Wed, 12 Nov 2025 16:02:08 +0800
+Subject: [PATCH] lib/utils: add serial spinal uart driver
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ include/sbi_utils/serial/spinal-uart.h | 16 +++++++++++++
+ lib/utils/serial/Kconfig               |  8 +++++++
+ lib/utils/serial/fdt_serial_spinal.c   | 31 +++++++++++++++++++++++++
+ lib/utils/serial/objects.mk            |  4 ++++
+ lib/utils/serial/spinal-uart.c         | 32 ++++++++++++++++++++++++++
+ platform/generic/configs/defconfig     |  1 +
+ 6 files changed, 92 insertions(+)
+ create mode 100644 include/sbi_utils/serial/spinal-uart.h
+ create mode 100644 lib/utils/serial/fdt_serial_spinal.c
+ create mode 100644 lib/utils/serial/spinal-uart.c
+
+diff --git a/include/sbi_utils/serial/spinal-uart.h b/include/sbi_utils/serial/spinal-uart.h
+new file mode 100644
+index 00000000..52682c37
+--- /dev/null
++++ b/include/sbi_utils/serial/spinal-uart.h
+@@ -0,0 +1,16 @@
++/*
++ * SPDX-License-Identifier: BSD-2-Clause
++ *
++ * Copyright (c) 2025 Efinix Inc
++ *
++ * Author: Mohamad Noor Alim <mnalim@efinixinc.com>
++ */
++
++#ifndef __SERIAL_SPINAL_UART_H__
++#define __SERIAL_SPINAL_UART_H__
++
++#include <sbi/sbi_types.h>
++
++int spinal_uart_init(unsigned long base);
++
++#endif
+diff --git a/lib/utils/serial/Kconfig b/lib/utils/serial/Kconfig
+index e3589cac..2a4e551b 100644
+--- a/lib/utils/serial/Kconfig
++++ b/lib/utils/serial/Kconfig
+@@ -54,6 +54,11 @@ config FDT_SERIAL_XILINX_UARTLITE
+ 	select SERIAL_XILINX_UARTLITE
+ 	default n
+ 
++config FDT_SERIAL_SPINAL
++	bool "Spinal UART FDT driver"
++	select SERIAL_SPINAL
++	default n
++
+ endif
+ 
+ config SERIAL_CADENCE
+@@ -92,4 +97,7 @@ config SERIAL_SEMIHOSTING
+ 	bool "Semihosting support"
+ 	default n
+ 
++config SERIAL_SPINAL
++	bool "Spinal UART support"
++	default n
+ endmenu
+diff --git a/lib/utils/serial/fdt_serial_spinal.c b/lib/utils/serial/fdt_serial_spinal.c
+new file mode 100644
+index 00000000..ab26ab33
+--- /dev/null
++++ b/lib/utils/serial/fdt_serial_spinal.c
+@@ -0,0 +1,31 @@
++#include <sbi/sbi_error.h>
++#include <sbi_utils/fdt/fdt_helper.h>
++#include <sbi_utils/serial/fdt_serial.h>
++
++extern int spinal_uart_init(unsigned long base);
++
++static int serial_spinal_init(const void *fdt, int nodeoff,
++			     const struct fdt_match *match)
++{
++	uint64_t reg_addr, reg_size;
++	int rc;
++
++	if (nodeoff < 0 || !fdt)
++		return SBI_ENODEV;
++
++	rc = fdt_get_node_addr_size(fdt, nodeoff, 0, &reg_addr, &reg_size);
++	if (rc < 0 || !reg_addr || !reg_size)
++		return SBI_ENODEV;
++
++	return spinal_uart_init(reg_addr);
++}
++
++static const struct fdt_match serial_spinal_match[] = {
++	{ .compatible = "riscv_sbi,uart" },
++	{ },
++};
++
++struct fdt_driver fdt_serial_spinal = {
++	.match_table = serial_spinal_match,
++	.init = serial_spinal_init
++};
+diff --git a/lib/utils/serial/objects.mk b/lib/utils/serial/objects.mk
+index 7c973c83..a53fab40 100644
+--- a/lib/utils/serial/objects.mk
++++ b/lib/utils/serial/objects.mk
+@@ -37,6 +37,9 @@ libsbiutils-objs-$(CONFIG_FDT_SERIAL_UART8250) += serial/fdt_serial_uart8250.o
+ carray-fdt_serial_drivers-$(CONFIG_FDT_SERIAL_XILINX_UARTLITE) += fdt_serial_xlnx_uartlite
+ libsbiutils-objs-$(CONFIG_FDT_SERIAL_XILINX_UARTLITE) += serial/fdt_serial_xlnx_uartlite.o
+ 
++carray-fdt_serial_drivers-$(CONFIG_FDT_SERIAL_SPINAL) += fdt_serial_spinal
++libsbiutils-objs-$(CONFIG_FDT_SERIAL_SPINAL) += serial/fdt_serial_spinal.o
++
+ libsbiutils-objs-$(CONFIG_SERIAL_CADENCE) += serial/cadence-uart.o
+ libsbiutils-objs-$(CONFIG_SERIAL_GAISLER) += serial/gaisler-uart.o
+ libsbiutils-objs-$(CONFIG_SERIAL_RENESAS_SCIF) += serial/renesas_scif.o
+@@ -46,3 +49,4 @@ libsbiutils-objs-$(CONFIG_SERIAL_LITEX) += serial/litex-uart.o
+ libsbiutils-objs-$(CONFIG_SERIAL_UART8250) += serial/uart8250.o
+ libsbiutils-objs-$(CONFIG_SERIAL_XILINX_UARTLITE) += serial/xlnx-uartlite.o
+ libsbiutils-objs-$(CONFIG_SERIAL_SEMIHOSTING) += serial/semihosting.o
++libsbiutils-objs-$(CONFIG_SERIAL_SPINAL) += serial/spinal-uart.o
+diff --git a/lib/utils/serial/spinal-uart.c b/lib/utils/serial/spinal-uart.c
+new file mode 100644
+index 00000000..7da2f403
+--- /dev/null
++++ b/lib/utils/serial/spinal-uart.c
+@@ -0,0 +1,32 @@
++#include <sbi/riscv_io.h>
++#include <sbi/sbi_console.h>
++
++static volatile unsigned int *uart_base;
++
++#define UART_DATA 0
++#define UART_STATUS 1
++
++
++static void spinal_uart_putc(char ch)
++{
++	while(((readl(uart_base + UART_STATUS) >> 16) & 0xFF) == 0);
++	writel(ch, uart_base);
++}
++
++static int spinal_uart_getc(void)
++{
++    return (readl(uart_base + UART_STATUS) >> 24) == 0 ? -1 : readl(uart_base + UART_DATA);
++}
++
++static struct sbi_console_device spinal_console = {
++	.name = "spinal_uart",
++	.console_putc = spinal_uart_putc,
++	.console_getc = spinal_uart_getc
++};
++
++int spinal_uart_init(unsigned long base)
++{
++	uart_base = (unsigned int *)base;
++	sbi_console_set_device(&spinal_console);
++	return 0;
++}
+diff --git a/platform/generic/configs/defconfig b/platform/generic/configs/defconfig
+index e23b38b2..ead968c4 100644
+--- a/platform/generic/configs/defconfig
++++ b/platform/generic/configs/defconfig
+@@ -47,6 +47,7 @@ CONFIG_FDT_SERIAL_SIFIVE=y
+ CONFIG_FDT_SERIAL_LITEX=y
+ CONFIG_FDT_SERIAL_UART8250=y
+ CONFIG_FDT_SERIAL_XILINX_UARTLITE=y
++CONFIG_FDT_SERIAL_SPINAL=y
+ CONFIG_SERIAL_SEMIHOSTING=y
+ CONFIG_FDT_SUSPEND=y
+ CONFIG_FDT_SUSPEND_RPMI=y
+-- 
+2.43.0
+
