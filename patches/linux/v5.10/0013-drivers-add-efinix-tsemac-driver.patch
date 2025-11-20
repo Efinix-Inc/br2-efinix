@@ -1,4 +1,4 @@
-From e4c885db8c57dc4bc0dd3084d9503a71200df3b2 Mon Sep 17 00:00:00 2001
+From 74a26d9c6afdf1b1e1a9b7303b08e196ce64d707 Mon Sep 17 00:00:00 2001
 From: Kenny Cheung <kenny.cheung@elitestek.com>
 Date: Thu, 30 Mar 2023 14:28:01 +0800
 Subject: [PATCH] drivers: add efinix tsemac driver
@@ -10,11 +10,11 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
  drivers/net/ethernet/Makefile                 |    1 +
  drivers/net/ethernet/efinix/Kconfig           |   18 +
  drivers/net/ethernet/efinix/Makefile          |    3 +
- drivers/net/ethernet/efinix/efinix_tse.c      | 1348 +++++++++++++++++
- drivers/net/ethernet/efinix/efinix_tse.h      |  457 ++++++
+ drivers/net/ethernet/efinix/efinix_tse.c      | 1386 +++++++++++++++++
+ drivers/net/ethernet/efinix/efinix_tse.h      |  459 ++++++
  drivers/net/ethernet/efinix/efinix_tse_dma.c  |  244 +++
  drivers/net/ethernet/efinix/efinix_tse_mdio.c |  195 +++
- 8 files changed, 2267 insertions(+)
+ 8 files changed, 2307 insertions(+)
  create mode 100644 drivers/net/ethernet/efinix/Kconfig
  create mode 100644 drivers/net/ethernet/efinix/Makefile
  create mode 100644 drivers/net/ethernet/efinix/efinix_tse.c
@@ -77,10 +77,10 @@ index 000000000000..51062131b736
 +obj-$(CONFIG_EFINIX_TSEMAC) += efinix_tsemac.o
 diff --git a/drivers/net/ethernet/efinix/efinix_tse.c b/drivers/net/ethernet/efinix/efinix_tse.c
 new file mode 100644
-index 000000000000..6d52b3a0df0a
+index 000000000000..f9e5547e11ff
 --- /dev/null
 +++ b/drivers/net/ethernet/efinix/efinix_tse.c
-@@ -0,0 +1,1348 @@
+@@ -0,0 +1,1386 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Ethernet driver for the Efinix Triple Speed Ethernet device
@@ -139,6 +139,32 @@ index 000000000000..6d52b3a0df0a
 +static void tsemac_dma_err_handler(struct work_struct *work);
 +static int tsemac_probe(struct platform_device *pdev);
 +
++static void tsemac_hw_set_tx_csum(struct net_device *ndev, bool enable)
++{
++	struct efx_tsemac_local *lp = netdev_priv(ndev);
++
++	if (enable) {
++		lp->features |= TSEMAC_FEATURE_FULL_TX_CSUM;
++		tsemac_out32(lp, ETHERNET_CTRL_HW_TX_CHECKSUM_EN, 1);
++	} else {
++		lp->features &= ~TSEMAC_FEATURE_FULL_TX_CSUM;
++		tsemac_out32(lp, ETHERNET_CTRL_HW_TX_CHECKSUM_EN, 0);
++	}
++}
++
++static void tsemac_hw_set_rx_csum(struct net_device *ndev, bool enable)
++{
++	struct efx_tsemac_local *lp = netdev_priv(ndev);
++
++	if (enable) {
++		lp->features |= TSEMAC_FEATURE_FULL_RX_CSUM;
++		tsemac_out32(lp, ETHERNET_CTRL_HW_RX_CHECKSUM_EN, 1);
++	} else {
++		lp->features &= ~TSEMAC_FEATURE_FULL_RX_CSUM;
++		tsemac_out32(lp, ETHERNET_CTRL_HW_RX_CHECKSUM_EN, 0);
++	}
++}
++
 +static void tsemac_set_mac_address(struct net_device *ndev, const void *address)
 +{
 +	struct efx_tsemac_local *lp = netdev_priv(ndev);
@@ -188,6 +214,21 @@ index 000000000000..6d52b3a0df0a
 +		tsemac_out32(lp, TSEMAC_COMMAND_CONFIG, reg);
 +		dev_info(&ndev->dev, "Promiscuous mode disabled.\n");
 +	}
++}
++
++static netdev_features_t tsemac_fix_features(struct net_device *ndev, netdev_features_t features)
++{
++	features &= ndev->hw_features;
++
++	return features;
++}
++
++static int tsemac_set_features(struct net_device *ndev, netdev_features_t features)
++{
++	tsemac_hw_set_tx_csum(ndev, !! (features & NETIF_F_HW_CSUM));
++	tsemac_hw_set_rx_csum(ndev, !! (features & NETIF_F_RXCSUM));
++
++	return 0;
 +}
 +
 +static inline u32 tsemac_check_tx_bd_head(struct efx_tsemac_local *lp, u32 first_bd, u32 last_bd)
@@ -259,13 +300,6 @@ index 000000000000..6d52b3a0df0a
 +		return NETDEV_TX_BUSY;
 +	}
 +
-+	if (skb->ip_summed == CHECKSUM_PARTIAL || skb->ip_summed == CHECKSUM_UNNECESSARY) {
-+		if (net_ratelimit())
-+			netdev_err(ndev, "Unsupported checksum mode\n");
-+		ndev->stats.tx_dropped++;
-+		return NETDEV_TX_OK;
-+	}
-+
 +	// assign descriptors for frag first
 +	for (ii = 0; ii < num_frag; ii++) {
 +		if (++new_tail_ptr >= lp->tx_bd_num)
@@ -302,6 +336,11 @@ index 000000000000..6d52b3a0df0a
 +	}
 +	desc_set_tx_phys_addr(lp, phys, &lp->tx_bd_v[orig_tail_ptr]);
 +	cur_p->skb = skb;
++
++	if (lp->features & TSEMAC_FEATURE_FULL_TX_CSUM)
++		skb->ip_summed = CHECKSUM_PARTIAL;
++	else
++		skb->ip_summed = CHECKSUM_NONE;
 +
 +	spin_lock(&lp->lock);
 +	if (orig_tail_ptr != new_tail_ptr) {
@@ -637,17 +676,11 @@ index 000000000000..6d52b3a0df0a
 +			skb_put(skb, length);
 +			skb->protocol = eth_type_trans(skb, lp->ndev);
 +			/*skb_checksum_none_assert(skb);*/
-+			//TODO: enable checksum offload
-+			skb->ip_summed = CHECKSUM_NONE;
 +
-+			//TODO: return when invalid features are used
-+			if (lp->features & TSEMAC_FEATURE_FULL_RX_CSUM) {
-+				netdev_err(lp->ndev, "unexpected FULL_RX_CSUM flag");
-+			} else if ((lp->features & TSEMAC_FEATURE_PARTIAL_RX_CSUM) != 0 &&
-+				   skb->protocol == htons(ETH_P_IP) &&
-+				   skb->len > 64) {
-+				netdev_err(lp->ndev, "unexpected PARTIAL_RX_CSUM flag");
-+			}
++			if (lp->csum_offload_on_rx_path & TSEMAC_FEATURE_FULL_RX_CSUM)
++				skb->ip_summed = CHECKSUM_UNNECESSARY;
++			else
++				skb->ip_summed = CHECKSUM_NONE;
 +
 +			napi_gro_receive(napi, skb);
 +
@@ -925,6 +958,7 @@ index 000000000000..6d52b3a0df0a
 +
 +int __tsemac_device_reset(struct efx_tsemac_local *lp)
 +{
++	struct net_device *ndev = lp->ndev;
 +	tsemac_out32(lp, ETHERNET_CTRL_PHY_RST, 1);
 +	tsemac_out32(lp, ETHERNET_CTRL_MAC_RST, 1);
 +	mdelay(100);
@@ -932,6 +966,11 @@ index 000000000000..6d52b3a0df0a
 +	mdelay(100);
 +	tsemac_out32(lp, ETHERNET_CTRL_PHY_RST, 0);
 +	mdelay(100);
++
++	/* Disabled TX & RX checksum offload */
++	tsemac_hw_set_tx_csum(ndev, false);
++	tsemac_hw_set_rx_csum(ndev, false);
++
 +	return 0;
 +}
 +
@@ -1138,6 +1177,8 @@ index 000000000000..6d52b3a0df0a
 +	.ndo_validate_addr = eth_validate_addr,
 +	.ndo_do_ioctl = tsemac_ioctl,
 +	.ndo_set_rx_mode = tsemac_set_multicast_list,
++	.ndo_set_features = tsemac_set_features,
++	.ndo_fix_features = tsemac_fix_features,
 +#ifdef CONFIG_NET_POLL_CONTROLLER
 +	.ndo_poll_controller = tsemac_poll_controller,
 +#endif
@@ -1190,7 +1231,6 @@ index 000000000000..6d52b3a0df0a
 +
 +	SET_NETDEV_DEV(ndev, &pdev->dev);
 +	ndev->flags &= ~IFF_MULTICAST;
-+	ndev->features = NETIF_F_SG;
 +	ndev->netdev_ops = &tsemac_netdev_ops;
 +	ndev->ethtool_ops = &tsemac_ethtool_ops;
 +
@@ -1233,25 +1273,24 @@ index 000000000000..6d52b3a0df0a
 +	/* Setup checksum offload, but default to off if not specified */
 +	lp->features = 0;
 +
++	/* Advertise capability */
++	ndev->hw_features |= NETIF_F_HW_CSUM | NETIF_F_RXCSUM | NETIF_F_SG;
++	ndev->features |= NETIF_F_SG;
++
 +	ret = of_property_read_u32(pdev->dev.of_node, "efx,txcsum", &value);
 +	if (!ret) {
 +		switch (value) {
 +		case 1:
 +			lp->csum_offload_on_tx_path =
-+				TSEMAC_FEATURE_PARTIAL_TX_CSUM;
-+			lp->features |= TSEMAC_FEATURE_PARTIAL_TX_CSUM;
-+			/* Can checksum TCP/UDP over IPv4. */
-+			ndev->features |= NETIF_F_IP_CSUM;
-+			break;
-+		case 2:
-+			lp->csum_offload_on_tx_path =
 +				TSEMAC_FEATURE_FULL_TX_CSUM;
 +			lp->features |= TSEMAC_FEATURE_FULL_TX_CSUM;
-+			/* Can checksum TCP/UDP over IPv4. */
-+			ndev->features |= NETIF_F_IP_CSUM;
++			ndev->features |= NETIF_F_HW_CSUM;
++			tsemac_hw_set_tx_csum(ndev, true);
 +			break;
 +		default:
 +			lp->csum_offload_on_tx_path = TSEMAC_NO_CSUM_OFFLOAD;
++			ndev->features &= ~NETIF_F_HW_CSUM;
++			tsemac_hw_set_tx_csum(ndev, false);
 +		}
 +	}
 +	ret = of_property_read_u32(pdev->dev.of_node, "efx,rxcsum", &value);
@@ -1259,16 +1298,15 @@ index 000000000000..6d52b3a0df0a
 +		switch (value) {
 +		case 1:
 +			lp->csum_offload_on_rx_path =
-+				TSEMAC_FEATURE_PARTIAL_RX_CSUM;
-+			lp->features |= TSEMAC_FEATURE_PARTIAL_RX_CSUM;
-+			break;
-+		case 2:
-+			lp->csum_offload_on_rx_path =
 +				TSEMAC_FEATURE_FULL_RX_CSUM;
 +			lp->features |= TSEMAC_FEATURE_FULL_RX_CSUM;
++			ndev->features |= NETIF_F_RXCSUM;
++			tsemac_hw_set_rx_csum(ndev, true);
 +			break;
 +		default:
 +			lp->csum_offload_on_rx_path = TSEMAC_NO_CSUM_OFFLOAD;
++			ndev->features &= ~NETIF_F_RXCSUM;
++			tsemac_hw_set_rx_csum(ndev, false);
 +		}
 +	}
 +
@@ -1431,10 +1469,10 @@ index 000000000000..6d52b3a0df0a
 +MODULE_LICENSE("GPL v2");
 diff --git a/drivers/net/ethernet/efinix/efinix_tse.h b/drivers/net/ethernet/efinix/efinix_tse.h
 new file mode 100644
-index 000000000000..a666bcb743c6
+index 000000000000..e103ec66b3e6
 --- /dev/null
 +++ b/drivers/net/ethernet/efinix/efinix_tse.h
-@@ -0,0 +1,457 @@
+@@ -0,0 +1,459 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (c) 2023 Efinix, Inc. All rights reserved.
@@ -1542,6 +1580,8 @@ index 000000000000..a666bcb743c6
 +#define ETHERNET_CTRL_PHY_RST               0x204
 +#define ETHERNET_CTRL_DMA_RX_RESET          0x208
 +#define ETHERNET_CTRL_DMA_TX_RESET          0x20C
++#define ETHERNET_CTRL_HW_RX_CHECKSUM_EN     0x210
++#define ETHERNET_CTRL_HW_TX_CHECKSUM_EN     0x214
 +
 +#define TSEMAC_PHY_TYPE_MII					0
 +#define TSEMAC_PHY_TYPE_GMII				1
