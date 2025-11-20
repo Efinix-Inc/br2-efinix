@@ -1,4 +1,4 @@
-From 09e2f78cdcf15294008921981064d02ed2db43f3 Mon Sep 17 00:00:00 2001
+From bc2070893acbd5e331e33528f161cd1d5c91e7dd Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Tue, 10 Oct 2023 14:56:37 +0800
 Subject: [PATCH] mmc: add efinix sdhci driver
@@ -6,9 +6,9 @@ Subject: [PATCH] mmc: add efinix sdhci driver
 Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
  drivers/mmc/host/Kconfig     |   8 +
- drivers/mmc/host/Makefile    |   3 +-
- drivers/mmc/host/sdhci-efx.c | 329 +++++++++++++++++++++++++++++++++++
- 3 files changed, 339 insertions(+), 1 deletion(-)
+ drivers/mmc/host/Makefile    |   1 +
+ drivers/mmc/host/sdhci-efx.c | 335 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 344 insertions(+)
  create mode 100644 drivers/mmc/host/sdhci-efx.c
 
 diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
@@ -30,25 +30,23 @@ index 31481c9fcc2e..c81d5977e3ba 100644
  config MMC_SDHCI_EXTERNAL_DMA
  	bool
 diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-index 451c25fc2c69..5da2ebc89eec 100644
+index 451c25fc2c69..c6a7ed2abcf6 100644
 --- a/drivers/mmc/host/Makefile
 +++ b/drivers/mmc/host/Makefile
-@@ -105,7 +105,8 @@ obj-$(CONFIG_MMC_SDHCI_OMAP)		+= sdhci-omap.o
+@@ -105,6 +105,7 @@ obj-$(CONFIG_MMC_SDHCI_OMAP)		+= sdhci-omap.o
  obj-$(CONFIG_MMC_SDHCI_SPRD)		+= sdhci-sprd.o
  obj-$(CONFIG_MMC_CQHCI)			+= cqhci.o
  obj-$(CONFIG_MMC_HSQ)			+= mmc_hsq.o
--
 +obj-$(CONFIG_MMC_SDHCI_EFX)		+= sdhci-efx.o
-+
+ 
  ifeq ($(CONFIG_CB710_DEBUG),y)
  	CFLAGS-cb710-mmc	+= -DDEBUG
- endif
 diff --git a/drivers/mmc/host/sdhci-efx.c b/drivers/mmc/host/sdhci-efx.c
 new file mode 100644
-index 000000000000..6666cb152dae
+index 000000000000..ebb9cb779e64
 --- /dev/null
 +++ b/drivers/mmc/host/sdhci-efx.c
-@@ -0,0 +1,329 @@
+@@ -0,0 +1,335 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Support for SDHIC on Efinix Inc SoC
@@ -93,6 +91,12 @@ index 000000000000..6666cb152dae
 +	u32 val;
 +	u32 offset = reg + EFX_SDHCI_REG_OFFSET;
 +	struct mmc_command *data_cmd = host->data_cmd;
++
++	// clear cache for ACMD51
++	if (data_cmd) {
++                if (data_cmd->opcode == 51)
++                        asm(".word(0x500F)");
++        }
 +
 +	val = readl(host->ioaddr + offset);
 +
@@ -379,5 +383,5 @@ index 000000000000..6666cb152dae
 +MODULE_AUTHOR("mnalim@efinixinc.com");
 +MODULE_LICENSE("GPL v2");
 -- 
-2.17.1
+2.43.0
 
