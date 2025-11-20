@@ -1,4 +1,4 @@
-From 29a74280b3be7fd8263f1690612c97c68932ea67 Mon Sep 17 00:00:00 2001
+From e4c885db8c57dc4bc0dd3084d9503a71200df3b2 Mon Sep 17 00:00:00 2001
 From: Kenny Cheung <kenny.cheung@elitestek.com>
 Date: Thu, 30 Mar 2023 14:28:01 +0800
 Subject: [PATCH] drivers: add efinix tsemac driver
@@ -11,10 +11,10 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
  drivers/net/ethernet/efinix/Kconfig           |   18 +
  drivers/net/ethernet/efinix/Makefile          |    3 +
  drivers/net/ethernet/efinix/efinix_tse.c      | 1348 +++++++++++++++++
- drivers/net/ethernet/efinix/efinix_tse.h      |  452 ++++++
+ drivers/net/ethernet/efinix/efinix_tse.h      |  457 ++++++
  drivers/net/ethernet/efinix/efinix_tse_dma.c  |  244 +++
  drivers/net/ethernet/efinix/efinix_tse_mdio.c |  195 +++
- 8 files changed, 2262 insertions(+)
+ 8 files changed, 2267 insertions(+)
  create mode 100644 drivers/net/ethernet/efinix/Kconfig
  create mode 100644 drivers/net/ethernet/efinix/Makefile
  create mode 100644 drivers/net/ethernet/efinix/efinix_tse.c
@@ -1431,10 +1431,10 @@ index 000000000000..6d52b3a0df0a
 +MODULE_LICENSE("GPL v2");
 diff --git a/drivers/net/ethernet/efinix/efinix_tse.h b/drivers/net/ethernet/efinix/efinix_tse.h
 new file mode 100644
-index 000000000000..f27bd8266719
+index 000000000000..a666bcb743c6
 --- /dev/null
 +++ b/drivers/net/ethernet/efinix/efinix_tse.h
-@@ -0,0 +1,452 @@
+@@ -0,0 +1,457 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (c) 2023 Efinix, Inc. All rights reserved.
@@ -1690,6 +1690,7 @@ index 000000000000..f27bd8266719
 +asm(".set regnum_t5  , 30");
 +asm(".set regnum_t6  , 31");
 +
++#if defined(CONFIG_32BIT)
 +//Invalidate the whole data cache
 +#define data_cache_invalidate_all() asm(".word(0x500F)");
 +
@@ -1702,6 +1703,10 @@ index 000000000000..f27bd8266719
 +     : "r" (address)                               \
 +    );                                         \
 +})
++#else
++#define data_cache_invalidate_all()
++#define data_cache_invalidate_address(address)
++#endif /* CONFIG_32_BIT */
 +
 +//Invalidate the whole instruction cache
 +#define instruction_cache_invalidate() asm("fence.i");
