@@ -1,4 +1,4 @@
-From 74a26d9c6afdf1b1e1a9b7303b08e196ce64d707 Mon Sep 17 00:00:00 2001
+From 7a61581001a90a48d1cf1679b716dacd87ce82bb Mon Sep 17 00:00:00 2001
 From: Kenny Cheung <kenny.cheung@elitestek.com>
 Date: Thu, 30 Mar 2023 14:28:01 +0800
 Subject: [PATCH] drivers: add efinix tsemac driver
@@ -10,11 +10,11 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
  drivers/net/ethernet/Makefile                 |    1 +
  drivers/net/ethernet/efinix/Kconfig           |   18 +
  drivers/net/ethernet/efinix/Makefile          |    3 +
- drivers/net/ethernet/efinix/efinix_tse.c      | 1386 +++++++++++++++++
+ drivers/net/ethernet/efinix/efinix_tse.c      | 1409 +++++++++++++++++
  drivers/net/ethernet/efinix/efinix_tse.h      |  459 ++++++
  drivers/net/ethernet/efinix/efinix_tse_dma.c  |  244 +++
  drivers/net/ethernet/efinix/efinix_tse_mdio.c |  195 +++
- 8 files changed, 2307 insertions(+)
+ 8 files changed, 2330 insertions(+)
  create mode 100644 drivers/net/ethernet/efinix/Kconfig
  create mode 100644 drivers/net/ethernet/efinix/Makefile
  create mode 100644 drivers/net/ethernet/efinix/efinix_tse.c
@@ -77,10 +77,10 @@ index 000000000000..51062131b736
 +obj-$(CONFIG_EFINIX_TSEMAC) += efinix_tsemac.o
 diff --git a/drivers/net/ethernet/efinix/efinix_tse.c b/drivers/net/ethernet/efinix/efinix_tse.c
 new file mode 100644
-index 000000000000..f9e5547e11ff
+index 000000000000..46113cc24869
 --- /dev/null
 +++ b/drivers/net/ethernet/efinix/efinix_tse.c
-@@ -0,0 +1,1386 @@
+@@ -0,0 +1,1409 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Ethernet driver for the Efinix Triple Speed Ethernet device
@@ -686,11 +686,19 @@ index 000000000000..f9e5547e11ff
 +
 +			size += length;
 +			packets++;
++		} else {
++			/* DONE but skb is NULL. Count as drop to avoid silent loss */
++			lp->ndev->stats.rx_dropped++;
 +		}
 +
++		/* Refill descriptor for HW */
 +		new_skb = napi_alloc_skb(napi, lp->max_frm_size);
-+		if (!new_skb)
++		if (unlikely((!new_skb))) {
 +			break;
++		}
++
++		/* if arch benefits from alignment */
++		//skb_reserve(new_skb, NET_SKB_PAD + NET_IP_ALIGN);
 +
 +		phys = dma_map_single(lp->dev, new_skb->data,
 +				      lp->max_frm_size,
@@ -704,6 +712,7 @@ index 000000000000..f9e5547e11ff
 +		desc_set_rx_phys_addr(lp, phys, cur_p);
 +
 +		cur_p->control = (lp->max_frm_size - 1) & DMASG_DESCRIPTOR_CONTROL_BYTES;
++		wmb();
 +		cur_p->status = 0;
 +		cur_p->skb = new_skb;
 +
@@ -717,7 +726,8 @@ index 000000000000..f9e5547e11ff
 +	lp->ndev->stats.rx_bytes += size;
 +	err = tsemac_in32(lp, TSEMAC_IF_IN_ERRORS);
 +	if (err > lp->prev_rx_err) {
-+		/*int err_kind;
++		/*
++		int err_kind;
 +		err_kind = tsemac_in32(lp, TSEMAC_IF_IN_ERRORS);
 +		netdev_err(lp->ndev, "RX error occurred, having %d error\n", err_kind);
 +		err_kind = tsemac_in32(lp, TSEMAC_CRC_ERRORS);
@@ -725,17 +735,30 @@ index 000000000000..f9e5547e11ff
 +		err_kind = tsemac_in32(lp, TSEMAC_ETHER_STATS_UNDER_SIZE_PKTS);
 +		netdev_err(lp->ndev, "RX error occurred, having %d undersize error\n", err_kind);
 +		*/
++
 +		lp->ndev->stats.rx_errors += err - lp->prev_rx_err;
 +	}
 +	lp->prev_rx_err = err;
 +
-+	// if (!packets)
-+	// 	netdev_err(lp->ndev, "no packet received\n");
++	/*
++	 * End-of-poll decision:
++	 * - If we hit budget, return budget to force immediate repoll (IRQ still masked).
++	 * - If head has DONE, keep NaPI alive by returning budget.
++	 * - Otherwise, ring is empty: complete NAPI and re-enable RX IRQ.
++	 */
 +
-+	if (packets < budget && napi_complete_done(napi, packets)) {
++	dma_rmb();
++	u32 head_status = READ_ONCE(lp->rx_bd_v[lp->rx_bd_ci].status);
++	if (packets == budget)
++		return budget;
++
++	if (head_status & DMASG_DESCRIPTOR_STATUS_COMPLETED)
++		return budget; /* workk remains; keep polling */
++
++	if (napi_complete_done(napi, packets)) {
 +		tsemac_dma_out32(lp, DMA_CH_INTERRUPT_ENABLE, DMASG_RX_BASE, lp->rx_dma_cr);
 +	}
-+	
++
 +	return packets;
 +}
 +
