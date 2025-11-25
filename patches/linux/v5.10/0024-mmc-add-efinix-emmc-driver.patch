@@ -1,17 +1,17 @@
-From 0c2da8881a535c2640d271b1143fcc4e59f89e47 Mon Sep 17 00:00:00 2001
+From 356ef676b07106b83f8622f4f25e1c594a9abe54 Mon Sep 17 00:00:00 2001
 From: Teoh Choon Zone <czteoh@efinixinc.com>
 Date: Tue, 30 Sep 2025 14:34:34 +0800
 Subject: [PATCH] mmc: Add Efinix eMMC driver
 
 ---
- drivers/mmc/host/Kconfig             |   12 +
- drivers/mmc/host/Makefile            |    2 +
- drivers/mmc/host/efx_emmc.h          |  370 ++++++++++
- drivers/mmc/host/efx_emmc_core.c     | 1025 ++++++++++++++++++++++++++
- drivers/mmc/host/efx_emmc_dma.c      |  208 ++++++
- drivers/mmc/host/efx_emmc_platform.c |  407 ++++++++++
- drivers/mmc/host/efx_emmc_tuning.c   |  459 ++++++++++++
- 7 files changed, 2483 insertions(+)
+ drivers/mmc/host/Kconfig             |  12 +
+ drivers/mmc/host/Makefile            |   2 +
+ drivers/mmc/host/efx_emmc.h          | 304 +++++++++
+ drivers/mmc/host/efx_emmc_core.c     | 975 +++++++++++++++++++++++++++
+ drivers/mmc/host/efx_emmc_dma.c      | 209 ++++++
+ drivers/mmc/host/efx_emmc_platform.c | 370 ++++++++++
+ drivers/mmc/host/efx_emmc_tuning.c   | 459 +++++++++++++
+ 7 files changed, 2331 insertions(+)
  create mode 100644 drivers/mmc/host/efx_emmc.h
  create mode 100644 drivers/mmc/host/efx_emmc_core.c
  create mode 100644 drivers/mmc/host/efx_emmc_dma.c
@@ -53,10 +53,10 @@ index c6a7ed2abcf6..ef488f1288fa 100644
  	CFLAGS-cb710-mmc	+= -DDEBUG
 diff --git a/drivers/mmc/host/efx_emmc.h b/drivers/mmc/host/efx_emmc.h
 new file mode 100644
-index 000000000000..3b382f137ffa
+index 000000000000..e7d48463957e
 --- /dev/null
 +++ b/drivers/mmc/host/efx_emmc.h
-@@ -0,0 +1,370 @@
+@@ -0,0 +1,304 @@
 +/* SPDX-License-Identifier: GPL-2.0-or-later */
 +/*
 + * Efinix eMMC Host Controller Driver Header with DMA Support
@@ -64,6 +64,7 @@ index 000000000000..3b382f137ffa
 + * Copyright (C) 2025 Efinix, Inc.
 + * Author: Teoh Choon Zone <czteoh@efinixinc.com>
 + */
++
 +
 +#ifndef __EFX_EMMC_H__
 +#define __EFX_EMMC_H__
@@ -75,12 +76,10 @@ index 000000000000..3b382f137ffa
 +#include <linux/interrupt.h>
 +#include <linux/dma-mapping.h>
 +
-+/* Compatibility macros */
 +#ifndef min3
 +#define min3(x, y, z) min(min(x, y), z)
 +#endif
 +
-+/* ADMA descriptor definitions */
 +#define EFX_ADMA_DESC_VALID     BIT(0)
 +#define EFX_ADMA_DESC_END       BIT(1)
 +#define EFX_ADMA_DESC_INT       BIT(2)
@@ -90,9 +89,8 @@ index 000000000000..3b382f137ffa
 +
 +#define EFX_ADMA_MAX_LEN        65536
 +#define EFX_ADMA_DESC_ALIGN     8
-+#define EFX_ADMA_TABLE_SZ       (512 * 8) /* Support up to 512 descriptors */
++#define EFX_ADMA_TABLE_SZ       (512 * 8) 
 +
-+/* DMA boundary sizes */
 +#define EFX_DMA_BOUNDARY_4K     0
 +#define EFX_DMA_BOUNDARY_8K     1
 +#define EFX_DMA_BOUNDARY_16K    2
@@ -102,7 +100,6 @@ index 000000000000..3b382f137ffa
 +#define EFX_DMA_BOUNDARY_256K   6
 +#define EFX_DMA_BOUNDARY_512K   7
 +
-+/* eMMC IP Register Offsets - Efinix eMMC Controller */
 +#define EFX_EMMC_VERSION                0x000
 +#define EFX_EMMC_BASE_REG0              0x004
 +#define EFX_EMMC_BASE_STATUS_REG0       0x008
@@ -125,34 +122,28 @@ index 000000000000..3b382f137ffa
 +#define EFX_EMMC_ADMA_SYS_ADDR_LOW      0x158
 +#define EFX_EMMC_ADMA_SYS_ADDR_HIGH     0x15C
 +
-+/* System Register Offsets */
 +#define EFX_SYS_DATE_REG                0x000
 +#define EFX_SYS_TEST_REG                0x004
 +#define EFX_SYS_RESET_REG               0x008
 +
-+/* Base Register 0 (0x004) */
 +#define EFX_EMMC_BASE_REG0_CLK_EN       BIT(16)
 +#define EFX_EMMC_BASE_REG0_CLK_DIV_MASK 0xFFFF
 +
-+/* Base Status Register 0 (0x008) */
 +#define EFX_EMMC_BASE_STATUS_DAT_BUSY   BIT(1)
 +#define EFX_EMMC_BASE_STATUS_CMD_BUSY   BIT(0)
 +
-+/* Base Register 1 (0x00C) */
 +#define EFX_EMMC_BASE_REG1_SAMPLE_CNT_SHIFT 16
 +#define EFX_EMMC_BASE_REG1_SAMPLE_CNT_MASK  (0xFFFF << 16)
 +#define EFX_EMMC_BASE_REG1_PHASE_SHIFT      6
 +#define EFX_EMMC_BASE_REG1_PHASE_MASK       (0x7 << 6)
 +#define EFX_EMMC_BASE_REG1_PHASE_PULSE      BIT(0)
 +
-+/* Block Size Register (0x104) */
 +#define EFX_EMMC_BLOCK_COUNT_SHIFT      16
 +#define EFX_EMMC_BLOCK_COUNT_MASK       (0xFFFF << 16)
 +#define EFX_EMMC_BLOCK_SIZE_MASK        0xFFF
 +#define EFX_EMMC_DMA_BOUNDARY_SHIFT     12
 +#define EFX_EMMC_DMA_BOUNDARY_MASK      (0x7 << 12)
 +
-+/* Transfer Mode Register (0x10C) */
 +#define EFX_EMMC_CMD_INDEX_SHIFT        24
 +#define EFX_EMMC_CMD_INDEX_MASK         (0x3F << 24)
 +#define EFX_EMMC_DATA_PRESENT           BIT(21)
@@ -171,7 +162,6 @@ index 000000000000..3b382f137ffa
 +#define EFX_EMMC_BLOCK_COUNT_EN         BIT(1)
 +#define EFX_EMMC_DMA_EN                 BIT(0)
 +
-+/* Present State Register (0x124) */
 +#define EFX_EMMC_BUFFER_READ_EN         BIT(11)
 +#define EFX_EMMC_BUFFER_WRITE_EN        BIT(10)
 +#define EFX_EMMC_READ_XFER_ACTIVE       BIT(9)
@@ -180,7 +170,6 @@ index 000000000000..3b382f137ffa
 +#define EFX_EMMC_CMD_INHIBIT_DAT        BIT(1)
 +#define EFX_EMMC_CMD_INHIBIT_CMD        BIT(0)
 +
-+/* Host Control Register (0x128) */
 +#define EFX_EMMC_DATA_SAMPLING_MODE     BIT(3)
 +#define EFX_EMMC_DATA_WIDTH_SHIFT       1
 +#define EFX_EMMC_DATA_WIDTH_MASK        (0x3 << 1)
@@ -188,7 +177,6 @@ index 000000000000..3b382f137ffa
 +#define EFX_EMMC_DATA_WIDTH_4BIT        1
 +#define EFX_EMMC_DATA_WIDTH_8BIT        2
 +
-+/* Interrupt Status Register bits */
 +#define EFX_EMMC_INT_ADMA_ERROR         BIT(25)
 +#define EFX_EMMC_INT_DATA_TIMEOUT_ERR   BIT(22)
 +#define EFX_EMMC_INT_DATA_CRC_ERR       BIT(21)
@@ -199,7 +187,6 @@ index 000000000000..3b382f137ffa
 +#define EFX_EMMC_INT_CMD_TIMEOUT_ERR    BIT(16)
 +#define EFX_EMMC_INT_BUFFER_READ_RDY    BIT(5)
 +#define EFX_EMMC_INT_BUFFER_WRITE_RDY   BIT(4)
-+#define EFX_EMMC_INT_DMA_INTERRUPT      BIT(3)
 +#define EFX_EMMC_INT_BLOCK_GAP_EVENT    BIT(2)
 +#define EFX_EMMC_INT_XFER_COMPLETE      BIT(1)
 +#define EFX_EMMC_INT_CMD_COMPLETE       BIT(0)
@@ -216,90 +203,40 @@ index 000000000000..3b382f137ffa
 +#define EFX_EMMC_INT_ALL_MASK           (EFX_EMMC_INT_ERROR_MASK | \
 +                                         EFX_EMMC_INT_BUFFER_READ_RDY | \
 +                                         EFX_EMMC_INT_BUFFER_WRITE_RDY | \
-+                                         EFX_EMMC_INT_DMA_INTERRUPT | \
 +                                         EFX_EMMC_INT_BLOCK_GAP_EVENT | \
 +                                         EFX_EMMC_INT_XFER_COMPLETE | \
 +                                         EFX_EMMC_INT_CMD_COMPLETE)
 +
-+/* System Reset Register bits */
 +#define EFX_SYS_RESET_EMMC_DEV          BIT(1)
 +#define EFX_SYS_RESET_EMMC_IP           BIT(0)
 +
-+/* Host capabilities */
 +#define EFX_EMMC_BASE_CLK_FREQ_MHZ      200
 +#define EFX_EMMC_MAX_BLOCK_LENGTH       512
 +#define EFX_EMMC_TIMEOUT_CLK_FREQ       200000000
 +
-+/* Driver constants */
-+#define EFX_EMMC_MIN_FREQ               400000    /* 400 KHz */
-+#define EFX_EMMC_MAX_FREQ               200000000 /* 200 MHz */
++#define EFX_EMMC_MIN_FREQ               400000    
++#define EFX_EMMC_MAX_FREQ               200000000 
 +#define EFX_EMMC_PIO_TIMEOUT_MS         1000
 +
-+/* Hardware specific constants from documentation */
-+#define EFX_EMMC_CLOCK_STABILIZE_DELAY  1000      /* 1ms + 74 clock cycles */
-+#define EFX_EMMC_RESET_PULSE_WIDTH      1         /* 1us minimum */
-+#define EFX_EMMC_POST_RESET_DELAY       200       /* 200us minimum */
-+#define EFX_EMMC_CMD_RETRY_COUNT        3         /* Command retry attempts */
++#define EFX_EMMC_CLOCK_STABILIZE_DELAY  1000      
++#define EFX_EMMC_RESET_PULSE_WIDTH      1         
++#define EFX_EMMC_POST_RESET_DELAY       200       
++#define EFX_EMMC_CMD_RETRY_COUNT        3         
 +
-+/* Tuning algorithm constants - HS200/HS400 timing optimization */
-+#define EFX_EMMC_MAX_PLL_SHIFT		8	/* 8 phase positions (45°) */
-+#define EFX_EMMC_PLL_SETTLING_TIME	50	/* 50ms PLL settling time */
-+#define EFX_EMMC_TUNING_TIMEOUT_MS	50	/* CMD21 timeout */
-+#define EFX_EMMC_TUNING_POLL_INTERVAL	200	/* 200us polling interval */
-+#define EFX_EMMC_TUNING_BLOCK_SIZE_4BIT	64	/* 4-bit bus tuning block */
-+#define EFX_EMMC_TUNING_BLOCK_SIZE_8BIT	128	/* 8-bit bus tuning block */
-+#define EFX_EMMC_MIN_TIMING_MARGIN	1	/* Min consecutive valid */
++#define EFX_EMMC_MAX_PLL_SHIFT		8	
++#define EFX_EMMC_PLL_SETTLING_TIME	50	
++#define EFX_EMMC_TUNING_TIMEOUT_MS	50	
++#define EFX_EMMC_TUNING_POLL_INTERVAL	200	
++#define EFX_EMMC_TUNING_BLOCK_SIZE_4BIT	64	
++#define EFX_EMMC_TUNING_BLOCK_SIZE_8BIT	128	
++#define EFX_EMMC_MIN_TIMING_MARGIN	1	
 +
-+/**
-+ * struct efx_adma_desc - ADMA descriptor structure
-+ * @attr: Descriptor attributes (valid, end, interrupt, type)
-+ * @len: Data length for this descriptor
-+ * @addr: 32-bit DMA address
-+ *
-+ * Hardware ADMA descriptor structure, must be 8-byte aligned
-+ */
 +struct efx_adma_desc {
 +	u16 attr;
 +	u16 len;
 +	u32 addr;
 +} __packed __aligned(8);
 +
-+/**
-+ * struct efx_emmc_host - Efinix eMMC host controller instance
-+ * @mmc: MMC host structure
-+ * @ioaddr: Base address for eMMC registers
-+ * @sys_ioaddr: Base address for system registers
-+ * @clk: Controller clock
-+ * @irq: Interrupt number
-+ * @mrq: Current MMC request
-+ * @cmd: Current MMC command
-+ * @data: Current MMC data transfer
-+ * @base_clk: Base clock frequency
-+ * @current_clk: Current configured clock frequency
-+ * @bytes_to_transfer: Remaining bytes for PIO transfer
-+ * @blocks_done: Number of completed blocks
-+ * @sg_offset: Current offset in scatter-gather list
-+ * @adma_desc: ADMA descriptor table
-+ * @adma_desc_dma: DMA address of descriptor table
-+ * @adma_desc_sz: Size of descriptor table
-+ * @bounce_buffer: Bounce buffer for unaligned transfers
-+ * @bounce_dma: DMA address of bounce buffer
-+ * @bounce_buffer_size: Size of bounce buffer
-+ * @use_dma: Flag indicating DMA mode is active
-+ * @dma_64bit: Flag indicating 64-bit DMA support
-+ * @clk_div: Current clock divider value
-+ * @optimal_sample_count: Optimal sample count from tuning
-+ * @optimal_pll_shift: Optimal PLL shift from tuning
-+ * @optimal_margin: Timing margin from tuning
-+ * @tuning_done: Flag indicating tuning completion
-+ * @tuning_in_progress: Flag indicating active tuning
-+ * @prev_timing: Previous timing mode
-+ * @hs400_retune_pending: Flag indicating HS400 retune needed
-+ * @hs400_retune_work: Delayed work for HS400 retuning
-+ * @tuned_timing_modes: Bitmap of successfully tuned timing modes
-+ * @lock: Spinlock for protecting shared data
-+ * @pdev: Platform device
-+ */
 +struct efx_emmc_host {
 +	struct mmc_host *mmc;
 +	void __iomem *ioaddr;
@@ -308,18 +245,17 @@ index 000000000000..3b382f137ffa
 +	int irq;
 +
 +	struct mmc_request *mrq;
++	struct mmc_request *mrq_done;
 +	struct mmc_command *cmd;
 +	struct mmc_data *data;
 +
 +	u32 base_clk;
 +	u32 current_clk;
 +
-+	/* Transfer state tracking */
 +	int bytes_to_transfer;
 +	int blocks_done;
 +	unsigned int sg_offset;
 +
-+	/* DMA related fields */
 +	struct efx_adma_desc *adma_desc;
 +	dma_addr_t adma_desc_dma;
 +	size_t adma_desc_sz;
@@ -327,22 +263,27 @@ index 000000000000..3b382f137ffa
 +	void *bounce_buffer;
 +	dma_addr_t bounce_dma;
 +	unsigned int bounce_buffer_size;
++	unsigned int bounce_used;
++	bool bounce_active;
 +
 +	bool use_dma;
 +	bool dma_64bit;
 +
-+	/* Tuning related fields */
 +	u32 clk_div;
-+	u32 optimal_sample_count;
-+	u32 optimal_pll_shift;
-+	u32 optimal_margin;
++	u32 hs200_sample_count;
++	u32 hs200_pll_shift;
++	u32 hs200_margin;
++	u32 hs400_sample_count;
++	u32 hs400_pll_shift;
++	u32 hs400_margin;
++	u32 hs400_default_sample;
++	u32 hs400_default_pll;
 +	bool tuning_done;
 +	bool tuning_in_progress;
 +	unsigned int prev_timing;
 +	bool hs400_retune_pending;
 +	struct delayed_work hs400_retune_work;
 +
-+	/* Tuning state bitmap - tracks which timing modes have been tuned */
 +	unsigned long tuned_timing_modes;
 +
 +	spinlock_t lock;
@@ -350,7 +291,6 @@ index 000000000000..3b382f137ffa
 +	struct platform_device *pdev;
 +};
 +
-+/* Debug macros */
 +#define efx_emmc_dbg_irq(host, fmt, ...) \
 +	dev_dbg(&(host)->pdev->dev, fmt, ##__VA_ARGS__)
 +#define efx_emmc_dbg_pio(host, fmt, ...) \
@@ -358,14 +298,12 @@ index 000000000000..3b382f137ffa
 +#define efx_emmc_dbg_cmd(host, fmt, ...) \
 +	dev_dbg(&(host)->pdev->dev, fmt, ##__VA_ARGS__)
 +
-+/* Platform driver function prototypes */
 +int efx_emmc_probe(struct platform_device *pdev);
 +int efx_emmc_remove(struct platform_device *pdev);
 +int efx_emmc_init_hw(struct efx_emmc_host *host);
 +void efx_emmc_reset_hw(struct efx_emmc_host *host);
 +void efx_emmc_hs400_retune_work(struct work_struct *work);
 +
-+/* Core MMC host operation prototypes */
 +void efx_emmc_request(struct mmc_host *mmc, struct mmc_request *mrq);
 +void efx_emmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
 +int efx_emmc_get_cd(struct mmc_host *mmc);
@@ -373,7 +311,6 @@ index 000000000000..3b382f137ffa
 +int efx_emmc_get_ro(struct mmc_host *mmc);
 +irqreturn_t efx_emmc_irq(int irq, void *dev_id);
 +
-+/* Core helper function prototypes */
 +void efx_emmc_send_command(struct efx_emmc_host *host, struct mmc_command *cmd);
 +void efx_emmc_finish_request(struct efx_emmc_host *host,
 +			     struct mmc_request *mrq);
@@ -385,7 +322,6 @@ index 000000000000..3b382f137ffa
 +void efx_emmc_set_timing(struct efx_emmc_host *host, unsigned int timing);
 +bool efx_emmc_card_busy(struct efx_emmc_host *host);
 +
-+/* DMA function prototypes */
 +int efx_emmc_adma_table_pre(struct efx_emmc_host *host,
 +			    struct mmc_data *data);
 +void efx_emmc_adma_table_post(struct efx_emmc_host *host,
@@ -394,7 +330,6 @@ index 000000000000..3b382f137ffa
 +void efx_emmc_cleanup_dma(struct efx_emmc_host *host, struct mmc_data *data);
 +void efx_emmc_set_adma_addr(struct efx_emmc_host *host, dma_addr_t addr);
 +
-+/* Tuning function prototypes */
 +int efx_emmc_execute_tuning(struct mmc_host *mmc, u32 opcode);
 +int efx_emmc_execute_tuning_command(struct efx_emmc_host *host,
 +				     int bus_width);
@@ -404,7 +339,6 @@ index 000000000000..3b382f137ffa
 +				  u8 result_map[][EFX_EMMC_MAX_PLL_SHIFT],
 +				  u32 max_sample_count);
 +
-+/* Register access helpers */
 +static inline u32 efx_emmc_readl(struct efx_emmc_host *host, u32 reg)
 +{
 +    return readl(host->ioaddr + reg);
@@ -426,15 +360,14 @@ index 000000000000..3b382f137ffa
 +    writel(val, host->sys_ioaddr + reg);
 +}
 +
-+#endif /* __EFX_EMMC_H__ */
-\ No newline at end of file
++#endif 
 diff --git a/drivers/mmc/host/efx_emmc_core.c b/drivers/mmc/host/efx_emmc_core.c
 new file mode 100644
-index 000000000000..c5eb59006f54
+index 000000000000..4c4a975a32c3
 --- /dev/null
 +++ b/drivers/mmc/host/efx_emmc_core.c
-@@ -0,0 +1,1025 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later
+@@ -0,0 +1,975 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
 +/*
 + * Efinix eMMC Host Controller Core Operations
 + *
@@ -442,6 +375,8 @@ index 000000000000..c5eb59006f54
 + * Author: Teoh Choon Zone <czteoh@efinixinc.com>
 + */
 +
++
++#include <linux/compiler.h>
 +#include <linux/delay.h>
 +#include <linux/scatterlist.h>
 +#include <linux/jiffies.h>
@@ -449,6 +384,18 @@ index 000000000000..c5eb59006f54
 +#include <linux/mmc/host.h>
 +
 +#include "efx_emmc.h"
++
++static void efx_emmc_complete_pending_request(struct efx_emmc_host *host)
++{
++	struct mmc_request *mrq;
++
++	mrq = READ_ONCE(host->mrq_done);
++	if (!mrq)
++		return;
++
++	WRITE_ONCE(host->mrq_done, NULL);
++	mmc_request_done(host->mmc, mrq);
++}
 +
 +bool efx_emmc_card_busy(struct efx_emmc_host *host)
 +{
@@ -459,15 +406,12 @@ index 000000000000..c5eb59006f54
 +static bool efx_emmc_need_stop_command(struct mmc_data *data,
 +					struct mmc_request *mrq)
 +{
-+	/* Don't send CMD12 for single block transfers */
 +	if (data->blocks <= 1)
 +		return false;
 +
-+	/* Don't send CMD12 if stop command is not provided */
 +	if (!data->stop)
 +		return false;
 +
-+	/* Don't send CMD12 if CMD23 was used (SET_BLOCK_COUNT) */
 +	if (mrq->sbc)
 +		return false;
 +
@@ -478,7 +422,6 @@ index 000000000000..c5eb59006f54
 +			     struct mmc_request *mrq)
 +{
 +
-+	/* Cleanup DMA if used */
 +	if (host->data) {
 +		efx_emmc_cleanup_dma(host, host->data);
 +	}
@@ -488,9 +431,11 @@ index 000000000000..c5eb59006f54
 +	host->data = NULL;
 +	host->bytes_to_transfer = 0;
 +	host->blocks_done = 0;
++	host->sg_offset = 0;
 +	host->use_dma = false;
 +
-+	mmc_request_done(host->mmc, mrq);
++	if (mrq)
++		WRITE_ONCE(host->mrq_done, mrq);
 +}
 +
 +static void efx_emmc_transfer_pio_read(struct efx_emmc_host *host)
@@ -513,7 +458,6 @@ index 000000000000..c5eb59006f54
 +		return;
 +	}
 +
-+	/* Pre-calculate words per block */
 +	words_in_fifo = data->blksz / sizeof(u32);
 +	sg_offset = host->sg_offset;
 +	words_transferred = 0;
@@ -533,7 +477,6 @@ index 000000000000..c5eb59006f54
 +
 +		buf = (u32 *)(sg_virt(sg) + sg_offset);
 +		remaining_in_sg = sg->length - sg_offset;
-+		/* Calculate words to transfer */
 +		words_to_transfer = min3(remaining_in_sg / sizeof(u32),
 +		                        (unsigned int)(words_in_fifo -
 +		                                      words_transferred),
@@ -592,7 +535,6 @@ index 000000000000..c5eb59006f54
 +		return;
 +	}
 +
-+	/* Pre-calculate words per block */
 +	words_in_fifo = data->blksz / sizeof(u32);
 +	sg_offset = host->sg_offset;
 +	words_transferred = 0;
@@ -612,7 +554,6 @@ index 000000000000..c5eb59006f54
 +
 +		buf = (u32 *)(sg_virt(sg) + sg_offset);
 +		remaining_in_sg = sg->length - sg_offset;
-+		/* Calculate words to transfer */
 +		words_to_transfer = min3(remaining_in_sg / sizeof(u32),
 +		                        (unsigned int)(words_in_fifo -
 +		                                      words_transferred),
@@ -661,7 +602,6 @@ index 000000000000..c5eb59006f54
 +		return;
 +	}
 +
-+	/* Check buffer ready and perform transfer */
 +	present_state = efx_emmc_readl(host, EFX_EMMC_PRESENT_STATE);
 +
 +	if (data->flags & MMC_DATA_READ) {
@@ -699,17 +639,14 @@ index 000000000000..c5eb59006f54
 +		         data->error);
 +	}
 +
-+	/* Clear data pointer */
++	efx_emmc_cleanup_dma(host, data);
++
 +	host->data = NULL;
 +	host->bytes_to_transfer = 0;
 +	host->blocks_done = 0;
 +	host->sg_offset = 0;
 +
-+	/* Send stop command if needed and no error occurred */
 +	if (efx_emmc_need_stop_command(data, host->mrq) && !data->error) {
-+		/* Wait for any data line activity to complete before
-+		 * sending CMD12
-+		 */
 +		retry_count = 0;
 +		while (retry_count < 100) {
 +		    present_state = efx_emmc_readl(host,
@@ -756,14 +693,11 @@ index 000000000000..c5eb59006f54
 +
 +	if (cmd->flags & MMC_RSP_PRESENT) {
 +		if (cmd->flags & MMC_RSP_136) {
-+		    /* 120-bit response - read all 4 registers */
 +		    resp[0] = efx_emmc_readl(host, EFX_EMMC_RESPONSE0);
 +		    resp[1] = efx_emmc_readl(host, EFX_EMMC_RESPONSE1);
 +		    resp[2] = efx_emmc_readl(host, EFX_EMMC_RESPONSE2);
 +		    resp[3] = efx_emmc_readl(host, EFX_EMMC_RESPONSE3) & 0xFFFFFF;
 +
-+		    /* Convert hardware 120-bit response to MMC core 136-bit format
-+		     * by shifting and concatenating registers with proper alignment */
 +		    cmd->resp[0] = resp[3] << 8 | resp[2] >> 24;
 +		    cmd->resp[1] = resp[2] << 8 | resp[1] >> 24;
 +		    cmd->resp[2] = resp[1] << 8 | resp[0] >> 24;
@@ -774,36 +708,31 @@ index 000000000000..c5eb59006f54
 +				     cmd->opcode, cmd->resp[0], cmd->resp[1],
 +				     cmd->resp[2], cmd->resp[3]);
 +		} else {
-+		    /* 48-bit response */
 +		    cmd->resp[0] = efx_emmc_readl(host, EFX_EMMC_RESPONSE0);
 +		    efx_emmc_dbg_cmd(host, "CMD%d response: 0x%08x\n",
 +				     cmd->opcode, cmd->resp[0]);
 +		}
 +	}
 +
-+	/* Handle CMD6 mode switch completion - apply safe timing after
-+	 * successful mode switch
-+	 */
 +	if (cmd->opcode == 6 && cmd->error == 0) {
 +		u32 arg = cmd->arg;
 +		u8 index = (arg >> 16) & 0xFF;
 +		u8 value = (arg >> 8) & 0xFF;
 +
-+		/* Check if this is a timing interface switch (index 185) */
 +		if (index == 185) {
 +		    switch (value) {
-+		    case 0: /* Legacy timing */
-+		    case 1: /* High Speed timing */
++		    case 0: 
++		    case 1: 
 +		        dev_dbg(&host->pdev->dev,
 +				"CMD6 mode switch to legacy/HS completed\n");
 +		        efx_emmc_set_timing_config(host, 0, 0);
 +		        break;
-+		    case 2: /* DDR52 timing */
++		    case 2: 
 +		        dev_dbg(&host->pdev->dev,
 +				"CMD6 mode switch to DDR52 completed\n");
 +		        efx_emmc_set_timing_config(host, 2, 2);
 +		        break;
-+		    case 3: /* HS200 timing - wait for tuning */
++		    case 3: 
 +		        dev_dbg(&host->pdev->dev,
 +				"CMD6 mode switch to HS200 completed\n");
 +		        break;
@@ -813,24 +742,23 @@ index 000000000000..c5eb59006f54
 +					 value);
 +		        break;
 +		    }
++
++		    efx_emmc_writel(host, 0xFFFFFFFF, EFX_EMMC_INT_STATUS);
++
 +		}
 +	}
 +
-+	/* Check if this was CMD23 completion */
 +	if (cmd->opcode == 23 && host->mrq && host->mrq->cmd) {
 +		efx_emmc_dbg_cmd(host,
 +				  "CMD23 complete, sending main command CMD%d\n",
 +				  host->mrq->cmd->opcode);
-+		/* CMD23 completed, now send the main command */
 +		host->cmd = host->mrq->cmd;
 +		efx_emmc_send_command(host, host->mrq->cmd);
 +		return;
 +	}
 +
-+	/* Clear the command pointer - we're done with command phase */
 +	host->cmd = NULL;
 +
-+	/* If no data transfer, finish the request immediately */
 +	if (!host->data) {
 +		efx_emmc_dbg_cmd(host, "Command complete, finishing request\n");
 +		if (host->mrq) {
@@ -841,7 +769,6 @@ index 000000000000..c5eb59006f54
 +				  "Command complete, data transfer continues (DMA: %s)\n",
 +		        host->use_dma ? "enabled" : "disabled");
 +
-+		/* For PIO transfers, check if buffer is ready - single register read */
 +		if (!host->use_dma) {
 +		    bool buffer_ready_read, buffer_ready_write;
 +
@@ -851,7 +778,6 @@ index 000000000000..c5eb59006f54
 +				     "Present state after command: 0x%08x\n",
 +				     present_state);
 +
-+		    /* Cache register read result to avoid redundant access */
 +		    buffer_ready_read = !!(present_state & EFX_EMMC_BUFFER_READ_EN);
 +		    buffer_ready_write = !!(present_state & EFX_EMMC_BUFFER_WRITE_EN);
 +
@@ -869,7 +795,6 @@ index 000000000000..c5eb59006f54
 +		        }
 +		    }
 +		}
-+		/* For DMA transfers, hardware handles data transfer automatically */
 +	}
 +}
 +
@@ -886,37 +811,34 @@ index 000000000000..c5eb59006f54
 +	efx_emmc_dbg_cmd(host, "Sending CMD%d, arg=0x%08x%s\n",
 +		    cmd->opcode, cmd->arg, (cmd->opcode == 12) ? " (STOP)" : "");
 +
-+	/* Special handling for CMD6 - use safe timing during mode switch */
 +	if (cmd->opcode == 6) {
 +		u32 arg = cmd->arg;
 +		u8 index = (arg >> 16) & 0xFF;
 +		u8 value = (arg >> 8) & 0xFF;
 +
-+		/* Check if this is a timing interface switch (index 185) */
 +		if (index == 185) {
 +		    dev_dbg(&host->pdev->dev,
 +			    "CMD6 mode switch detected (index=%u, value=%u)\n",
 +		             index, value);
-+		    /* Apply very safe timing for mode switch command */
 +		    efx_emmc_set_timing_config(host, 0, 0);
-+		    /* Optimized delay to ensure timing is stable */
-+		    usleep_range(100, 200); /* Reduced from 5ms to 100-200us */
++		    msleep(10);
++
++		    efx_emmc_writel(host, 0xFFFFFFFF, EFX_EMMC_INT_STATUS);
 +		}
 +	}
 +
-+	/* Get command-specific timeout - clearer than lookup table */
 +	switch (cmd->opcode) {
-+	case 6:  /* CMD6 mode switch */
++	case 6:  
 +		cmd_timeout = 2000;
 +		break;
-+	case 12: /* CMD12 stop transmission */
++	case 12: 
 +		cmd_timeout = 1000;
 +		break;
-+	case 23: /* CMD23 set block count */
++	case 23: 
 +		cmd_timeout = 500;
 +		break;
 +	default:
-+		cmd_timeout = 500;  /* Default timeout for all other commands */
++		cmd_timeout = 500;  
 +		break;
 +	}
 +	timeout = jiffies + msecs_to_jiffies(cmd_timeout);
@@ -941,10 +863,8 @@ index 000000000000..c5eb59006f54
 +		return;
 +	}
 +
-+	/* Set command argument */
 +	efx_emmc_writel(host, cmd->arg, EFX_EMMC_ARG1);
 +
-+	/* Build command register value */
 +	command = (cmd->opcode << EFX_EMMC_CMD_INDEX_SHIFT) &
 +		  EFX_EMMC_CMD_INDEX_MASK;
 +
@@ -969,15 +889,12 @@ index 000000000000..c5eb59006f54
 +	if (data) {
 +		command |= EFX_EMMC_DATA_PRESENT;
 +
-+		/* Use DMA for transfers >= 512 bytes */
 +		host->use_dma = (data->blksz * data->blocks >= 512);
 +
-+		/* Prepare DMA if enabled */
 +		if (host->use_dma) {
 +		    efx_emmc_prepare_dma(host, data);
 +		}
 +
-+		/* Set up data transfer */
 +		efx_emmc_writel(host, (data->blocks << EFX_EMMC_BLOCK_COUNT_SHIFT) |
 +		                (data->blksz & EFX_EMMC_BLOCK_SIZE_MASK),
 +		                EFX_EMMC_BLOCK_SIZE);
@@ -998,19 +915,16 @@ index 000000000000..c5eb59006f54
 +		    command |= EFX_EMMC_DATA_XFER_DIR;
 +		}
 +
-+		/* Enable DMA if prepared successfully */
 +		if (host->use_dma) {
 +		    command |= EFX_EMMC_DMA_EN;
 +		    efx_emmc_dbg_cmd(host, "DMA enabled for data transfer\n");
 +		} else {
-+		    /* Initialize PIO transfer state */
 +		    host->bytes_to_transfer = data->blksz * data->blocks;
 +		    host->blocks_done = 0;
 +		    host->sg_offset = 0;
 +		    efx_emmc_dbg_cmd(host, "Using PIO for data transfer\n");
 +		}
 +
-+		/* Initialize data transfer state */
 +		host->data = data;
 +
 +		efx_emmc_dbg_cmd(host, "Data transfer: %d blocks of %d bytes, %s, %s\n",
@@ -1030,7 +944,6 @@ index 000000000000..c5eb59006f54
 +	unsigned long timeout;
 +
 +	if (clock == 0) {
-+		/* Disable clock */
 +		reg = efx_emmc_readl(host, EFX_EMMC_BASE_REG0);
 +		reg &= ~EFX_EMMC_BASE_REG0_CLK_EN;
 +		efx_emmc_writel(host, reg, EFX_EMMC_BASE_REG0);
@@ -1038,46 +951,30 @@ index 000000000000..c5eb59006f54
 +		return;
 +	}
 +
-+	/* Calculate clock divider (hardware constraint: must be 1 or even number)
-+	 * Formula: actual_freq = base_freq / divider
-+	 * This ensures we don't exceed the requested frequency.
-+	 */
-+	/* Enforce maximum frequency limit */
 +	if (clock > EFX_EMMC_MAX_FREQ) {
 +		clock = EFX_EMMC_MAX_FREQ;
 +	}
 +
-+	/* Calculate clock divider */
 +	if (clock >= host->base_clk) {
 +		div = 1;
 +	} else {
-+		div = (host->base_clk + clock - 1) / clock; /* Round up */
-+		/* Ensure even divider for hardware compliance */
++		div = (host->base_clk + clock - 1) / clock; 
 +		if (div > 1 && (div & 1)) {
 +		    div += 1;
 +		}
 +	}
 +
-+	/* Disable clock first */
 +	reg = efx_emmc_readl(host, EFX_EMMC_BASE_REG0);
 +	reg &= ~EFX_EMMC_BASE_REG0_CLK_EN;
 +	efx_emmc_writel(host, reg, EFX_EMMC_BASE_REG0);
 +
-+	/* Set divider */
 +	reg = (reg & ~EFX_EMMC_BASE_REG0_CLK_DIV_MASK) |
 +	      (div & EFX_EMMC_BASE_REG0_CLK_DIV_MASK);
 +	efx_emmc_writel(host, reg, EFX_EMMC_BASE_REG0);
 +
-+	/* Enable clock */
 +	reg |= EFX_EMMC_BASE_REG0_CLK_EN;
 +	efx_emmc_writel(host, reg, EFX_EMMC_BASE_REG0);
 +
-+	/* Clock stabilization delays based on eMMC specification:
-+	 * - Low freq (≤400kHz): 0.5-1ms for card identification mode
-+	 * - Medium freq (≤25MHz): 100-200us for normal operation
-+	 * - High freq (>25MHz): 50-100us for high-speed modes
-+	 * These delays ensure PLL lock and signal integrity.
-+	 */
 +	if (clock <= 400000) {
 +		usleep_range(500, 1000);
 +	} else if (clock <= 25000000) {
@@ -1086,7 +983,6 @@ index 000000000000..c5eb59006f54
 +		usleep_range(50, 100);
 +	}
 +
-+	/* Verify controller is ready */
 +	timeout = jiffies + msecs_to_jiffies(50);
 +	while (time_before(jiffies, timeout)) {
 +		if (!(efx_emmc_readl(host, EFX_EMMC_BASE_STATUS_REG0) &
@@ -1098,7 +994,7 @@ index 000000000000..c5eb59006f54
 +	}
 +
 +	host->current_clk = host->base_clk / div;
-+	host->clk_div = div; /* Store for tuning algorithm */
++	host->clk_div = div; 
 +	dev_dbg(&host->pdev->dev, "Set clock to %u Hz (div=%u, actual=%u)\n",
 +		    clock, div, host->current_clk);
 +}
@@ -1140,49 +1036,52 @@ index 000000000000..c5eb59006f54
 +	case MMC_TIMING_LEGACY:
 +	case MMC_TIMING_MMC_HS:
 +		reg &= ~EFX_EMMC_DATA_SAMPLING_MODE;
-+		/* Legacy/HS modes don't require tuning - leave state unchanged */
 +		break;
 +	case MMC_TIMING_MMC_DDR52:
 +		reg |= EFX_EMMC_DATA_SAMPLING_MODE;
-+		/* DDR52 uses safe timing configuration - mark as tuned */
 +		host->tuning_done = true;
 +		set_bit(timing, &host->tuned_timing_modes);
 +		break;
 +	case MMC_TIMING_MMC_HS200:
 +		reg &= ~EFX_EMMC_DATA_SAMPLING_MODE;
-+		/* Check if we've already tuned for HS200 */
 +		if (!test_bit(timing, &host->tuned_timing_modes)) {
 +		    needs_tuning = true;
 +		    host->tuning_done = false;
 +		    dev_dbg(&host->pdev->dev, "HS200 mode - tuning required\n");
 +		} else {
-+		    dev_dbg(&host->pdev->dev, "HS200 mode - already tuned\n");
++		    efx_emmc_set_timing_config(host, host->hs200_sample_count,
++		                               host->hs200_pll_shift);
++		    dev_dbg(&host->pdev->dev,
++		            "HS200 mode - already tuned, restored timing (sample=%u, pll=%u)\n",
++		            host->hs200_sample_count, host->hs200_pll_shift);
 +		}
 +		break;
 +	case MMC_TIMING_MMC_HS400:
-+		reg |= EFX_EMMC_DATA_SAMPLING_MODE;
-+		/* Check if we've already tuned for HS400 */
++		reg |= EFX_EMMC_DATA_SAMPLING_MODE; 
++
 +		if (!test_bit(timing, &host->tuned_timing_modes)) {
++		    u32 initial_sample = host->hs400_default_sample;
++		    u32 initial_pll = host->hs400_default_pll;
++
++		    efx_emmc_set_timing_config(host, initial_sample, initial_pll);
 +		    needs_tuning = true;
 +		    host->tuning_done = false;
-+		    dev_dbg(&host->pdev->dev, "HS400 mode - tuning required\n");
++		    host->hs400_retune_pending = true;
 +
-+		    /* Force HS400 retuning for first time */
-+		    if (host->mmc) {
-+		        dev_dbg(&host->pdev->dev,
-+				"HS400 first time - timing %u to HS400\n",
-+				host->prev_timing);
-+		        host->hs400_retune_pending = true;
-+		        mmc_retune_needed(host->mmc);
-+
-+		        /* Schedule delayed worker as backup */
-+		        dev_dbg(&host->pdev->dev,
-+				"Scheduling delayed worker in 100ms\n");
-+		        schedule_delayed_work(&host->hs400_retune_work,
-+					      msecs_to_jiffies(100));
-+		    }
++		    dev_info(&host->pdev->dev,
++			     "HS400 mode - using default sample=%u pll=%u, clock=%u Hz\n",
++			     initial_sample, initial_pll, host->mmc->ios.clock);
++		    dev_info(&host->pdev->dev,
++		             "HS400 tuning scheduled (clock=%u Hz)\n",
++		             host->mmc->ios.clock);
++		    schedule_delayed_work(&host->hs400_retune_work,
++					  msecs_to_jiffies(10));
 +		} else {
-+		    dev_dbg(&host->pdev->dev, "HS400 mode - already tuned\n");
++		    efx_emmc_set_timing_config(host, host->hs400_sample_count,
++		                               host->hs400_pll_shift);
++		    dev_info(&host->pdev->dev,
++		             "HS400 mode - already tuned, restored timing (sample=%u, pll=%u)\n",
++		             host->hs400_sample_count, host->hs400_pll_shift);
 +		}
 +		break;
 +	default:
@@ -1199,7 +1098,6 @@ index 000000000000..c5eb59006f54
 +		     timing == MMC_TIMING_MMC_HS400 ? "HS400" : "Unknown", timing,
 +		     needs_tuning ? "NEEDS TUNING" : "NO TUNING NEEDED");
 +
-+	/* Update previous timing for reference */
 +	host->prev_timing = timing;
 +}
 +
@@ -1226,9 +1124,7 @@ index 000000000000..c5eb59006f54
 +	efx_emmc_writel(host, intstat, EFX_EMMC_INT_STATUS);
 +	result = IRQ_HANDLED;
 +
-+	/* Handle error interrupts first */
 +	if (intstat & EFX_EMMC_INT_ERROR_MASK) {
-+		/* Handle ADMA error specifically */
 +		if (intstat & EFX_EMMC_INT_ADMA_ERROR) {
 +		    dev_err(&host->pdev->dev, "ADMA error detected\n");
 +		    if (host->data) {
@@ -1236,14 +1132,12 @@ index 000000000000..c5eb59006f54
 +		    }
 +		}
 +
-+		/* Log error but don't spam for expected errors during detection */
 +		if (host->cmd && (host->cmd->opcode == 52 || host->cmd->opcode == 8 ||
 +		                 host->cmd->opcode == 5 || host->cmd->opcode == 55)) {
 +		    efx_emmc_dbg_irq(host,
 +				     "Expected timeout for CMD%d during card detection\n",
 +		            host->cmd->opcode);
 +		} else if (host->tuning_in_progress) {
-+		    /* Suppress error logging during tuning - errors are expected */
 +		    efx_emmc_dbg_irq(host, "Tuning error (expected): 0x%08x\n",
 +		            (unsigned int)(intstat & EFX_EMMC_INT_ERROR_MASK));
 +		} else {
@@ -1313,19 +1207,11 @@ index 000000000000..c5eb59006f54
 +		goto out;
 +	}
 +
-+	/* Handle command completion */
 +	if (intstat & EFX_EMMC_INT_CMD_COMPLETE) {
 +		efx_emmc_dbg_irq(host, "Command complete\n");
 +		efx_emmc_finish_command(host);
 +	}
 +
-+	/* Handle DMA interrupt */
-+	if (intstat & EFX_EMMC_INT_DMA_INTERRUPT) {
-+		efx_emmc_dbg_irq(host, "DMA interrupt\n");
-+		/* DMA boundary reached, but transfer continues automatically */
-+	}
-+
-+	/* Handle data buffer ready interrupts (for PIO only) */
 +	if (likely(!host->use_dma) &&
 +	    (intstat & (EFX_EMMC_INT_BUFFER_READ_RDY |
 +			EFX_EMMC_INT_BUFFER_WRITE_RDY))) {
@@ -1344,29 +1230,27 @@ index 000000000000..c5eb59006f54
 +		}
 +	}
 +
-+	/* Handle transfer completion */
 +	if (intstat & EFX_EMMC_INT_XFER_COMPLETE) {
 +		efx_emmc_dbg_irq(host, "Transfer complete interrupt (DMA: %s)\n",
 +		        host->use_dma ? "enabled" : "disabled");
 +		efx_emmc_finish_data(host);
 +	}
 +
-+	/* Debug: Check for any unhandled interrupts */
 +	if (intstat & ~(EFX_EMMC_INT_CMD_COMPLETE | EFX_EMMC_INT_BUFFER_READ_RDY |
-+		            EFX_EMMC_INT_BUFFER_WRITE_RDY | EFX_EMMC_INT_DMA_INTERRUPT |
++		            EFX_EMMC_INT_BUFFER_WRITE_RDY |
 +		            EFX_EMMC_INT_XFER_COMPLETE | EFX_EMMC_INT_ERROR_MASK)) {
 +		efx_emmc_dbg_irq(host, "Unhandled interrupt bits: 0x%08x\n",
 +		         (unsigned int)(intstat &
-+					~(EFX_EMMC_INT_CMD_COMPLETE |
-+					  EFX_EMMC_INT_BUFFER_READ_RDY |
-+					  EFX_EMMC_INT_BUFFER_WRITE_RDY |
-+					  EFX_EMMC_INT_DMA_INTERRUPT |
-+					  EFX_EMMC_INT_XFER_COMPLETE |
-+					  EFX_EMMC_INT_ERROR_MASK)));
++						~(EFX_EMMC_INT_CMD_COMPLETE |
++						  EFX_EMMC_INT_BUFFER_READ_RDY |
++						  EFX_EMMC_INT_BUFFER_WRITE_RDY |
++						  EFX_EMMC_INT_XFER_COMPLETE |
++						  EFX_EMMC_INT_ERROR_MASK)));
 +	}
 +
 +out:
 +	spin_unlock(&host->lock);
++	efx_emmc_complete_pending_request(host);
 +	return result;
 +}
 +
@@ -1382,8 +1266,8 @@ index 000000000000..c5eb59006f54
 +	if (!host->clk) {
 +		dev_err(&host->pdev->dev, "No clock available\n");
 +		mrq->cmd->error = -ENODEV;
-+		mmc_request_done(mmc, mrq);
 +		spin_unlock_irqrestore(&host->lock, flags);
++		mmc_request_done(mmc, mrq);
 +		return;
 +	}
 +
@@ -1391,7 +1275,6 @@ index 000000000000..c5eb59006f54
 +
 +	host->mrq = mrq;
 +
-+	/* Send CMD23 (SET_BLOCK_COUNT) first if present */
 +	if (mrq->sbc) {
 +		efx_emmc_dbg_cmd(host,
 +				  "Sending CMD23 (SET_BLOCK_COUNT) first, blocks=%u\n",
@@ -1403,6 +1286,7 @@ index 000000000000..c5eb59006f54
 +	}
 +
 +	spin_unlock_irqrestore(&host->lock, flags);
++	efx_emmc_complete_pending_request(host);
 +}
 +
 +void efx_emmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
@@ -1424,7 +1308,6 @@ index 000000000000..c5eb59006f54
 +		need_host_control_update = true;
 +	}
 +
-+	/* Log significant timing mode changes */
 +	if (ios->timing != host->prev_timing) {
 +		dev_dbg(&host->pdev->dev, "Timing mode: %u -> %u, Clock: %u Hz\n",
 +		        host->prev_timing, ios->timing, ios->clock);
@@ -1437,7 +1320,7 @@ index 000000000000..c5eb59006f54
 +
 +int efx_emmc_get_cd(struct mmc_host *mmc)
 +{
-+	return 1;  /* eMMC is always present */
++	return 1;  
 +}
 +
 +int efx_emmc_card_busy_wrapper(struct mmc_host *mmc)
@@ -1457,21 +1340,22 @@ index 000000000000..c5eb59006f54
 +
 +int efx_emmc_get_ro(struct mmc_host *mmc)
 +{
-+	return 0;  /* eMMC is never read-only */
++	return 0;  
 +}
 diff --git a/drivers/mmc/host/efx_emmc_dma.c b/drivers/mmc/host/efx_emmc_dma.c
 new file mode 100644
-index 000000000000..20777ebc09e5
+index 000000000000..a50634996521
 --- /dev/null
 +++ b/drivers/mmc/host/efx_emmc_dma.c
-@@ -0,0 +1,208 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later
+@@ -0,0 +1,209 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
 +/*
 + * Efinix eMMC Host Controller DMA Support
 + *
 + * Copyright (C) 2025 Efinix, Inc.
 + * Author: Teoh Choon Zone <czteoh@efinixinc.com>
 + */
++
 +
 +#include <linux/dma-mapping.h>
 +#include <linux/scatterlist.h>
@@ -1483,10 +1367,7 @@ index 000000000000..20777ebc09e5
 +{
 +	efx_emmc_writel(host, (u32)addr, EFX_EMMC_ADMA_SYS_ADDR_LOW);
 +
-+	if (host->dma_64bit) {
-+		efx_emmc_writel(host, (u32)((u64)addr >> 32),
-+				 EFX_EMMC_ADMA_SYS_ADDR_HIGH);
-+	}
++	efx_emmc_writel(host, 0, EFX_EMMC_ADMA_SYS_ADDR_HIGH);
 +}
 +
 +static void efx_emmc_adma_mark_end(struct efx_adma_desc *desc)
@@ -1511,12 +1392,10 @@ index 000000000000..20777ebc09e5
 +	int i, desc_count = 0;
 +	bool use_bounce = false;
 +
-+	/* Check if we need bounce buffer due to alignment requirements */
 +	for_each_sg(data->sg, sg, data->sg_len, i) {
 +	addr = sg_dma_address(sg);
 +	len = sg_dma_len(sg);
 +
-+	/* Check 8-byte alignment requirement for DMA */
 +	if ((addr & 0x7) || (len & 0x7)) {
 +	    use_bounce = true;
 +	    break;
@@ -1524,7 +1403,6 @@ index 000000000000..20777ebc09e5
 +	}
 +
 +	if (use_bounce) {
-+	/* Use bounce buffer for unaligned transfers */
 +	if (!host->bounce_buffer) {
 +	    dev_err(&host->pdev->dev, "Bounce buffer not available\n");
 +	    return -ENOMEM;
@@ -1535,7 +1413,6 @@ index 000000000000..20777ebc09e5
 +	    return -EINVAL;
 +	}
 +
-+	/* Copy data to bounce buffer for write operations */
 +	if (data->flags & MMC_DATA_WRITE) {
 +	    struct scatterlist *sg;
 +	    char *bounce_pos;
@@ -1544,22 +1421,23 @@ index 000000000000..20777ebc09e5
 +	    bounce_pos = host->bounce_buffer;
 +
 +	    for_each_sg(data->sg, sg, data->sg_len, i) {
-+	        /* Copy data to bounce buffer */
 +	        memcpy(bounce_pos, sg_virt(sg), sg->length);
 +	        bounce_pos += sg->length;
 +	    }
 +	}
 +
-+	/* Setup single descriptor for bounce buffer */
 +	desc = host->adma_desc;
 +	efx_emmc_adma_set_desc(desc, host->bounce_dma,
 +	                      data->blksz * data->blocks,
 +	                      EFX_ADMA_DESC_VALID | EFX_ADMA_DESC_TRAN);
 +	efx_emmc_adma_mark_end(desc);
 +	desc_count = 1;
++	host->bounce_active = true;
++	host->bounce_used = data->blksz * data->blocks;
 +	} else {
-+	/* Setup descriptors for scatter-gather list */
 +	desc = host->adma_desc;
++	host->bounce_active = false;
++	host->bounce_used = 0;
 +
 +	for_each_sg(data->sg, sg, data->sg_len, i) {
 +	    addr = sg_dma_address(sg);
@@ -1595,7 +1473,6 @@ index 000000000000..20777ebc09e5
 +	return -EINVAL;
 +	}
 +
-+	/* Sync descriptor table */
 +	dma_sync_single_for_device(&host->pdev->dev, host->adma_desc_dma,
 +	                      host->adma_desc_sz, DMA_TO_DEVICE);
 +
@@ -1604,24 +1481,36 @@ index 000000000000..20777ebc09e5
 +
 +void efx_emmc_adma_table_post(struct efx_emmc_host *host, struct mmc_data *data)
 +{
-+	/* Sync descriptor table */
 +	dma_sync_single_for_cpu(&host->pdev->dev, host->adma_desc_dma,
 +	                   host->adma_desc_sz, DMA_FROM_DEVICE);
 +
-+	/* Copy data from bounce buffer for read operations */
 +	if (host->bounce_buffer && (data->flags & MMC_DATA_READ)) {
-+	struct scatterlist *sg;
-+	char *bounce_pos;
-+	int i;
++		struct scatterlist *sg;
++		char *bounce_pos;
++		int i;
++		unsigned int remaining;
++
++		if (!host->bounce_active)
++			goto out;
++
++		remaining = host->bounce_used;
 +
 +	bounce_pos = host->bounce_buffer;
 +
 +	for_each_sg(data->sg, sg, data->sg_len, i) {
-+	    /* Copy data from bounce buffer */
-+	    memcpy(sg_virt(sg), bounce_pos, sg->length);
-+	    bounce_pos += sg->length;
++	    unsigned int len = min(sg->length, remaining);
++
++	    if (!len)
++		break;
++
++	    memcpy(sg_virt(sg), bounce_pos, len);
++	    bounce_pos += len;
++	    remaining -= len;
 +	}
 +	}
++out:
++	host->bounce_active = false;
++	host->bounce_used = 0;
 +}
 +
 +void efx_emmc_prepare_dma(struct efx_emmc_host *host, struct mmc_data *data)
@@ -1632,7 +1521,6 @@ index 000000000000..20777ebc09e5
 +	return;
 +	}
 +
-+	/* Map scatter-gather list for DMA */
 +	ret = dma_map_sg(&host->pdev->dev, data->sg, data->sg_len,
 +	             (data->flags & MMC_DATA_READ) ?
 +			     DMA_FROM_DEVICE : DMA_TO_DEVICE);
@@ -1644,7 +1532,6 @@ index 000000000000..20777ebc09e5
 +
 +	data->sg_len = ret;
 +
-+	/* Setup ADMA descriptor table */
 +	ret = efx_emmc_adma_table_pre(host, data);
 +	if (ret) {
 +	dev_err(&host->pdev->dev, "Failed to setup ADMA table: %d\n", ret);
@@ -1655,7 +1542,6 @@ index 000000000000..20777ebc09e5
 +	return;
 +	}
 +
-+	/* Set ADMA system address */
 +	efx_emmc_set_adma_addr(host, host->adma_desc_dma);
 +}
 +
@@ -1665,27 +1551,26 @@ index 000000000000..20777ebc09e5
 +		return;
 +	}
 +
-+	/* Post-process ADMA table */
 +	efx_emmc_adma_table_post(host, data);
 +
-+	/* Unmap scatter-gather list */
 +	dma_unmap_sg(&host->pdev->dev, data->sg, data->sg_len,
 +		     (data->flags & MMC_DATA_READ) ?
 +			DMA_FROM_DEVICE : DMA_TO_DEVICE);
 +}
 diff --git a/drivers/mmc/host/efx_emmc_platform.c b/drivers/mmc/host/efx_emmc_platform.c
 new file mode 100644
-index 000000000000..1128022658b8
+index 000000000000..dcfc5222d5e1
 --- /dev/null
 +++ b/drivers/mmc/host/efx_emmc_platform.c
-@@ -0,0 +1,407 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later
+@@ -0,0 +1,370 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
 +/*
 + * Efinix eMMC Host Controller Platform Driver
 + *
 + * Copyright (C) 2025 Efinix, Inc.
 + * Author: Teoh Choon Zone <czteoh@efinixinc.com>
 + */
++
 +
 +#include <linux/module.h>
 +#include <linux/init.h>
@@ -1719,89 +1604,60 @@ index 000000000000..1128022658b8
 +	struct efx_emmc_host *host = container_of(work, struct efx_emmc_host,
 +					       hs400_retune_work.work);
 +
-+	dev_dbg(&host->pdev->dev, "HS400 delayed retune worker started\n");
++	dev_info(&host->pdev->dev, "HS400 delayed retune worker started\n");
 +
-+	/* Check if HS400 conditions are met and retuning is still pending */
 +	if (host->hs400_retune_pending &&
 +	host->mmc &&
-+	host->mmc->ios.timing == MMC_TIMING_MMC_HS400 &&
-+	host->mmc->ios.clock == 200000000) {
++	host->mmc->ios.timing == MMC_TIMING_MMC_HS400) {
 +
-+	dev_dbg(&host->pdev->dev, "HS400 conditions met, forcing retuning\n");
++	dev_info(&host->pdev->dev,
++		 "HS400 conditions met (clock=%u Hz), executing tuning\n",
++		 host->mmc->ios.clock);
 +
-+	/* Call tuning function directly with proper HS400 context */
 +	efx_emmc_execute_tuning(host->mmc, MMC_SEND_TUNING_BLOCK_HS200);
 +
 +	} else {
-+	dev_dbg(&host->pdev->dev,
++	dev_warn(&host->pdev->dev,
 +		"HS400 conditions not met: pending=%s, timing=%u, clock=%u\n",
 +	         host->hs400_retune_pending ? "true" : "false",
 +	         host->mmc ? host->mmc->ios.timing : 0,
 +	         host->mmc ? host->mmc->ios.clock : 0);
 +	}
 +
-+	dev_dbg(&host->pdev->dev, "HS400 delayed retune worker completed\n");
++	dev_info(&host->pdev->dev, "HS400 delayed retune worker completed\n");
 +}
 +
-+/**
-+ * efx_emmc_reset_hw - Reset eMMC IP and device
-+ * @host: eMMC host controller instance
-+ *
-+ * Performs hardware reset sequence according to eMMC specification:
-+ * 1. Reset IP core (minimum 1us pulse)
-+ * 2. Reset eMMC device (minimum 1us pulse)
-+ * 3. Wait for device initialization (200us minimum)
-+ */
 +void efx_emmc_reset_hw(struct efx_emmc_host *host)
 +{
 +	u32 reg;
 +
-+	/* Reset eMMC IP - minimum 1us pulse width per documentation */
 +	reg = efx_emmc_sys_readl(host, EFX_SYS_RESET_REG);
 +	reg |= EFX_SYS_RESET_EMMC_IP;
 +	efx_emmc_sys_writel(host, reg, EFX_SYS_RESET_REG);
 +	udelay(EFX_EMMC_RESET_PULSE_WIDTH);
 +
-+	/* Release IP reset */
 +	reg &= ~EFX_SYS_RESET_EMMC_IP;
 +	efx_emmc_sys_writel(host, reg, EFX_SYS_RESET_REG);
 +	udelay(EFX_EMMC_RESET_PULSE_WIDTH);
 +
-+	/* Reset eMMC device - minimum 1us pulse width (tRSTW) */
 +	reg |= EFX_SYS_RESET_EMMC_DEV;
 +	efx_emmc_sys_writel(host, reg, EFX_SYS_RESET_REG);
 +	udelay(EFX_EMMC_RESET_PULSE_WIDTH);
 +
-+	/* Release device reset */
 +	reg &= ~EFX_SYS_RESET_EMMC_DEV;
 +	efx_emmc_sys_writel(host, reg, EFX_SYS_RESET_REG);
 +
-+	/* Wait 200us (tRSCA) or 74 clock cycles per documentation */
 +	udelay(EFX_EMMC_POST_RESET_DELAY);
 +}
 +
-+/**
-+ * efx_emmc_init_hw - Initialize eMMC hardware
-+ * @host: eMMC host controller instance
-+ *
-+ * Initializes the eMMC controller hardware including:
-+ * - Hardware reset
-+ * - Capability reading and base clock setup
-+ * - Interrupt configuration
-+ * - Initial bus width and clock settings
-+ *
-+ * Return: 0 on success, negative error code on failure
-+ */
 +int efx_emmc_init_hw(struct efx_emmc_host *host)
 +{
 +	u32 caps, reg;
 +
-+	/* Reset hardware */
 +	efx_emmc_reset_hw(host);
 +
-+	/* Read capabilities */
 +	caps = efx_emmc_readl(host, EFX_EMMC_HOST_CAPABILITIES);
-+	host->base_clk = (caps & 0x3FF) * 1000000; /* Convert MHz to Hz */
++	host->base_clk = (caps & 0x3FF) * 1000000; 
 +
 +	if (host->base_clk == 0) {
 +	host->base_clk = EFX_EMMC_BASE_CLK_FREQ_MHZ * 1000000;
@@ -1810,26 +1666,20 @@ index 000000000000..1128022658b8
 +	dev_info(&host->pdev->dev, "Base clock: %u Hz, Capabilities: 0x%08x\n",
 +	     host->base_clk, caps);
 +
-+	/* Disable all interrupts initially */
 +	efx_emmc_writel(host, 0, EFX_EMMC_INT_SIGNAL_EN);
 +	efx_emmc_writel(host, 0, EFX_EMMC_INT_STATUS_EN);
 +
-+	/* Clear any pending interrupts */
 +	efx_emmc_writel(host, EFX_EMMC_INT_ALL_MASK, EFX_EMMC_INT_STATUS);
 +
-+	/* Set initial bus width to 1-bit */
 +	reg = efx_emmc_readl(host, EFX_EMMC_HOST_CONTROL);
 +	reg &= ~EFX_EMMC_DATA_WIDTH_MASK;
 +	reg |= (EFX_EMMC_DATA_WIDTH_1BIT << EFX_EMMC_DATA_WIDTH_SHIFT);
 +	efx_emmc_writel(host, reg, EFX_EMMC_HOST_CONTROL);
 +
-+	/* Set initial clock to identification frequency */
 +	efx_emmc_set_clock(host, EFX_EMMC_MIN_FREQ);
 +
-+	/* Wait for hardware to stabilize */
 +	msleep(10);
 +
-+	/* Enable interrupts */
 +	efx_emmc_writel(host, EFX_EMMC_INT_ALL_MASK, EFX_EMMC_INT_STATUS_EN);
 +	efx_emmc_writel(host, EFX_EMMC_INT_ALL_MASK, EFX_EMMC_INT_SIGNAL_EN);
 +
@@ -1845,6 +1695,7 @@ index 000000000000..1128022658b8
 +	struct resource *res;
 +	int ret;
 +	u32 version, present_state;
++	u32 hs400_defaults[2];
 +
 +	mmc = mmc_alloc_host(sizeof(struct efx_emmc_host), &pdev->dev);
 +	if (!mmc) {
@@ -1857,21 +1708,21 @@ index 000000000000..1128022658b8
 +
 +	spin_lock_init(&host->lock);
 +
-+	/* Initialize tuning-related fields */
 +	host->tuning_done = false;
 +	host->tuning_in_progress = false;
-+	host->optimal_sample_count = 0;
-+	host->optimal_pll_shift = 0;
-+	host->optimal_margin = 0;
++	host->hs200_sample_count = 0;
++	host->hs200_pll_shift = 0;
++	host->hs200_margin = 0;
++	host->hs400_sample_count = 0;
++	host->hs400_pll_shift = 0;
++	host->hs400_margin = 0;
 +	host->prev_timing = MMC_TIMING_LEGACY;
 +	host->hs400_retune_pending = false;
-+	host->tuned_timing_modes = 0; /* Clear all bits - no modes tuned yet */
++	host->tuned_timing_modes = 0; 
 +
-+	/* Initialize delayed workqueue for HS400 forced retuning */
 +	INIT_DELAYED_WORK(&host->hs400_retune_work, efx_emmc_hs400_retune_work);
 +
 +
-+	/* Get memory resources */
 +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 +	host->ioaddr = devm_ioremap_resource(&pdev->dev, res);
 +	if (IS_ERR(host->ioaddr)) {
@@ -1886,7 +1737,18 @@ index 000000000000..1128022658b8
 +	goto err_free_host;
 +	}
 +
-+	/* Get clock */
++	host->hs400_default_sample = 0;
++	host->hs400_default_pll = 6;
++
++	if (!of_property_read_u32_array(pdev->dev.of_node,
++					"hs400-default-timing",
++					hs400_defaults, 2)) {
++	host->hs400_default_sample = hs400_defaults[0];
++	host->hs400_default_pll = hs400_defaults[1];
++	dev_info(&pdev->dev, "HS400 default timing from DT: sample=%u pll=%u\n",
++		 host->hs400_default_sample, host->hs400_default_pll);
++	}
++
 +	host->clk = devm_clk_get(&pdev->dev, NULL);
 +	if (IS_ERR(host->clk)) {
 +	ret = PTR_ERR(host->clk);
@@ -1900,20 +1762,13 @@ index 000000000000..1128022658b8
 +	goto err_free_host;
 +	}
 +
-+	/* Set up DMA mask */
-+	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
-+	if (ret) {
 +	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
 +	if (ret) {
-+	    dev_err(&pdev->dev, "Failed to set DMA mask\n");
-+	    goto err_clk_disable;
++	dev_err(&pdev->dev, "Failed to set DMA mask\n");
++	goto err_clk_disable;
 +	}
 +	host->dma_64bit = false;
-+	} else {
-+	host->dma_64bit = true;
-+	}
 +
-+	/* Allocate ADMA descriptor table */
 +	host->adma_desc_sz = EFX_ADMA_TABLE_SZ;
 +	host->adma_desc = dma_alloc_coherent(&pdev->dev, host->adma_desc_sz,
 +	                                &host->adma_desc_dma, GFP_KERNEL);
@@ -1923,8 +1778,7 @@ index 000000000000..1128022658b8
 +	goto err_clk_disable;
 +	}
 +
-+	/* Allocate bounce buffer for unaligned transfers */
-+	host->bounce_buffer_size = 512 * 1024; /* 512KB bounce buffer */
++	host->bounce_buffer_size = 512 * 1024; 
 +	host->bounce_buffer = dma_alloc_coherent(&pdev->dev,
 +					     host->bounce_buffer_size,
 +	                                   &host->bounce_dma, GFP_KERNEL);
@@ -1933,8 +1787,9 @@ index 000000000000..1128022658b8
 +		 "Failed to allocate bounce buffer, using software alignment\n");
 +	host->bounce_buffer_size = 0;
 +	}
++	host->bounce_used = 0;
++	host->bounce_active = false;
 +
-+	/* Get IRQ */
 +	host->irq = platform_get_irq(pdev, 0);
 +	if (host->irq < 0) {
 +	ret = host->irq;
@@ -1948,36 +1803,33 @@ index 000000000000..1128022658b8
 +	goto err_free_dma;
 +	}
 +
-+	/* Initialize hardware */
 +	ret = efx_emmc_init_hw(host);
 +	if (ret) {
 +	goto err_free_dma;
 +	}
 +
-+	/* Read version register to verify hardware is accessible */
 +	version = efx_emmc_readl(host, EFX_EMMC_VERSION);
 +	present_state = efx_emmc_readl(host, EFX_EMMC_PRESENT_STATE);
 +	dev_info(&pdev->dev, "Version: 0x%08x, Present state: 0x%08x\n",
 +	     version, present_state);
 +
-+	/* Set up MMC host */
-+	mmc->ops = &efx_emmc_ops;
-+	mmc->f_min = EFX_EMMC_MIN_FREQ;
-+	mmc->f_max = EFX_EMMC_MAX_FREQ;
-+
-+	/* eMMC-specific capabilities */
-+	mmc->caps = MMC_CAP_MMC_HIGHSPEED | MMC_CAP_8_BIT_DATA |
-+	        MMC_CAP_NONREMOVABLE | MMC_CAP_1_8V_DDR | MMC_CAP_CMD23;
-+
-+	/* HS200/HS400 capabilities - requires tuning support */
-+	mmc->caps2 = MMC_CAP2_HS200_1_8V_SDR;
-+
-+	/* Add HS400 support if 8-bit bus is available */
-+	if (mmc->caps & MMC_CAP_8_BIT_DATA) {
-+	mmc->caps2 |= MMC_CAP2_HS400_1_8V;
++	ret = mmc_of_parse(mmc);
++	if (ret) {
++	dev_err(&pdev->dev, "Failed to parse DT: %d\n", ret);
++	goto err_free_dma;
 +	}
 +
-+	/* Voltage support: 1.7-1.95V and 2.7-3.6V */
++	mmc->ops = &efx_emmc_ops;
++
++	if (!mmc->f_min)
++	mmc->f_min = EFX_EMMC_MIN_FREQ;
++	if (!mmc->f_max)
++	mmc->f_max = EFX_EMMC_MAX_FREQ;
++
++	if (!(mmc->caps & MMC_CAP_CMD23))
++	mmc->caps |= MMC_CAP_CMD23;
++
++	if (!mmc->ocr_avail)
 +	mmc->ocr_avail = MMC_VDD_165_195 | MMC_VDD_27_28 | MMC_VDD_28_29 |
 +	             MMC_VDD_29_30 | MMC_VDD_30_31 | MMC_VDD_31_32 |
 +	             MMC_VDD_32_33 | MMC_VDD_33_34 | MMC_VDD_34_35 |
@@ -1997,7 +1849,6 @@ index 000000000000..1128022658b8
 +	goto err_free_dma;
 +	}
 +
-+	/* Force card detection after a delay */
 +	mmc_detect_change(mmc, msecs_to_jiffies(500));
 +
 +	dev_info(&pdev->dev, "Efinix eMMC Host Controller registered (DMA: %s)\n",
@@ -2039,17 +1890,13 @@ index 000000000000..1128022658b8
 +
 +	mmc_remove_host(mmc);
 +
-+	/* Cancel any pending delayed work */
 +	cancel_delayed_work_sync(&host->hs400_retune_work);
 +
-+	/* Disable interrupts */
 +	efx_emmc_writel(host, 0, EFX_EMMC_INT_SIGNAL_EN);
 +	efx_emmc_writel(host, 0, EFX_EMMC_INT_STATUS_EN);
 +
-+	/* Reset hardware */
 +	efx_emmc_reset_hw(host);
 +
-+	/* Free DMA resources */
 +	if (host->bounce_buffer) {
 +	dma_free_coherent(&pdev->dev, host->bounce_buffer_size,
 +	                 host->bounce_buffer, host->bounce_dma);
@@ -2086,20 +1933,20 @@ index 000000000000..1128022658b8
 +MODULE_AUTHOR("Teoh Choon Zone <czteoh@efinixinc.com>");
 +MODULE_LICENSE("GPL v2");
 +MODULE_VERSION("1.0");
-\ No newline at end of file
 diff --git a/drivers/mmc/host/efx_emmc_tuning.c b/drivers/mmc/host/efx_emmc_tuning.c
 new file mode 100644
-index 000000000000..d1ef97fe933f
+index 000000000000..f38a77091c65
 --- /dev/null
 +++ b/drivers/mmc/host/efx_emmc_tuning.c
 @@ -0,0 +1,459 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later
++/* SPDX-License-Identifier: GPL-2.0-or-later */
 +/*
 + * Efinix eMMC Host Controller Tuning Support
 + *
 + * Copyright (C) 2025 Efinix, Inc.
 + * Author: Teoh Choon Zone <czteoh@efinixinc.com>
 + */
++
 +
 +#include <linux/delay.h>
 +#include <linux/slab.h>
@@ -2108,7 +1955,6 @@ index 000000000000..d1ef97fe933f
 +
 +#include "efx_emmc.h"
 +
-+/* Standard eMMC tuning block patterns from bare metal driver */
 +static const u32 tuning_block_pattern_8b_mode[] = {
 +	0xff00ffff, 0x0000ffff, 0xccccffff, 0xcccc33cc,
 +	0xcc3333cc, 0xffffcccc, 0xffffeeff, 0xffeeeeff,
@@ -2132,19 +1978,13 @@ index 000000000000..d1ef97fe933f
 +{
 +	u32 config_value;
 +
-+	/* Build timing configuration: sample_count[31:16] | pll_shift[8:6] */
 +	config_value = (sample_count << 16) | (pll_shift << 6);
 +
-+	/* Apply timing configuration with hardware trigger sequence:
-+	 * 1. Write config with trigger bit clear (bit 0 = 0)
-+	 * 2. Write config with trigger bit set (bit 0 = 1) to latch settings
-+	 */
 +	efx_emmc_writel(host, config_value | 0x0, EFX_EMMC_BASE_REG1);
 +	efx_emmc_writel(host, config_value | 0x1, EFX_EMMC_BASE_REG1);
 +	efx_emmc_writel(host, config_value | 0x0, EFX_EMMC_BASE_REG1);
 +
-+	/* Wait for PLL settling */
-+	udelay(100); /* 100us is sufficient for PLL settling */
++	udelay(100); 
 +}
 +
 +int efx_emmc_execute_tuning_command(struct efx_emmc_host *host, int bus_width)
@@ -2156,7 +1996,6 @@ index 000000000000..d1ef97fe933f
 +	unsigned long timeout;
 +	u32 tuning_present_state;
 +
-+	/* Determine block size and reference pattern based on bus width */
 +	if (bus_width == 8) {
 +	block_size = EFX_EMMC_TUNING_BLOCK_SIZE_8BIT;
 +	word_count = 32;
@@ -2167,16 +2006,14 @@ index 000000000000..d1ef97fe933f
 +	reference_pattern = tuning_block_pattern_4b_mode;
 +	}
 +
-+	/* Configure command parameters for CMD21 */
 +	efx_emmc_writel(host, (1 << 16) | block_size, EFX_EMMC_BLOCK_SIZE);
 +	efx_emmc_writel(host, 0x0, EFX_EMMC_ARG1);
 +
-+	/* Issue CMD21 tuning command with specific configuration */
-+	/* CMD21 (index=21), data present, CRC check, 48-bit response */
++	efx_emmc_writel(host, 0xFFFFFFFF, EFX_EMMC_INT_STATUS);
++
 +	command_config = 0x153A0010;
 +	efx_emmc_writel(host, command_config, EFX_EMMC_TRANSFER_MODE);
 +
-+	/* Wait for buffer ready with timeout */
 +	timeout = jiffies + msecs_to_jiffies(5);
 +
 +	do {
@@ -2187,17 +2024,15 @@ index 000000000000..d1ef97fe933f
 +
 +	if (time_after(jiffies, timeout)) {
 +	    dev_dbg(&host->pdev->dev, "Tuning command timeout after 5ms\n");
-+	    return 0; /* Failure */
++	    return 0; 
 +	}
 +
 +	cpu_relax();
 +	} while (1);
 +
-+	/* Read tuning data and compare against expected pattern */
 +	for (i = 0; i < word_count; i++) {
 +	received_data = efx_emmc_readl(host, EFX_EMMC_BUFFER_DATA_PORT);
 +
-+	/* Compare against standard pattern */
 +	if (received_data != reference_pattern[i]) {
 +	    mismatches++;
 +	    dev_dbg(&host->pdev->dev,
@@ -2206,12 +2041,11 @@ index 000000000000..d1ef97fe933f
 +	}
 +	}
 +
-+	/* Allow up to 2 mismatches due to electrical noise during tuning */
 +	if (mismatches <= 2) {
-+	return 1; /* Success */
++	return 1; 
 +	} else {
 +	dev_dbg(&host->pdev->dev, "Too many mismatches: %d\n", mismatches);
-+	return 0; /* Failure */
++	return 0; 
 +	}
 +}
 +
@@ -2260,7 +2094,6 @@ index 000000000000..d1ef97fe933f
 +	}
 +	}
 +
-+	/* Return center of longest consecutive sequence */
 +	center = max_start + (max_len / 2);
 +	return center;
 +}
@@ -2280,7 +2113,6 @@ index 000000000000..d1ef97fe933f
 +	return -ENOMEM;
 +	}
 +
-+	/* Find rows with longest consecutive 1's */
 +	dev_dbg(&host->pdev->dev, "Analyzing timing results\n");
 +	max_consecutive_length = 0;
 +	for (i = 0; i < max_sample_count; i++) {
@@ -2305,7 +2137,6 @@ index 000000000000..d1ef97fe933f
 +	        max_consecutive_length, EFX_EMMC_MIN_TIMING_MARGIN);
 +	}
 +
-+	/* Collect all rows with maximum consecutive length */
 +	optimal_row_count = 0;
 +	for (i = 0; i < max_sample_count; i++) {
 +	if (efx_emmc_find_longest_consecutive_ones(result_map[i],
@@ -2317,19 +2148,16 @@ index 000000000000..d1ef97fe933f
 +
 +	if (optimal_row_count == 0) {
 +	kfree(optimal_rows);
-+	return -ENODEV; /* No valid configurations found */
++	return -ENODEV; 
 +	}
 +
-+	/* Find center row */
 +	center_row = optimal_row_count / 2;
 +	optimal_sample_count = optimal_rows[center_row];
 +
-+	/* Find center column within optimal row */
 +	dev_dbg(&host->pdev->dev,
 +	     "Selected sample_count=%d from %d optimal rows\n",
 +	     optimal_sample_count, optimal_row_count);
 +
-+	/* Debug: Show the row being analyzed for center calculation */
 +	optimal_row_str[0] = '\0';
 +	for (i = 0; i < EFX_EMMC_MAX_PLL_SHIFT; i++) {
 +	sprintf(optimal_row_str + strlen(optimal_row_str), "%d",
@@ -2347,10 +2175,15 @@ index 000000000000..d1ef97fe933f
 +	     "Center PLL calculation result: pll_shift=%d\n",
 +	     optimal_pll_shift);
 +
-+	/* Store optimal configuration */
-+	host->optimal_sample_count = optimal_sample_count;
-+	host->optimal_pll_shift = optimal_pll_shift;
-+	host->optimal_margin = max_consecutive_length;
++	if (host->mmc->ios.timing == MMC_TIMING_MMC_HS200) {
++		host->hs200_sample_count = optimal_sample_count;
++		host->hs200_pll_shift = optimal_pll_shift;
++		host->hs200_margin = max_consecutive_length;
++	} else if (host->mmc->ios.timing == MMC_TIMING_MMC_HS400) {
++		host->hs400_sample_count = optimal_sample_count;
++		host->hs400_pll_shift = optimal_pll_shift;
++		host->hs400_margin = max_consecutive_length;
++	}
 +
 +	dev_dbg(&host->pdev->dev,
 +	     "Optimal timing found: sample_count=%u, pll_shift=%u, margin=%d\n",
@@ -2370,29 +2203,34 @@ index 000000000000..d1ef97fe933f
 +
 +	host = mmc_priv(mmc);
 +
-+	/* Set tuning in progress flag to suppress error logging */
 +	host->tuning_in_progress = true;
 +
-+	dev_dbg(&host->pdev->dev, "Starting tuning: timing=%u, clock=%u Hz\n",
++	dev_info(&host->pdev->dev, "execute_tuning called: timing=%u, clock=%u Hz\n",
 +	     mmc->ios.timing, mmc->ios.clock);
 +
-+	/* Skip tuning if already tuned for current mode */
-+	if (!host->hs400_retune_pending && host->prev_timing == mmc->ios.timing &&
-+	host->tuning_done &&
-+	(mmc->ios.timing == MMC_TIMING_MMC_HS200 ||
-+	 mmc->ios.timing == MMC_TIMING_MMC_HS400)) {
-+	dev_dbg(&host->pdev->dev,
-+			"Tuning skipped: already tuned for timing=%u (sample=%u, pll=%u)\n",
-+	        mmc->ios.timing, host->optimal_sample_count,
-+			host->optimal_pll_shift);
-+	return 0;
++	if (!host->hs400_retune_pending &&
++	    test_bit(mmc->ios.timing, &host->tuned_timing_modes) &&
++	    host->tuning_done &&
++	    (mmc->ios.timing == MMC_TIMING_MMC_HS200 ||
++	     mmc->ios.timing == MMC_TIMING_MMC_HS400)) {
++		u32 sample = (mmc->ios.timing == MMC_TIMING_MMC_HS200) ?
++			     host->hs200_sample_count : host->hs400_sample_count;
++		u32 pll = (mmc->ios.timing == MMC_TIMING_MMC_HS200) ?
++			  host->hs200_pll_shift : host->hs400_pll_shift;
++
++		efx_emmc_set_timing_config(host, sample, pll);
++
++		dev_info(&host->pdev->dev,
++			"Tuning skipped: already successfully tuned for timing=%u (sample=%u, pll=%u)\n",
++	        mmc->ios.timing, sample, pll);
++		return 0;
 +	}
 +
-+	/* Handle HS400 forced retuning */
 +	if (host->hs400_retune_pending &&
-+	mmc->ios.timing == MMC_TIMING_MMC_HS400 &&
-+	mmc->ios.clock == 200000000) {
-+	dev_dbg(&host->pdev->dev, "HS400 forced retuning at 200MHz\n");
++	    mmc->ios.timing == MMC_TIMING_MMC_HS400) {
++	dev_info(&host->pdev->dev,
++		 "HS400 forced retuning (clock=%u Hz)\n",
++		 mmc->ios.clock);
 +	host->hs400_retune_pending = false;
 +	}
 +
@@ -2402,19 +2240,18 @@ index 000000000000..d1ef97fe933f
 +	return -EINVAL;
 +	}
 +
-+	/* Determine current bus width */
++	if (mmc->ios.timing == MMC_TIMING_MMC_HS400) {
++	dev_info(&host->pdev->dev,
++		 "Tuning in HS400 mode (DDR has different timing than HS200 SDR)\n");
++	}
++
 +	bus_width = (mmc->ios.bus_width == MMC_BUS_WIDTH_8) ? 8 : 4;
-+	/* max_sample_count should match clk_div - sample count can't exceed
-+	 * clock divider
-+	 */
-+	/* Use actual clock divider */
 +	max_sample_count = host->clk_div ? host->clk_div : 1;
 +
 +	dev_dbg(&host->pdev->dev,
 +	     "Starting tuning algorithm (bus_width=%d, max_sample=%u)\n",
 +	     bus_width, max_sample_count);
 +
-+	/* Dynamically allocate tuning result map */
 +	tuning_result_map = kmalloc(max_sample_count *
 +				sizeof(u8[EFX_EMMC_MAX_PLL_SHIFT]),
 +				GFP_KERNEL);
@@ -2423,19 +2260,14 @@ index 000000000000..d1ef97fe933f
 +	return -ENOMEM;
 +	}
 +
-+	/* Initialize all entries to 0 (untested/failed) - critical fix for
-+	 * fake results bug
-+	 */
 +	memset(tuning_result_map, 0,
 +	   max_sample_count * sizeof(u8[EFX_EMMC_MAX_PLL_SHIFT]));
 +
 +	dev_dbg(&host->pdev->dev, "Using clk_div=%u for sample count\n",
 +	     max_sample_count);
 +
-+	/* Set tuning timeout to 5 seconds */
 +	timeout = jiffies + msecs_to_jiffies(5000);
 +
-+	/* Phase 2: Timing configuration search */
 +	dev_dbg(&host->pdev->dev, "Testing %d samples × %d PLL positions\n",
 +	     max_sample_count, EFX_EMMC_MAX_PLL_SHIFT);
 +	for (sample_count = 0; sample_count < max_sample_count; sample_count++) {
@@ -2443,13 +2275,10 @@ index 000000000000..d1ef97fe933f
 +
 +	for (pll_shift = 0; pll_shift < EFX_EMMC_MAX_PLL_SHIFT; pll_shift++) {
 +
-+	    /* Apply timing configuration */
 +	    efx_emmc_set_timing_config(host, sample_count, pll_shift);
 +
-+	    /* Execute validation test */
 +	    success = efx_emmc_execute_tuning_command(host, bus_width);
 +
-+	    /* Update result map */
 +	    if (!success) {
 +	        tuning_result_map[sample_count][pll_shift] = 0;
 +	        consecutive_passes = 0;
@@ -2463,7 +2292,6 @@ index 000000000000..d1ef97fe933f
 +	           sample_count, pll_shift, success ? "PASS" : "FAIL",
 +			   consecutive_passes);
 +
-+	    /* Check timeout */
 +	    if (time_after(jiffies, timeout)) {
 +	        dev_warn(&host->pdev->dev, "Tuning timeout after 5 seconds\n");
 +	        goto find_optimal;
@@ -2473,7 +2301,6 @@ index 000000000000..d1ef97fe933f
 +
 +find_optimal:
 +
-+	/* Print timing map results - only for new timing modes */
 +	if (!test_bit(mmc->ios.timing, &host->tuned_timing_modes)) {
 +	dev_info(&host->pdev->dev, "Tuning result map:\n");
 +	for (sample_count = 0; sample_count < max_sample_count;
@@ -2489,59 +2316,78 @@ index 000000000000..d1ef97fe933f
 +	}
 +	}
 +
-+	/* Phase 4: Find optimal timing configuration using dynamic map */
 +	ret = efx_emmc_find_optimal_timing(host, tuning_result_map,
 +					max_sample_count);
 +	if (ret == 0) {
-+	/* Use optimal timing found by tuning algorithm */
-+	efx_emmc_set_timing_config(host, host->optimal_sample_count,
-+				   host->optimal_pll_shift);
++	u32 sample, pll, margin;
++	if (mmc->ios.timing == MMC_TIMING_MMC_HS200) {
++		sample = host->hs200_sample_count;
++		pll = host->hs200_pll_shift;
++		margin = host->hs200_margin;
++	} else if (mmc->ios.timing == MMC_TIMING_MMC_HS400) {
++		sample = host->hs400_sample_count;
++		pll = host->hs400_pll_shift;
++		margin = host->hs400_margin;
++	} else {
++		sample = 0;
++		pll = 4;  
++		margin = 0;
++	}
 +
-+	/* Show detailed results only for new timing modes */
++	efx_emmc_set_timing_config(host, sample, pll);
++
 +	if (!test_bit(mmc->ios.timing, &host->tuned_timing_modes)) {
 +	    dev_info(&host->pdev->dev,
 +		     "Tuning completed: sample=%u, pll=%u, margin=%u\n",
-+	             host->optimal_sample_count, host->optimal_pll_shift,
-+			     host->optimal_margin);
++	             sample, pll, margin);
 +	} else {
 +	    dev_info(&host->pdev->dev,
 +		     "Tuning reconfirmed: sample=%u, pll=%u\n",
-+	             host->optimal_sample_count, host->optimal_pll_shift);
++	             sample, pll);
 +	}
 +
 +	host->tuning_done = true;
-+	/* Mark this timing mode as successfully tuned */
 +	set_bit(mmc->ios.timing, &host->tuned_timing_modes);
 +	} else {
-+	/* Fallback to safe timing configuration */
 +	dev_warn(&host->pdev->dev,
 +			  "Tuning failed: %d, using fallback configuration\n",
 +			  ret);
 +	if (max_sample_count == 1) {
-+	    efx_emmc_set_timing_config(host, 0, 2); /* Safe for 200MHz */
-+	    host->optimal_sample_count = 0;
-+	    host->optimal_pll_shift = 2;
++	    efx_emmc_set_timing_config(host, 0, 2); 
++	    if (mmc->ios.timing == MMC_TIMING_MMC_HS200) {
++	        host->hs200_sample_count = 0;
++	        host->hs200_pll_shift = 2;
++	    } else if (mmc->ios.timing == MMC_TIMING_MMC_HS400) {
++	        host->hs400_sample_count = 0;
++	        host->hs400_pll_shift = 2;
++	    }
 +	} else {
-+	    /* Conservative default timing */
 +	    efx_emmc_set_timing_config(host, 1, 1);
-+	    host->optimal_sample_count = 1;
-+	    host->optimal_pll_shift = 1;
++	    if (mmc->ios.timing == MMC_TIMING_MMC_HS200) {
++	        host->hs200_sample_count = 1;
++	        host->hs200_pll_shift = 1;
++	    } else if (mmc->ios.timing == MMC_TIMING_MMC_HS400) {
++	        host->hs400_sample_count = 1;
++	        host->hs400_pll_shift = 1;
++	    }
 +	}
-+	host->tuning_done = true; /* Mark as done to prevent retry loops */
-+	/* Mark this timing mode as successfully tuned (fallback) */
-+	set_bit(mmc->ios.timing, &host->tuned_timing_modes);
-+	ret = 0; /* Return success to allow operation to continue */
++	host->tuning_done = true; 
++
++	if (mmc->ios.timing != MMC_TIMING_MMC_HS400) {
++		set_bit(mmc->ios.timing, &host->tuned_timing_modes);
++	} else {
++		dev_warn(&host->pdev->dev,
++			 "HS400 tuning fallback - will retry on next access\n");
++	}
++	ret = 0; 
 +	}
 +
-+	/* Update host state */
 +	spin_lock_irqsave(&host->lock, flags);
 +	host->prev_timing = mmc->ios.timing;
 +	spin_unlock_irqrestore(&host->lock, flags);
 +
-+	/* Free dynamically allocated tuning result map */
 +	kfree(tuning_result_map);
 +
-+	/* Clear tuning in progress flag */
 +	host->tuning_in_progress = false;
 +
 +	if (ret == 0) {
