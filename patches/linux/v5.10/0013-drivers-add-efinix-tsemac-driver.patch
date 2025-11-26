@@ -1,4 +1,4 @@
-From 7a61581001a90a48d1cf1679b716dacd87ce82bb Mon Sep 17 00:00:00 2001
+From 3e5449b3107e51484f9a8604b0800cd2b4d9c55c Mon Sep 17 00:00:00 2001
 From: Kenny Cheung <kenny.cheung@elitestek.com>
 Date: Thu, 30 Mar 2023 14:28:01 +0800
 Subject: [PATCH] drivers: add efinix tsemac driver
@@ -10,11 +10,11 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
  drivers/net/ethernet/Makefile                 |    1 +
  drivers/net/ethernet/efinix/Kconfig           |   18 +
  drivers/net/ethernet/efinix/Makefile          |    3 +
- drivers/net/ethernet/efinix/efinix_tse.c      | 1409 +++++++++++++++++
+ drivers/net/ethernet/efinix/efinix_tse.c      | 1416 +++++++++++++++++
  drivers/net/ethernet/efinix/efinix_tse.h      |  459 ++++++
  drivers/net/ethernet/efinix/efinix_tse_dma.c  |  244 +++
  drivers/net/ethernet/efinix/efinix_tse_mdio.c |  195 +++
- 8 files changed, 2330 insertions(+)
+ 8 files changed, 2337 insertions(+)
  create mode 100644 drivers/net/ethernet/efinix/Kconfig
  create mode 100644 drivers/net/ethernet/efinix/Makefile
  create mode 100644 drivers/net/ethernet/efinix/efinix_tse.c
@@ -77,10 +77,10 @@ index 000000000000..51062131b736
 +obj-$(CONFIG_EFINIX_TSEMAC) += efinix_tsemac.o
 diff --git a/drivers/net/ethernet/efinix/efinix_tse.c b/drivers/net/ethernet/efinix/efinix_tse.c
 new file mode 100644
-index 000000000000..46113cc24869
+index 000000000000..ad17f22f623a
 --- /dev/null
 +++ b/drivers/net/ethernet/efinix/efinix_tse.c
-@@ -0,0 +1,1409 @@
+@@ -0,0 +1,1416 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Ethernet driver for the Efinix Triple Speed Ethernet device
@@ -646,12 +646,22 @@ index 000000000000..46113cc24869
 +	struct dmasg_descriptor *cur_p;
 +	struct sk_buff *skb, *new_skb;
 +	struct efx_tsemac_local *lp = container_of(napi, struct efx_tsemac_local, napi_rx);
-+	u32 err;
++	u32 new_err, prev, delta;
 +
 +	data_cache_invalidate_all();
++	dma_rmb();
 +	cur_p = &lp->rx_bd_v[lp->rx_bd_ci];
 +
-+	while (packets < budget && (cur_p->status & DMASG_DESCRIPTOR_STATUS_COMPLETED)) {
++	length = READ_ONCE(cur_p->status) & DMASG_DESCRIPTOR_STATUS_BYTES;
++
++	/* Increase the lp->rx_bd_ci if current length is 0 */
++	if (length == 0) {
++		if (++lp->rx_bd_ci >= lp->rx_bd_num)
++			lp->rx_bd_ci = 0;
++		cur_p = &lp->rx_bd_v[lp->rx_bd_ci];
++	}
++
++	while (packets < budget && (READ_ONCE(cur_p->status) & DMASG_DESCRIPTOR_STATUS_COMPLETED)) {
 +		dma_addr_t phys;
 +
 +		/* Ensure we see complete descriptor update */
@@ -666,8 +676,12 @@ index 000000000000..46113cc24869
 +		 * receive it again.
 +		 */
 +		if (likely(skb)) {
-+			length = (cur_p->status & DMASG_DESCRIPTOR_STATUS_BYTES);
-+			// netdev_err(lp->ndev, "rx length: %u", length);
++			length = READ_ONCE(cur_p->status) & DMASG_DESCRIPTOR_STATUS_BYTES;
++
++			if (unlikely(length == 0 || length > lp->max_frm_size)) {
++				dev_kfree_skb(skb);
++				goto rearm;
++			}
 +
 +			phys = desc_get_rx_phys_addr(lp, cur_p);
 +			dma_unmap_single(lp->dev, phys, lp->max_frm_size,
@@ -691,14 +705,12 @@ index 000000000000..46113cc24869
 +			lp->ndev->stats.rx_dropped++;
 +		}
 +
++rearm:
 +		/* Refill descriptor for HW */
 +		new_skb = napi_alloc_skb(napi, lp->max_frm_size);
 +		if (unlikely((!new_skb))) {
 +			break;
 +		}
-+
-+		/* if arch benefits from alignment */
-+		//skb_reserve(new_skb, NET_SKB_PAD + NET_IP_ALIGN);
 +
 +		phys = dma_map_single(lp->dev, new_skb->data,
 +				      lp->max_frm_size,
@@ -724,39 +736,34 @@ index 000000000000..46113cc24869
 +
 +	lp->ndev->stats.rx_packets += packets;
 +	lp->ndev->stats.rx_bytes += size;
-+	err = tsemac_in32(lp, TSEMAC_IF_IN_ERRORS);
-+	if (err > lp->prev_rx_err) {
-+		/*
-+		int err_kind;
-+		err_kind = tsemac_in32(lp, TSEMAC_IF_IN_ERRORS);
-+		netdev_err(lp->ndev, "RX error occurred, having %d error\n", err_kind);
-+		err_kind = tsemac_in32(lp, TSEMAC_CRC_ERRORS);
-+		netdev_err(lp->ndev, "RX error occurred, having %d CRC error\n", err_kind);
-+		err_kind = tsemac_in32(lp, TSEMAC_ETHER_STATS_UNDER_SIZE_PKTS);
-+		netdev_err(lp->ndev, "RX error occurred, having %d undersize error\n", err_kind);
-+		*/
-+
-+		lp->ndev->stats.rx_errors += err - lp->prev_rx_err;
-+	}
-+	lp->prev_rx_err = err;
++	new_err = tsemac_in32(lp, TSEMAC_IF_IN_ERRORS);
++	prev = lp->prev_rx_err;
++	delta = (new_err >= prev) ? (new_err - prev) : (new_err + (UINT_MAX - prev) + 1);
++	lp->ndev->stats.rx_errors += delta;
++	lp->prev_rx_err = new_err;
 +
 +	/*
 +	 * End-of-poll decision:
 +	 * - If we hit budget, return budget to force immediate repoll (IRQ still masked).
-+	 * - If head has DONE, keep NaPI alive by returning budget.
++	 * - If head has DONE, keep NAPI alive by returning budget.
 +	 * - Otherwise, ring is empty: complete NAPI and re-enable RX IRQ.
 +	 */
 +
-+	dma_rmb();
-+	u32 head_status = READ_ONCE(lp->rx_bd_v[lp->rx_bd_ci].status);
 +	if (packets == budget)
 +		return budget;
 +
-+	if (head_status & DMASG_DESCRIPTOR_STATUS_COMPLETED)
-+		return budget; /* workk remains; keep polling */
++	/* work remains, keep polling */
++	if (READ_ONCE(lp->rx_bd_v[lp->rx_bd_ci].status) & DMASG_DESCRIPTOR_STATUS_COMPLETED)
++		return budget;
 +
 +	if (napi_complete_done(napi, packets)) {
++		dma_wmb();
 +		tsemac_dma_out32(lp, DMA_CH_INTERRUPT_ENABLE, DMASG_RX_BASE, lp->rx_dma_cr);
++
++		/* Restart linked list */
++		if (!(tsemac_dma_in32(lp, DMA_CH_STATUS, DMASG_RX_BASE) & DMA_CH_STATUS_BUSY)) {
++			tsemac_dma_out32(lp, DMA_CH_STATUS, DMASG_RX_BASE, DMA_CH_STATUS_LINKED_LIST_START);
++		}
 +	}
 +
 +	return packets;
@@ -1461,7 +1468,7 @@ index 000000000000..46113cc24869
 +		dev_err(&pdev->dev, "phylink_create error (%i)\n", ret);
 +		goto cleanup_mdio;
 +	}
-+	
++
 +	ret = register_netdev(lp->ndev);
 +	if (ret) {
 +		dev_err(lp->dev, "register_netdev() error (%i)\n", ret);
