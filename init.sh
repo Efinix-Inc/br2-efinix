@@ -15,6 +15,7 @@ unset EXTRA_HW_FEATURES
 unset X11_GRAPHICS
 unset MACHINE_ARCH
 unset USE_EMMC_BOOT
+unset KERNEL_SELECTION
 
 BOARD=$1
 SOC_H=$2
@@ -33,6 +34,7 @@ EFINIX_DIR="$BR2_EXTERNAL_DIR/boards/efinix"
 COMMON_DIR="$EFINIX_DIR/common"
 DT_DIR="$COMMON_DIR/sapphire-soc-dt-generator"
 JSON_FILE="$DT_DIR/config/default.json"
+KERNEL_SELECTION="1"
 
 # Text colors
 WHITE='\033[0;37m'
@@ -106,6 +108,9 @@ function usage()
 	echo "	-x			Enable X11 graphics for unified hardware design. This enable framebuffer, DMA and USB drivers."
 	echo "				Not compatible with camera (evsoc driver). This optional argument requires -u to be set first."
 	echo "	-w			Use eMMC u-boot configuration for eMMC storage support"
+	echo "	-k			Kernel version selection. Default is 1"
+	echo "				1 - 6.6.x (default)"
+	echo "				2 - 5.10.x"
 	echo
 	echo "Example usage,"
 	echo "$	source init.sh t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
@@ -527,6 +532,12 @@ function prepare_buildroot_env()
 		defconfig_fragments+=" $BR2_DEFCONFIG_DIR/$fragment"
 	done
 
+	if [ "$KERNEL_SELECTION" = "1" ]; then
+		defconfig_fragments+=" $BR2_DEFCONFIG_DIR/kernel_6_6_defconfig"
+	elif [ "$KERNEL_SELECTION" = "2" ]; then
+		defconfig_fragments+=" $BR2_DEFCONFIG_DIR/kernel_5_10_defconfig"
+	fi
+
 	echo "DEBUG: defconfig_fragments = $defconfig_fragments"
 
 	export CONFIG_="BR2"
@@ -689,7 +700,7 @@ function parser()
 		shift
 	done
 
-	while getopts ":d:s:m:raehuxcw" o; do
+	while getopts ":d:s:m:k:raehuxcw" o; do
 		case "${o}" in
 			:)
 				pr_err "Option -$OPTARG requires an argument"
@@ -750,6 +761,13 @@ function parser()
 			w)
 				USE_EMMC_BOOT=1
 				;;
+			k)
+				KERNEL_SELECTION="${OPTARG}"
+				if [ "$KERNEL_SELECTION" != "1" ] && [ "$KERNEL_SELECTION" ! = "2" ]; then
+					pr_err "Unsupported kernel selection: $KERNEL_SELECTION"
+					return 1
+				fi
+				;;
 			h)
 				usage
 				return
@@ -779,6 +797,7 @@ elif [[ ! -f $SOC_H ]]; then
 fi
 
 pr_info "Machine architecture: ${MACHINE_ARCH}-bit RISCV"
+pr_info "Kernel selection: $KERNEL_SELECTION"
 
 # clone sapphire-soc-dt-generator repository
 if [ ! -d $DT_DIR ]; then
