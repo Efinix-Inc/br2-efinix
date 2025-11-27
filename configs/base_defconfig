@@ -6,16 +6,15 @@ BR2_DL_DIR="$(HOME)/.buildroot-dl"
 # Target options
 BR2_riscv=y
 
-# Toolchain                                                                                                               
-BR2_TOOLCHAIN_USES_GLIBC=y                                                                                                
-BR2_TOOLCHAIN_BUILDROOT_GLIBC=y                                                                                           
-BR2_TOOLCHAIN_BUILDROOT_LIBC="glibc"                                                                                      
+# Toolchain
+BR2_TOOLCHAIN_USES_GLIBC=y
+BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
+BR2_TOOLCHAIN_BUILDROOT_LIBC="glibc"
 
-# Glibc Options                                                                                                           
+# Glibc Options
 BR2_PACKAGE_GLIBC=y
 
 # GCC
-BR2_GCC_VERSION_8_X=y
 BR2_OPTIMIZE_2=y
 BR2_TOOLCHAIN_BUILDROOT_CXX=y
 BR2_GCC_ENABLE_OPENMP=y
@@ -35,14 +34,9 @@ BR2_TARGET_ROOTFS_EXT2_SIZE="1G"
 
 BR2_PACKAGE_HOST_GENIMAGE=y
 
-# Linux headers
-BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_5_10=y
-
 # Kernel
 BR2_LINUX_KERNEL=y
 BR2_LINUX_KERNEL_CUSTOM_VERSION=y
-BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE="5.10.147"
-BR2_LINUX_KERNEL_PATCH="$(BR2_EXTERNAL_EFINIX_PATH)/patches/linux/v5.10"
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
 BR2_LINUX_KERNEL_VMLINUX=y
 BR2_LINUX_KERNEL_DTS_SUPPORT=y
