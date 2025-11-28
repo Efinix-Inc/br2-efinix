@@ -1,17 +1,18 @@
-From 356ef676b07106b83f8622f4f25e1c594a9abe54 Mon Sep 17 00:00:00 2001
-From: Teoh Choon Zone <czteoh@efinixinc.com>
-Date: Tue, 30 Sep 2025 14:34:34 +0800
+From 6c6ae7c9e3ac4d5c4d4292bcec06864ad28ac52c Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Fri, 28 Nov 2025 10:25:29 +0800
 Subject: [PATCH] mmc: Add Efinix eMMC driver
 
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
- drivers/mmc/host/Kconfig             |  12 +
+ drivers/mmc/host/Kconfig             |  11 +
  drivers/mmc/host/Makefile            |   2 +
  drivers/mmc/host/efx_emmc.h          | 304 +++++++++
  drivers/mmc/host/efx_emmc_core.c     | 975 +++++++++++++++++++++++++++
  drivers/mmc/host/efx_emmc_dma.c      | 209 ++++++
  drivers/mmc/host/efx_emmc_platform.c | 370 ++++++++++
  drivers/mmc/host/efx_emmc_tuning.c   | 459 +++++++++++++
- 7 files changed, 2331 insertions(+)
+ 7 files changed, 2330 insertions(+)
  create mode 100644 drivers/mmc/host/efx_emmc.h
  create mode 100644 drivers/mmc/host/efx_emmc_core.c
  create mode 100644 drivers/mmc/host/efx_emmc_dma.c
@@ -19,14 +20,13 @@ Subject: [PATCH] mmc: Add Efinix eMMC driver
  create mode 100644 drivers/mmc/host/efx_emmc_tuning.c
 
 diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index c81d5977e3ba..8ab6da848456 100644
+index ab2fad038522..fe726dd14961 100644
 --- a/drivers/mmc/host/Kconfig
 +++ b/drivers/mmc/host/Kconfig
-@@ -1109,3 +1109,15 @@ config MMC_SDHCI_EFX
- 
+@@ -1057,6 +1057,17 @@ config MMC_OWL
  config MMC_SDHCI_EXTERNAL_DMA
  	bool
-+
+ 
 +config MMC_EFX_EMMC
 +	tristate "Efinix eMMC host controller support"
 +	depends on OF
@@ -36,15 +36,18 @@ index c81d5977e3ba..8ab6da848456 100644
 +	  It includes hardware reset support and is designed for embedded applications.
 +
 +	  If you have an Efinix platform with an eMMC device, say Y here.
-+
 +	  If unsure, say N.
++
+ config MMC_LITEX
+ 	tristate "LiteX MMC Host Controller support"
+ 	depends on ((PPC_MICROWATT || LITEX) && OF && HAVE_CLK) || COMPILE_TEST
 diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-index c6a7ed2abcf6..ef488f1288fa 100644
+index cfe5e63e8259..364d8af4e295 100644
 --- a/drivers/mmc/host/Makefile
 +++ b/drivers/mmc/host/Makefile
-@@ -106,6 +106,8 @@ obj-$(CONFIG_MMC_SDHCI_SPRD)		+= sdhci-sprd.o
- obj-$(CONFIG_MMC_CQHCI)			+= cqhci.o
+@@ -102,6 +102,8 @@ cqhci-$(CONFIG_MMC_CRYPTO)		+= cqhci-crypto.o
  obj-$(CONFIG_MMC_HSQ)			+= mmc_hsq.o
+ obj-$(CONFIG_MMC_LITEX)			+= litex_mmc.o
  obj-$(CONFIG_MMC_SDHCI_EFX)		+= sdhci-efx.o
 +obj-$(CONFIG_MMC_EFX_EMMC)		+= efx-emmc.o
 +efx-emmc-y				+= efx_emmc_core.o efx_emmc_platform.o efx_emmc_dma.o efx_emmc_tuning.o
