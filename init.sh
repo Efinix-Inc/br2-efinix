@@ -320,6 +320,9 @@ function generate_device_tree() {
 		override_uboot_dt="$uboot_dt_config/$MACHINE_ARCH/unified_hw"
 	elif [ "$EXAMPLE_DESIGN" ]; then
 		override_linux_dt="$linux_dt_config/$MACHINE_ARCH/example_design"
+		if [ "$BOARD" = "ti60f225" ]; then
+			override_linux_dt="$override_linux_dt/$BOARD"
+		fi
 		override_uboot_dt="$uboot_dt_config/$MACHINE_ARCH/example_design"
 	fi
 
