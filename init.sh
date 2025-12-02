@@ -734,12 +734,8 @@ if [ $EXAMPLE_DESIGN ]; then
 		EXTRA_HW_FEATURES+="ethernet,"
 	fi
 
-	if [[ "$BOARD" = "ti375n1156" ]]; then
+	if [ "$BOARD" = "ti375n1156" ] || [ "$BOARD" = "ti375c529" ]; then
 		EXTRA_HW_FEATURES+="sdhc,ethernet,"
-	fi
-
-	if [[ "$BOARD" = "ti375c529" ]]; then
-		EXTRA_HW_FEATURES+="sdhc,ethernet,emmc,"
 	fi
 fi
 
