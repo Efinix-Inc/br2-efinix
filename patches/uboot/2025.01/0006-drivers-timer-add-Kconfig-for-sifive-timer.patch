@@ -1,0 +1,27 @@
+From 8c84cd4fa481f401e3df2b9945d3d3fcb25f5531 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Mon, 1 Dec 2025 14:16:04 +0800
+Subject: [PATCH] drivers/timer: add Kconfig for sifive timer
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/timer/Kconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/timer/Kconfig b/drivers/timer/Kconfig
+index cb6fc0e7fda..090ae809f90 100644
+--- a/drivers/timer/Kconfig
++++ b/drivers/timer/Kconfig
+@@ -354,4 +354,9 @@ config STARFIVE_TIMER
+ 	  Select this to enable support for the timer found on
+ 	  Starfive SoC.
+ 
++config SIFIVE_CLINT
++	bool "Clint timer"
++	depends on TIMER
++	help
++	  Clint timer for RISC-V platform.
+ endmenu
+-- 
+2.43.0
+
