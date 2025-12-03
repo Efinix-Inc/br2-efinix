@@ -1,4 +1,4 @@
-From 2e549d9e638d6b1b5e87210f0055baa7b6b9fc77 Mon Sep 17 00:00:00 2001
+From 824c475337b9569071b3b26481938630d20b5eac Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Mon, 23 Jun 2025 23:45:52 +0800
 Subject: [PATCH] board/vexriscv: add support for saxon vexriscv board
@@ -52,7 +52,7 @@ index de356584bf1..f23742417ae 100644
  
 diff --git a/board/vexriscv/saxon/Kconfig b/board/vexriscv/saxon/Kconfig
 new file mode 100644
-index 00000000000..22c47a4a7b8
+index 00000000000..723adcf78be
 --- /dev/null
 +++ b/board/vexriscv/saxon/Kconfig
 @@ -0,0 +1,27 @@
@@ -72,11 +72,11 @@ index 00000000000..22c47a4a7b8
 +
 +config SYS_TEXT_BASE
 +	hex "Text base"
-+	default 0x1040000
++	default 0x2040000
 +
 +config SYS_LOAD_ADDR
 +	hex "Load address"
-+	default 0x1040000
++	default 0x2040000
 +
 +config BOARD_SPECIFIC_OPTIONS # dummy
 +       def_bool y
@@ -202,7 +202,7 @@ index 00000000000..a6b0e03e469
 +#endif /* CONFIG_SPL_BUILD */
 diff --git a/include/configs/saxon.h b/include/configs/saxon.h
 new file mode 100644
-index 00000000000..dc7073c058d
+index 00000000000..365f407e39f
 --- /dev/null
 +++ b/include/configs/saxon.h
 @@ -0,0 +1,63 @@
@@ -227,7 +227,7 @@ index 00000000000..dc7073c058d
 +/* Initial stack and malloc must live in DRAM — do NOT tie to LOAD_ADDR */
 +
 +/* Small on-chip SRAM (if present) for very early use; otherwise keep minimal */
-+#define CFG_SYS_INIT_RAM_ADDR        0x001040000UL  /* optional, if you really have SRAM here */
++#define CFG_SYS_INIT_RAM_ADDR        0x00f90000UL  /* optional, if you really have SRAM here */
 +#define CFG_SYS_INIT_RAM_SIZE        0x00004000UL   /* 16 KiB */
 +
 +/* Place the initial SP near the top of DRAM (below reserved/LMB cushion) */
@@ -239,7 +239,7 @@ index 00000000000..dc7073c058d
 +#define CONFIG_SYS_MALLOC_F_LEN (1  * 1024 * 1024) /* 1 MiB early malloc (if enabled) */
 +
 +/* Text base: align with OpenSBI “Next Address” (from your boot log) */
-+#define CONFIG_SYS_TEXT_BASE         0x01040000UL
++#define CONFIG_SYS_TEXT_BASE         0x02040000UL
 +
 +/* Environment defaults */
 +#define CONFIG_EXTRA_ENV_SETTINGS "initrd_high=0xffffffff\0" \
@@ -261,8 +261,8 @@ index 00000000000..dc7073c058d
 +#define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION 1
 +
 +/* Arguments/Kernel handoff buffer (in DRAM) */
-+#define CONFIG_SYS_SPL_ARGS_ADDR 0x01047000UL
-+#define CONFIG_SYS_SPL_KERNEL_ADDR 0x01048000UL
++#define CONFIG_SYS_SPL_ARGS_ADDR 0x02047000UL
++#define CONFIG_SYS_SPL_KERNEL_ADDR 0x02048000UL
 +
 +/* Filename for SPL filesystem loaders */
 +#define CONFIG_SPL_FS_LOAD_ARGS_NAME "dtb"
