@@ -1,4 +1,4 @@
-From f17434b9cd9aeafb635251bf251c898a2d6d0779 Mon Sep 17 00:00:00 2001
+From 2e549d9e638d6b1b5e87210f0055baa7b6b9fc77 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Mon, 23 Jun 2025 23:45:52 +0800
 Subject: [PATCH] board/vexriscv: add support for saxon vexriscv board
@@ -7,11 +7,11 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
  arch/riscv/Kconfig            |   3 +
  arch/riscv/dts/Makefile       |   1 +
- board/vexriscv/saxon/Kconfig  |  25 +++++++++
+ board/vexriscv/saxon/Kconfig  |  27 +++++++++
  board/vexriscv/saxon/Makefile |   5 ++
  board/vexriscv/saxon/saxon.c  | 100 ++++++++++++++++++++++++++++++++++
- include/configs/saxon.h       |  35 ++++++++++++
- 6 files changed, 169 insertions(+)
+ include/configs/saxon.h       |  63 +++++++++++++++++++++
+ 6 files changed, 199 insertions(+)
  create mode 100644 board/vexriscv/saxon/Kconfig
  create mode 100644 board/vexriscv/saxon/Makefile
  create mode 100644 board/vexriscv/saxon/saxon.c
@@ -52,10 +52,10 @@ index de356584bf1..f23742417ae 100644
  
 diff --git a/board/vexriscv/saxon/Kconfig b/board/vexriscv/saxon/Kconfig
 new file mode 100644
-index 00000000000..3824fd98d32
+index 00000000000..22c47a4a7b8
 --- /dev/null
 +++ b/board/vexriscv/saxon/Kconfig
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,27 @@
 +if TARGET_VEXRISCV_SAXON
 +
 +config SYS_BOARD
@@ -71,10 +71,12 @@ index 00000000000..3824fd98d32
 +       default "saxon"
 +
 +config SYS_TEXT_BASE
-+       default 0x1040000
++	hex "Text base"
++	default 0x1040000
 +
 +config SYS_LOAD_ADDR
-+       default 0x1040000
++	hex "Load address"
++	default 0x1040000
 +
 +config BOARD_SPECIFIC_OPTIONS # dummy
 +       def_bool y
@@ -200,10 +202,10 @@ index 00000000000..a6b0e03e469
 +#endif /* CONFIG_SPL_BUILD */
 diff --git a/include/configs/saxon.h b/include/configs/saxon.h
 new file mode 100644
-index 00000000000..41abd045f33
+index 00000000000..dc7073c058d
 --- /dev/null
 +++ b/include/configs/saxon.h
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,63 @@
 +/* SPDX-License-Identifier: GPL-2.0+ */
 +/*
 + * Copyright (C) 2019 roman3017 <rbacik@hotmail.com>
@@ -215,26 +217,54 @@ index 00000000000..41abd045f33
 +
 +#include <linux/sizes.h>
 +
-+/* assuming Text Base is not bottom of memory for INIT_SP to work */
-+//#define CONFIG_SYS_LOAD_ADDR CONFIG_SYS_TEXT_BASE
-+#define CONFIG_SYS_TEXT_BASE	0x1040000
-+#define CFG_SYS_INIT_RAM_ADDR 0x1040000
-+#define CFG_SYS_INIT_RAM_SIZE 0x4000
-+#define CONFIG_SYS_INIT_SP_ADDR CONFIG_SYS_LOAD_ADDR
-+//#define CONFIG_SYS_MALLOC_LEN SZ_256K
++/* DRAM window (matches bdinfo): 0x0040_0000 .. 0x3FFF_FFFF (≈1020 MiB)  */
++#define CONFIG_SYS_SDRAM_BASE	0x00400000UL
++#define CONFIG_SYS_SDRAM_SIZE	0x3FC00000UL   /* 1020 MiB */
++
++/* Default load address for images (kernel/FIT/DTB) — keep low in DRAM */
++//#define CONFIG_SYS_LOAD_ADDR	0x00400000UL
++
++/* Initial stack and malloc must live in DRAM — do NOT tie to LOAD_ADDR */
++
++/* Small on-chip SRAM (if present) for very early use; otherwise keep minimal */
++#define CFG_SYS_INIT_RAM_ADDR        0x001040000UL  /* optional, if you really have SRAM here */
++#define CFG_SYS_INIT_RAM_SIZE        0x00004000UL   /* 16 KiB */
++
++/* Place the initial SP near the top of DRAM (below reserved/LMB cushion) */
++#undef  CONFIG_SYS_INIT_SP_ADDR
++#define CONFIG_SYS_INIT_SP_ADDR (CONFIG_SYS_SDRAM_BASE + CONFIG_SYS_SDRAM_SIZE - 0x10000UL)
++
++/* Early/normal malloc arenas inside DRAM */
++#define CONFIG_SYS_MALLOC_LEN   (16 * 1024 * 1024) /* 16 MiB main heap */
++#define CONFIG_SYS_MALLOC_F_LEN (1  * 1024 * 1024) /* 1 MiB early malloc (if enabled) */
++
++/* Text base: align with OpenSBI “Next Address” (from your boot log) */
++#define CONFIG_SYS_TEXT_BASE         0x01040000UL
++
++/* Environment defaults */
 +#define CONFIG_EXTRA_ENV_SETTINGS "initrd_high=0xffffffff\0" \
 +                                  "fdt_high=0xffffffff\0"
++
++/* SPL section — keep everything inside DRAM (DRAM starts at 0x0040_0000) */
 +#ifdef CONFIG_SPL_BUILD
-+#define CONFIG_SYS_SPL_RAM_BASE 0x80000000
-+#define CONFIG_SYS_SPL_RAM_SIZE (SZ_8M)
-+#define CONFIG_SPL_MAX_SIZE CONFIG_SPL_SIZE_LIMIT
-+#define CONFIG_SPL_BSS_MAX_SIZE (SZ_4K)
-+//#define CONFIG_SPL_BSS_START_ADDR (CONFIG_SYS_SPL_RAM_BASE-SZ_1M)
-+#define CONFIG_SPL_BSS_START_ADDR (IMAGE_TEXT_BASE+CONFIG_SPL_MAX_SIZE-CONFIG_SPL_BSS_MAX_SIZE)
++/* Scratch RAM and sizes for SPL */
++#define CONFIG_SYS_SPL_RAM_BASE		0x02000000UL     /* 32 MiB region in DRAM */
++#define CONFIG_SYS_SPL_RAM_SIZE		(SZ_8M)/* 8 MiB scratch */
++
++/* SPL .bss placement - keep inside DRAM */
++#define CONFIG_SPL_MAX_SIZE		CONFIG_SPL_SIZE_LIMIT
++#define CONFIG_SPL_BSS_MAX_SIZE		(SZ_4K)
++#define CONFIG_SPL_BSS_START_ADDR	(IMAGE_TEXT_BASE + CONFIG_SPL_MAX_SIZE - CONFIG_SPL_BSS_MAX_SIZE)
++
++/* MMC/FS loading parameters (keep address in DRAM) */
 +#define CONFIG_SYS_MMCSD_RAW_MODE_KERNEL_SECTOR 0
 +#define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION 1
-+#define CONFIG_SYS_SPL_ARGS_ADDR 0x80007000
-+#define CONFIG_SYS_SPL_KERNEL_ADDR 0x80008000
++
++/* Arguments/Kernel handoff buffer (in DRAM) */
++#define CONFIG_SYS_SPL_ARGS_ADDR 0x01047000UL
++#define CONFIG_SYS_SPL_KERNEL_ADDR 0x01048000UL
++
++/* Filename for SPL filesystem loaders */
 +#define CONFIG_SPL_FS_LOAD_ARGS_NAME "dtb"
 +#define CONFIG_SPL_FS_LOAD_KERNEL_NAME CONFIG_SPL_PAYLOAD
 +#endif /* CONFIG_SPL_BUILD */
