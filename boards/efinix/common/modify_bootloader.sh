@@ -201,21 +201,23 @@ if [ -z "$STANDALONE_DIR" ]; then
 	exit 1
 fi
 BOOTLOADER_DIR="$(find "${STANDALONE_DIR}" -type d -name bootloader)"
-BOOTLOADERCONFIG="$(find "${EMBEDDED_SW_DIR}" -type f -name bootloaderConfig.h)"
-SOC_H="$(find "${EMBEDDED_SW_DIR}" -type f -name soc.h)"
-SOC_MK="$(find "${EMBEDDED_SW_DIR}" -type f -name soc.mk)"
+BOOTLOADERCONFIG="${BOOTLOADER_DIR}/src/bootloaderConfig.h"
+SOC_H="$(find "${BSP_DIR}" -type f -name soc.h)"
+SOC_MK="$(find "${BSP_DIR}" -type f -name soc.mk)"
 EFXSAPPHIRESOC_DIR="$BSP_DIR/efinix/EfxSapphireSoc"
 
 if [ $DEBUG ]; then
-	echo EFINITY_PROJECT = $EFINITY_PROJECT
-	echo EFINITY_PROJECT_DIR = $EFINITY_PROJECT_DIR
-	echo EMBEDDED_SW_DIR = $EMBEDDED_SW_DIR
-	echo BSP_DIR = $BSP_DIR
-	echo STANDALONE_DIR = $STANDALONE_DIR
-	echo BOOTLOADER_DIR = $BOOTLOADER_DIR
-	echo BOOTLOADERCONFIG = $BOOTLOADERCONFIG
-	echo SOC_H = $SOC_H
-	echo EFXSAPPHIRESOC_DIR = $EFXSAPPHIRESOC_DIR
+	echo
+	echo -e "EFINITY_PROJECT 	\t= $EFINITY_PROJECT"
+	echo -e "EFINITY_PROJECT_DIR 	\t= $EFINITY_PROJECT_DIR"
+	echo -e "EMBEDDED_SW_DIR 	\t= $EMBEDDED_SW_DIR"
+	echo -e "BSP_DIR 		\t= $BSP_DIR"
+	echo -e "STANDALONE_DIR \t\t\t= $STANDALONE_DIR"
+	echo -e "BOOTLOADER_DIR \t\t\t= $BOOTLOADER_DIR"
+	echo -e "BOOTLOADERCONFIG 	\t= $BOOTLOADERCONFIG"
+	echo -e "SOC_H 			\t= $SOC_H"
+	echo -e "EFXSAPPHIRESOC_DIR 	\t= $EFXSAPPHIRESOC_DIR"
+	echo
 fi
 
 echo INFO: Update Bootloader Program
