@@ -101,6 +101,7 @@ int i2c_start(struct i2c_device *dev)
 {
         int fd;
         int rc;
+	char buf;
 
         fd = open(dev->filename, O_RDWR);
         if (fd < 0) {
@@ -110,8 +111,15 @@ int i2c_start(struct i2c_device *dev)
 
         /* Set the given I2C slave address */
         rc = ioctl(fd, I2C_SLAVE, dev->addr);
-        if (rc < 0)
+        if (rc < 0) {
                 goto fail_set_i2c_slave;
+	} else {
+		/* Try a quick read 1 byte */
+		if (read(fd, &buf, 1) != 1) {
+			rc = 1;
+			goto fail_set_i2c_slave;
+		}
+	}
 
         dev->fd = fd;
 

@@ -1,27 +1,42 @@
 #include "cam_ops.h"
 
+int check_camera_i2c_bus(struct i2c_device *i2c_dev)
+{
+	char filename[32];
+	int ret, i2c_bus;
+
+	/* Scan first 3 i2c buses */
+	for (i2c_bus = 0; i2c_bus < 3; i2c_bus++) {
+		sprintf(filename, "/dev/i2c-%d", i2c_bus);
+		i2c_dev->filename = filename;
+		ret = i2c_start(i2c_dev);
+		if (ret == 0) {
+			printf("Camera is using i2c bus %d, %s\n", i2c_bus, i2c_dev->filename);
+			i2c_dev->i2c_bus = i2c_bus;
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
 int set_camera_setting(uint16_t addr, uint16_t regs, uint8_t data)
 {
-	struct i2c_device dev;
+	struct i2c_device i2c_dev;
 	int ret;
 	uint8_t reg[2];
-	uint8_t i2c_node_address = 0;
-	char filename[32];
 
-	dev.addr = addr;
-	sprintf(filename, "/dev/i2c-%d", i2c_node_address);
-	dev.filename = filename;
-	ret = i2c_start(&dev);
-
+	i2c_dev.addr = addr;
+	ret = check_camera_i2c_bus(&i2c_dev);
 	if (ret) {
-		printf("Failed to initialize /dev/i2c-%d\n", i2c_node_address);
+		printf("Failed to initialize i2c device on bus %d on %s\n", i2c_dev.i2c_bus, i2c_dev.filename);
 		return ret;
 	}
 
-	reg[0] = regs >> 8;
-	reg[1] = regs;
+	reg[0] = (regs >> 8) & 0xFF;
+	reg[1] = regs & 0xFF;
 
-	ret = i2c_writen(&dev, reg, &data, 1);
+	ret = i2c_writen(&i2c_dev, reg, &data, 1);
 	if (ret <= 0) {
 		printf("i2c write failed\n");
 		return ret;

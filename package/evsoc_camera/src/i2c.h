@@ -11,6 +11,7 @@ struct i2c_device {
         char *filename; /* Path of I2C bus. eg. /dev/i2c-0 */
         uint16_t addr; /* Address of I2C slave */
         int fd; /* file descriptor for the I2C bus */
+	int i2c_bus;
 };
 
 int i2c_read(struct i2c_device *dev, uint8_t *buf, size_t buf_len);
