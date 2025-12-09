@@ -302,121 +302,181 @@ function check_soc_configuration()
 	fi
 }
 
-
 function generate_device_tree() {
-	local base_cmd="python3 $DT_DIR/device_tree_generator.py -m $MACHINE_ARCH"
-	local end_cmd="$SOC_H $BOARD"
+	local -r base_cmd_py="python3"
+	local -r base_cmd="$DT_DIR/device_tree_generator.py"
+	local -r end_cmd="$SOC_H $BOARD"
+	local -r linux_dt_config="$DT_DIR/config/linux"
+	local -r uboot_dt_config="$DT_DIR/config/uboot"
+	local -a hw_features=()
 
-	local linux_dt_config="$DT_DIR/config/linux"
-	local uboot_dt_config="$DT_DIR/config/uboot"
-
-	local override_linux_dt=""
-	local override_uboot_dt=""
-	local hw_features=()
-
-	# Set override config paths
-	if [ "$UNIFIED_HW" ]; then
-		override_linux_dt="$linux_dt_config/$MACHINE_ARCH/unified_hw"
-		override_uboot_dt="$uboot_dt_config/$MACHINE_ARCH/unified_hw"
-	elif [ "$EXAMPLE_DESIGN" ]; then
-		override_linux_dt="$linux_dt_config/$MACHINE_ARCH/example_design"
-		if [ "$BOARD" = "ti60f225" ]; then
-			override_linux_dt="$override_linux_dt/$BOARD"
-		fi
-		override_uboot_dt="$uboot_dt_config/$MACHINE_ARCH/example_design"
+	local override_tag=""
+	if [[ -n "${UNIFIED_HW:-}" ]]; then
+		override_tag="unified_hw"
+	elif [[ -n "${EXAMPLE_DESIGN}" ]]; then
+		override_tag="example_design"
 	fi
 
-	# Parse extra hardware features
-	[ -n "$HW_FEATURES" ] && IFS=',' read -ra hw_features <<< "$HW_FEATURES"
+	local override_linux_dt="$linux_dt_config/$MACHINE_ARCH/$override_tag"
+	local override_uboot_dt="$uboot_dt_config/$MACHINE_ARCH/$override_tag"
 
-	# Helper to build device tree command
-	build_dt_cmd() {
-	local type=$1
-	local config_dir=$2
-	local generic_dir="$config_dir/generic"
-	local override_dir=$3
-	local cmd="$base_cmd -c $config_dir/drivers.json -c $config_dir/peripherals.json -c $DT_DIR/config/boards/$BOARD/memory.json"
+	if [[ -n "${HW_FEATURES:-}" ]]; then
+		IFS=',' read -r -a hw_features <<< "$HW_FEATURES"
+		local tmp=() f
+		for f in "${hw_features[@]}"; do
+			[[ -n "$f" ]] && tmp+=("$f")
+		done
+		hw_features=("${tmp[@]}")
+	fi
 
 	contains_feature() {
-		local search=$1
+		local search="$1"
+		local f
 		for f in "${hw_features[@]}"; do
-			[ "$f" == "$search" ] && return 0
+			[[ "$f" == "$search" ]] && return 0
 		done
 		return 1
 	}
 
-	if [ "$type" == "linux" ]; then
-		cmd+=" -c $generic_dir/reserved_memory.json"
-	fi
-
-	for feature in "${hw_features[@]}"; do
-		case "$feature" in
-		spi)
-			if ! contains_feature "sdhc"; then
-				cmd+=" -c $generic_dir/spi-mmc.json"
-			fi
-			[ "$type" == "linux" ] && cmd+=" -c $generic_dir/spi-nor.json"
-			;;
-		gpio) [ "$type" = "linux" ] && cmd+=" -c $generic_dir/gpio_led.json" ;;
-		ethernet)
-			[ "$type" = "linux" ] && {
-				cmd+=" -c $generic_dir/ethernet.json"
-				[ -n "$override_dir" ] && cmd+=" -c $override_dir/ethernet.json"
-			}
-			;;
-		sdhc)
-			cmd+=" -c $generic_dir/sdhc.json"
-			[ -n "$override_dir" ] && cmd+=" -c $override_dir/sdhc.json"
-			;;
-		emmc)
-			cmd+=" -c $generic_dir/emmc.json"
-			[ -n "$override_dir" ] && cmd+=" -c $override_dir/emmc.json"
-			;;
-		fb)
-			[ "$type" = "linux" ] && {
-				cmd+=" -c $generic_dir/framebuffer.json"
-				[ -n "$override_dir" ] && cmd+=" -c $override_dir/framebuffer.json"
-			}
-			;;
-		usb)
-			[ "$type" = "linux" ] && {
-				cmd+=" -c $generic_dir/usb.json"
-				[ -n "$override_dir" ] && cmd+=" -c $override_dir/usb.json"
-			}
-			;;
-		evsoc)
-			if [ "$type" = "linux" ]; then
-				cmd+=" -c $generic_dir/evsoc.json"
-				cp "$SOC_H" "$PROJ_DIR/kernel_modules/evsoc/src/soc.h"
-			fi
-			;;
-		watchdog)
-			if [ "$type" = "uboot" ]; then
-				cmd+=" -c $generic_dir/watchdog.json"
-			fi
-			;;
-	    esac
-	done
-
-	echo "$cmd $end_cmd $type"
+	# Add -c path only if the file exists
+	add_cfg_if_exists() {
+		local -n arr_ref="$1"; shift
+		local _path="$1"
+		[[ -n "$_path" && -f "$_path" ]] && arr_ref+=( -c "$_path")
 	}
 
-	# Generate U-Boot Device Tree
+	add_board_cfg() {
+		local -n arr_ref="$1"; shift
+		local _generic="$1"; shift
+		local _override_common="$1"; shift
+		local _override_board_dir="$1"; shift
+		local _feature_file="$1"
+
+		# Add generic hw features first
+		[[ -f "$_generic" ]] && arr_ref+=( -c "$_generic" )
+
+		# Add board specific hw features
+		local board_file="$_override_board_dir/$_feature_file"
+		local common_file="$_override_common/$_feature_file"
+
+		if [[ -f "$board_file" ]]; then
+			arr_ref+=( -c "$board_file")
+		elif [[ -f "$common_file" ]]; then
+			arr_ref+=( -c "$common_file")
+		fi
+	}
+
+	# Pretty print debug
+	print_cmd_debug() {
+		local -a cmd_arr=("$@")
+		local joined=""
+		printf -v joined '%s ' "${cmd_arr[@]}"
+		joined=${joined// -c /$'\n -c '}
+		printf '%b\n' "$joined"
+	}
+
+	# Helper to build device tree command
+	build_dt_cmd() {
+		local type="$1"
+		local config_dir="$2"
+		local override_dir="$3"
+		local -n out_arr="$4"
+
+		local generic_dir="$config_dir/generic"
+		local override_board_dir=""
+		if [[ -n "$override_dir" && -n "$BOARD" ]]; then
+			override_board_dir="$override_dir/$BOARD"
+		fi
+
+		# Base command
+		local -a cmd=(
+			"$base_cmd_py" "$base_cmd"
+			-m "$MACHINE_ARCH"
+			-c "$config_dir/drivers.json"
+			-c "$config_dir/peripherals.json"
+			-c "$DT_DIR/config/boards/$BOARD/memory.json"
+		)
+
+		# Type specific configs
+		if [[ "$type" == "linux" ]]; then
+			add_cfg_if_exists cmd "$generic_dir/reserved_memory.json"
+		fi
+
+		# Features configs
+		local feature
+		for feature in "${hw_features[@]}"; do
+			case "$feature" in
+			sdhc)
+				add_board_cfg cmd "$generic_dir/sdhc.json" "$override_dir" "$override_board_dir" "sdhc.json"
+				;;
+			emmc)
+				add_board_cfg cmd "$generic_dir/emmc.json" "$override_dir" "$override_board_dir" "emmc.json"
+				;;
+			spi)
+				if ! contains_feature "sdhc"; then
+					add_board_cfg cmd "$generic_dir/spi-mmc.json" "$override_dir" "$override_board_dir" "spi-mmc.json"
+				fi
+
+				# spi-nor is for Linux only
+				if [[ "$type" == "linux" ]]; then
+					add_board_cfg cmd "$generic_dir/spi-nor.json" "$override_dir" "$override_board_dir" "spi-nor.json"
+				fi
+				;;
+			gpio)
+				if [[ "$type" == "linux" ]]; then
+					add_board_cfg cmd "$generic_dir/gpio_led.json" "$override_dir" "$override_board_dir" "gpio_led.json"
+				fi
+				;;
+			ethernet)
+				if [[ "$type" == "linux" ]]; then
+					add_board_cfg cmd "$generic_dir/ethernet.json" "$override_dir" "$override_board_dir" "ethernet.json"
+				fi
+				;;
+			fb)
+				if [[ "$type" == "linux" ]]; then
+					add_board_cfg cmd "$generic_dir/framebuffer.json" "$override_dir" "$override_board_dir" "framebuffer.json"
+				fi
+				;;
+			usb)
+				if [[ "$type" == "linux" ]]; then
+					add_board_cfg cmd "$generic_dir/usb.json" "$override_dir" "$override_board_dir" "usb.json"
+				fi
+				;;
+			evsoc)
+				if [[ "$type" == "linux" ]]; then
+					add_board_cfg cmd "$generic_dir/evsoc.json" "$override_dir" "$override_board_dir" "evsoc.json"
+					cp -f -- "$SOC_H" "$PROJ_DIR/kernel_modules/evsoc/src/soc.h"
+				fi
+				;;
+			watchdog)
+				if [[ "$type" == "uboot" ]]; then
+					add_board_cfg cmd "$generic_dir/watchdog.json" "$override_dir" "$override_board_dir" "watchdog.json"
+				fi
+				;;
+			*)
+				;;
+			esac
+		done
+
+		cmd+=( "$SOC_H" "$BOARD" "$type" )
+		out_arr=("${cmd[@]}")
+	}
+
 	title "Generate U-Boot Device Tree"
-	local uboot_cmd
-	uboot_cmd=$(build_dt_cmd "uboot" "$uboot_dt_config" "$override_uboot_dt")
-	echo -e "DEBUG: Uboot device tree cmd:\n${uboot_cmd// -c /\\\n  -c }"
-	eval "$uboot_cmd" || return 1
+	local -a uboot_cmd=()
+	build_dt_cmd "uboot" "$uboot_dt_config" "$override_uboot_dt" uboot_cmd
+	echo -e "DEBUG: U-Boot Device Tree cmd:"
+	print_cmd_debug "${uboot_cmd[@]}"
+	"${uboot_cmd[@]}" || return 1
 	pr_info "Copying $DT_DIR/output/uboot/$MACHINE_ARCH/uboot.dts to $EFINIX_DIR/$BOARD/u-boot/uboot.dts"
 	cp $DT_DIR/output/uboot/$MACHINE_ARCH/uboot.dts $EFINIX_DIR/$BOARD/u-boot/uboot.dts
 
-	# Generate Linux Device Tree
 	title "Generate Linux Device Tree"
-	local linux_cmd
-	linux_cmd=$(build_dt_cmd "linux" "$linux_dt_config" "$override_linux_dt")
-	echo -e "DEBUG: Linux device tree cmd:\n${linux_cmd// -c /\\\n  -c }"
-	eval "$linux_cmd" || return 1
-
+	local -a linux_cmd=()
+	build_dt_cmd "linux" "$linux_dt_config" "$override_linux_dt" linux_cmd
+	echo -e "DEBUG: Linux Device Tree cmd:"
+	print_cmd_debug "${linux_cmd[@]}"
+	"${linux_cmd[@]}" || return 1
 	pr_info "Copying $DT_DIR/output/linux/$MACHINE_ARCH/sapphire.dtsi to $COMMON_DIR/dts/sapphire.dtsi"
 	cp $DT_DIR/output/linux/$MACHINE_ARCH/sapphire.dtsi $COMMON_DIR/dts/sapphire.dtsi
 	pr_info "Copying $DT_DIR/output/linux/$MACHINE_ARCH/linux.dts to $EFINIX_DIR/$BOARD/linux/linux.dts"
@@ -660,7 +720,10 @@ function parser()
 			u)
 				UNIFIED_HW=1
 				USE_EMMC_BOOT=1
-				EXTRA_HW_FEATURES="sdhc,ethernet,evsoc,emmc,"
+				EXTRA_HW_FEATURES="sdhc,ethernet,evsoc,"
+				if [ $BOARD = "ti375c529" ]; then
+					EXTRA_HW_FEATURES+="emmc,"
+				fi
 				;;
 			s)
 				EXTRA_HW_FEATURES+=${OPTARG}
@@ -668,7 +731,10 @@ function parser()
 			x)
 				if [ "$UNIFIED_HW" = "1" ]; then
 					X11_GRAPHICS=1
-					EXTRA_HW_FEATURES="sdhc,ethernet,fb,dma,usb,emmc,"
+					EXTRA_HW_FEATURES="sdhc,ethernet,fb,dma,usb,"
+					if [ $BOARD = "ti375c529" ]; then
+						EXTRA_HW_FEATURES="sdhc,ethernet,fb,dma,usb,emmc,"
+					fi
 				else
 					pr_err "-x option requires -u to be set first."
 					return 1
