@@ -1,0 +1,18 @@
+# eMMC specific settings - disable distro defaults for custom boot
+# CONFIG_DISTRO_DEFAULTS is not set
+CONFIG_USE_DEFAULT_ENV_FILE=y
+CONFIG_DEFAULT_ENV_FILE="board/vexriscv/saxon/default_env.txt"
+
+# Environment stored in SPI flash for eMMC
+CONFIG_ENV_OFFSET=0x780000
+CONFIG_ENV_SECT_SIZE=0x10000
+CONFIG_ENV_IS_IN_SPI_FLASH=y
+CONFIG_ENV_ADDR=0x0
+# CONFIG_USE_ENV_SPI_BUS is not set
+# CONFIG_USE_ENV_SPI_CS is not set
+# CONFIG_USE_ENV_SPI_MAX_HZ is not set
+# CONFIG_USE_ENV_SPI_MODE is not set
+# CONFIG_ENV_SPI_EARLY is not set
+
+# Ensure environment variables are set correctly
+CONFIG_EXTRA_ENV_SETTINGS=y

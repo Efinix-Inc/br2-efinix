@@ -1,0 +1,8 @@
+config BR2_PACKAGE_EMMC_PROGRAMMER
+	bool "eMMC Programmer"
+	depends on BR2_PACKAGE_PYTHON3
+	default n
+	help
+	  Python tool to create partitions and program images to eMMC device.
+	  Supports TFTP download and automatic partitioning with verification
+	  to distinguish between eMMC and SD card devices.

@@ -1,3 +1,5 @@
+# 64-bit specific architecture and ISA settings
 CONFIG_ARCH_RV64I=y
 CONFIG_RISCV_ISA_A=y
 CONFIG_RISCV_ISA_C=y
+CONFIG_CMODEL_MEDANY=y

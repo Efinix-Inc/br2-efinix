@@ -14,6 +14,7 @@ unset HW_FEATURES
 unset EXTRA_HW_FEATURES
 unset X11_GRAPHICS
 unset MACHINE_ARCH
+unset USE_EMMC_BOOT
 
 BOARD=$1
 SOC_H=$2
@@ -80,7 +81,7 @@ function self_check()
 
 function usage()
 {
-	echo "Usage: init.sh [board] [path/to/soc.h] [-c][-d][-m][-r][-a][-e][-u][-s][-x]"
+	echo "Usage: init.sh [board] [path/to/soc.h] [-c][-d][-m][-r][-a][-e][-u][-s][-x][-w]"
 	echo
 	echo "Positional arguments:"
 	echo "	board			Development kit name such as t120f324, ti60f225, ti180j484, ti375c529"
@@ -104,6 +105,7 @@ function usage()
 	echo "				For example, spi,i2c,gpio,ethernet,dma,framebuffer"
 	echo "	-x			Enable X11 graphics for unified hardware design. This enable framebuffer, DMA and USB drivers."
 	echo "				Not compatible with camera (evsoc driver). This optional argument requires -u to be set first."
+	echo "	-w			Use eMMC u-boot configuration for eMMC storage support"
 	echo
 	echo "Example usage,"
 	echo "$	source init.sh t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
@@ -128,6 +130,9 @@ function usage()
 	echo
 	echo "Demo Ti375c529 with unified hardware design + X11 graphics"
 	echo "$ source init.sh ti375c529 $(pwd)/boards/efinix/ti375c529/hardware/unified_hw/soc.h -u -x"
+	echo
+	echo "Demo with eMMC u-boot configuration"
+	echo "$ source init.sh ti375c529 $(pwd)/boards/efinix/ti375c529/hardware/soc/soc.h -w"
 }
 
 function sanity_check()
@@ -414,6 +419,25 @@ function prepare_buildroot_env()
 	mkdir $BUILD_DIR
 	cd $BUILD_DIR && \
 	make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BR2_DEFCONFIG
+
+	# Add storage-specific u-boot fragment to the build configuration
+	local storage_fragment=""
+	if [ "$USE_EMMC_BOOT" = "1" ]; then
+		pr_info "Adding eMMC u-boot configuration fragment to build config"
+		storage_fragment="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_emmc_defconfig"
+	else
+		pr_info "Adding SD card u-boot configuration fragment to build config (default)"
+		storage_fragment="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_sd_defconfig"
+	fi
+
+	# Append storage fragment to build configuration
+	if grep -q "BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES" .config; then
+		# If fragment files line exists, append to it
+		sed -i "/BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES/ s|\"$| $storage_fragment\"|" .config
+	else
+		# If no fragment files line exists, add it with base and storage configs
+		echo "BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES=\"\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_base_defconfig $storage_fragment\"" >> .config
+	fi
 }
 
 function get_cpu_count()
@@ -515,6 +539,9 @@ function set_kernel_config()
 			watchdog|wdt)
 				br2_linux_kernel_cfg+=" $kernel_frag_dir/watchdog.config"
 				;;
+			emmc)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/emmc.config"
+				;;
 			esac
 		done
 	fi
@@ -562,7 +589,7 @@ function parser()
 		shift
 	done
 
-	while getopts ":d:s:m:raehuxc" o; do
+	while getopts ":d:s:m:raehuxcw" o; do
 		case "${o}" in
 			:)
 				pr_err "Option -$OPTARG requires an argument"
@@ -612,6 +639,9 @@ function parser()
 					pr_err "-x option requires -u to be set first."
 					return 1
 				fi
+				;;
+			w)
+				USE_EMMC_BOOT=1
 				;;
 			h)
 				usage
@@ -670,8 +700,12 @@ if [ $EXAMPLE_DESIGN ]; then
 		EXTRA_HW_FEATURES+="ethernet,"
 	fi
 
-	if [[ "$BOARD" = "ti375c529" || "$BOARD" = "ti375n1156" ]]; then
+	if [[ "$BOARD" = "ti375n1156" ]]; then
 		EXTRA_HW_FEATURES+="mmc,ethernet,"
+	fi
+
+	if [[ "$BOARD" = "ti375c529" ]]; then
+		EXTRA_HW_FEATURES+="mmc,ethernet,emmc,"
 	fi
 fi
 
