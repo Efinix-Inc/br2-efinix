@@ -485,14 +485,40 @@ function generate_device_tree() {
 
 function prepare_buildroot_env()
 {
-	# prepare Buildroot build environment
+	# Prepare Buildroot build environment
 	title "Prepare Buildroot Build Environment"
 
-	# merge Buildroot defconfig
-	local defconfig_fragments="$BR2_DEFCONFIG_DIR/riscv${MACHINE_ARCH}_fragment"
+	local defconfig_fragments=""
+	local machine_fragments="$BR2_DEFCONFIG_DIR/riscv${MACHINE_ARCH}_fragment"
+	local uboot_dev_fragment="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/$BOARD/u-boot/uboot_defconfig"
 
+	if [ ! -f "$uboot_dev_fragment" ]; then
+		uboot_dev_fragment=""
+	fi
+
+	# Add storage-specific u-boot fragment to the build configuration
+	local storage_fragment=""
+	if [ "$USE_EMMC_BOOT" = "1" ]; then
+		pr_info "Adding eMMC u-boot configuration fragment to build config"
+		storage_fragment="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_emmc_defconfig"
+	else
+		pr_info "Adding SD card u-boot configuration fragment to build config (default)"
+		storage_fragment="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_sd_defconfig"
+	fi
+
+	# Append U-Boot defconfig fragments
+	if grep -q "BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES" "${machine_fragments}"; then
+		# If fragment files line exists, append to it
+		sed -i "/BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES/ s|\"$| $uboot_dev_fragment $storage_fragment\"|" "${machine_fragments}"
+	else
+		# If no fragment files line exists, add it them
+		echo "BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES=\"\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_base_defconfig $uboot_dev_fragment $storage_fragment\"" >> "${machine_fragments}"
+	fi
+
+	# Merge Buildroot defconfig
 	list_fragments=(
 		"base_defconfig"
+		"riscv${MACHINE_ARCH}_fragment"
 		"efinix_${BOARD}_defconfig"
 	)
 
@@ -512,25 +538,6 @@ function prepare_buildroot_env()
 	mkdir $BUILD_DIR
 	cd $BUILD_DIR && \
 	make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BR2_DEFCONFIG
-
-	# Add storage-specific u-boot fragment to the build configuration
-	local storage_fragment=""
-	if [ "$USE_EMMC_BOOT" = "1" ]; then
-		pr_info "Adding eMMC u-boot configuration fragment to build config"
-		storage_fragment="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_emmc_defconfig"
-	else
-		pr_info "Adding SD card u-boot configuration fragment to build config (default)"
-		storage_fragment="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_sd_defconfig"
-	fi
-
-	# Append storage fragment to build configuration
-	if grep -q "BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES" .config; then
-		# If fragment files line exists, append to it
-		sed -i "/BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES/ s|\"$| $storage_fragment\"|" .config
-	else
-		# If no fragment files line exists, add it with base and storage configs
-		echo "BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES=\"\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_base_defconfig $storage_fragment\"" >> .config
-	fi
 }
 
 function get_cpu_count()
