@@ -32,18 +32,18 @@ Please note that you need to generate the SoC first before proceed with this sec
 
 5. Flash firmware images.
    
-   - Follow [Flash firmware image](docs/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the Ti180J484 devkit.
+   - Follow [Flash firmware image](../setup/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the Ti180J484 devkit.
 
 6. Flash Linux image `sdcard.img` in to SD card.
    
    - you can use [Etcher](https://www.balena.io/etcher/) for Linux
    
-   - or, Linux command line to flash the Linux image into SD card. See [flash linux](docs/flash_linux.md) document.
+   - or, Linux command line to flash the Linux image into SD card. See [flash linux](../setup/flash_linux.md) document.
 
-7. Access the board serial console over USB UART. See [accessing uart terminal](docs/accessing_uart_terminal.md) document.
+7. Access the board serial console over USB UART. See [accessing uart terminal](../setup/accessing_uart_terminal.md) document.
 
 8. Example of Linux boot.
    
-   ![alt text](img/boot_linux_smp.gif)
+   ![alt text](../img/boot_linux_smp.gif)
 
 9. Use the login prompt as `root` at linux prompt.

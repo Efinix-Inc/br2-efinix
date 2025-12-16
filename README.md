@@ -143,17 +143,17 @@ Follow these documents to generate the custom soc.
 
 - For Sapphire High Performance SoC on Ti375C529
   
-  - [generate Efinix Sapphire High Performance SoC](docs/generate_sapphirehpsoc.md)
+  - [generate Efinix Sapphire High Performance SoC](docs/hw/generate_sapphirehpsoc.md)
 
 - For Sapphire SoC on T120F324, Ti60F225 and Ti180J484
   
-  - [generate Efinix Sapphire RISC-V SoC](docs/generate_sapphire_soc_for_linux.md)
+  - [generate Efinix Sapphire RISC-V SoC](docs/hw/generate_sapphire_soc_for_linux.md)
 
 ## Software: Build OpenSBI, U-Boot and Linux
 
 Please note that you need to generate the SoC first before proceed with this section. Follow these steps to build Linux image, OpenSBI and U-boot for Ti375C529 development kit using precompile bitstream of Efinity project at [boards/efinix/ti375c529/hardware/soc/soc.zip](boards/efinix/ti375c529/hardware/soc/soc.zip).
 
-To build Linux image on other supported devices see [Build Linux Image](docs/build_linux_image.md) document.
+To build Linux image on other supported devices see [Build Linux Image](docs/buildroot/build_linux_image.md) document.
 
 1. Set the username and email address on gitconfig
 
@@ -192,15 +192,15 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
 
 6. Flash firmware images.
    
-   - Follow [Flash firmware image](docs/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the Ti375C529 devkit.
+   - Follow [Flash firmware image](docs/setup/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the Ti375C529 devkit.
 
 7. Flash Linux image `sdcard.img` in to SD card.
    
    - you can use [Etcher](https://www.balena.io/etcher/) for Linux
    
-   - or, Linux command line to flash the Linux image into SD card. See [flash linux](docs/flash_linux.md) document.
+   - or, Linux command line to flash the Linux image into SD card. See [flash linux](docs/setup/flash_linux.md) document.
 
-8. Access the board serial console over USB UART. See [accessing uart terminal](docs/accessing_uart_terminal.md) document.
+8. Access the board serial console over USB UART. See [accessing uart terminal](docs/setup/accessing_uart_terminal.md) document.
 
 9. Example of Linux boot.
    
@@ -216,11 +216,11 @@ See [known issues](docs/known_issues.md) document.
 
 ## What's Next?
 
-1. You might want to write you own driver or custom application but do no know how to integrate it with Buildroot. See [kernel module and package](docs/kernel_module_and_packages.md) tutorial.
+1. You might want to write you own driver or custom application but do no know how to integrate it with Buildroot. See [kernel module and package](docs/buildroot/kernel_module_and_packages.md) tutorial.
 
 2. [Debugging application using GDB/GDBserver](docs/debugging/linux_application_debugging.md)
 
-3. [Debugging Linux Kernel](docs/debugging_linux_kernel.md)
+3. [Debugging Linux Kernel](docs/debugging/debugging_linux_kernel.md)
 
 4. [Build Linux with X11 graphics](boards/efinix/ti375c529/hardware/unified_hw/README.md)
 

@@ -24,7 +24,7 @@ This section is mandatory for boot up Linux using the unified hardware design.
    cd EmbeddedSystem-Solution
    ```
 
-2. Modify the bootloader using `modify_bootloader.sh` script. Please note that `modify_bootlader.sh` require 3 arguments. See [modify bootloader](docs/modify_fpga_bootloader.md) guide for more details. Here is an example to modify the bootloader.
+2. Modify the bootloader using `modify_bootloader.sh` script. Please note that `modify_bootlader.sh` require 3 arguments. See [modify bootloader](../../../../../docs/setup/modify_fpga_bootloader.md) guide for more details. Here is an example to modify the bootloader.
    
    ```bash
    cd ~/br2-efinix/boards/efinix/common
@@ -76,15 +76,15 @@ Steps to buid the Linux image for unified hardware design.
 
 5. Flash firmware images.
    
-   - Follow [Flash firmware image](../../../../../docs/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the Ti180J484 devkit.
+   - Follow [Flash firmware image](../../../../../docs/setup/flash_firmware_image.md) document for flashing the fpga bitstream, opensbi and u-boot into the Ti180J484 devkit.
 
 6. Flash Linux image `sdcard.img` in to SD card.
    
    - you can use [Etcher](https://www.balena.io/etcher/) for Linux
    
-   - or, Linux command line to flash the Linux image into SD card. See [flash linux](../../../../../docs/flash_linux.md) document.
+   - or, Linux command line to flash the Linux image into SD card. See [flash linux](../../../../../docs/setup/flash_linux.md) document.
 
-7. Access the board serial console over USB UART. See [accessing uart terminal](../../../../../docs/accessing_uart_terminal.md) document.
+7. Access the board serial console over USB UART. See [accessing uart terminal](../../../../../docs/setup/accessing_uart_terminal.md) document.
 
 ## Demo
 

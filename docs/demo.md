@@ -1,6 +1,6 @@
 # Demo Application
 
-This document contain a few demo applications. Some of the demo might require the ethernet capabilities. See configure the board [document](configure_the_board.md) to do so.
+This document contain a few demo applications. Some of the demo might require the ethernet capabilities. See configure the board [document](setup/configure_the_board.md) to do so.
 
 1. **gpio_app**
    

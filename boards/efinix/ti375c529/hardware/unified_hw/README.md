@@ -24,7 +24,7 @@ This section is mandatory for boot up Linux using the unified hardware design.
    cd EmbeddedSystem-Solution
    ```
 
-2. Modify the bootloader using `modify_bootloader.sh` script. Please note that `modify_bootlader.sh` require 3 arguments. See [modify bootloader](docs/modify_fpga_bootloader.md) guide for more details. Here is an example to modify the bootloader.
+2. Modify the bootloader using `modify_bootloader.sh` script. Please note that `modify_bootlader.sh` require 3 arguments. See [modify bootloader](../../../../../docs/setup/modify_fpga_bootloader.md) guide for more details. Here is an example to modify the bootloader.
    
    ```bash
    cd ~/br2-efinix/boards/efinix/common
@@ -36,7 +36,7 @@ This section is mandatory for boot up Linux using the unified hardware design.
 
 ## Enabling X11 Graphics
 
-X11 graphics and desktop environment are supported by enabling Linux framebuffer driver and BR2_PACKAGE_DESKTOP_ENVIRONMENT package. To build the Linux image with X11 graphics, just pass the `-u -x` optional arguments to `init.sh` script. See step 2 at **Building Linux Image** for building Linux image with X11 graphics. See [enable framebuffer and x11 graphics](../../../../../docs/enable_framebuffer_and_x11_graphics.md) document for more info.
+X11 graphics and desktop environment are supported by enabling Linux framebuffer driver and BR2_PACKAGE_DESKTOP_ENVIRONMENT package. To build the Linux image with X11 graphics, just pass the `-u -x` optional arguments to `init.sh` script. See step 2 at **Building Linux Image** for building Linux image with X11 graphics. See [enable framebuffer and x11 graphics](../../../../../docs/devices/framebuffer/enable_framebuffer_and_x11_graphics.md) document for more info.
 
 ![](../../../../../docs/img/screenshot_x11.png)
 

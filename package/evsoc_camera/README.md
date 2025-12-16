@@ -33,7 +33,7 @@ A simple http server which serve camera stream output over the web using mjpeg f
 
 ### How to run?
 
-1. Setup the network on the board. See [configure the board](../../docs/configure_the_board.md) guide.
+1. Setup the network on the board. See [configure the board](../../docs/setup/configure_the_board.md) guide.
 
 2. Load the drivers and run the applicaton.
    

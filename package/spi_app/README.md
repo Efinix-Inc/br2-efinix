@@ -63,7 +63,7 @@ Reading SPI Flash
 0x800000: 68 65 6c 6c 6f 20 77 6f 72 6c 64 ff ff ff ff ff
 ```
 
-> Please note that writing at address range less than 0x800000 of SPI flash will result of unable to boot up the Linux after reset due to corrupted the Linux bootloader. See [Firware Address](../../docs/modify_fpga_bootloader.md) to learn more.
+> Please note that writing at address range less than 0x800000 of SPI flash will result of unable to boot up the Linux after reset due to corrupted the Linux bootloader. See [Firware Address](../../docs/setup/modify_fpga_bootloader.md) to learn more.
 
 
 

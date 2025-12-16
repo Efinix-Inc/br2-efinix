@@ -68,7 +68,7 @@ In Part 1, we will enable KGDB and configuring kernel with debug symbol.
    make -j$(nproc)
    ```
 
-6. Flash the linux image to SD card and into the board. See doc [Flash Linux image into SD card](flash_linux.md).
+6. Flash the linux image to SD card and into the board. See doc [Flash Linux image into SD card](../setup/flash_linux.md).
 
 ### Part 2: Run KGDB on Linux
 
@@ -86,7 +86,7 @@ Terminal 3 - for GDB
    cd agent-proxy
    make
    ```
-2. Start the KDMX.  The `/dev/ttyUSB0`is a UART port for the Ti180J484. See doc [Accessing UART Terminal](accessing_uart_terminal.md) for other board.
+2. Start the KDMX.  The `/dev/ttyUSB0`is a UART port for the Ti180J484. See doc [Accessing UART Terminal](../setup/accessing_uart_terminal.md) for other board.
    
    ```bash
    ./kdmx -n -b115200 -p "/dev/ttyUSB0" -s  /tmp/kdmx_ports

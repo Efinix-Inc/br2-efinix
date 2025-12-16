@@ -4,7 +4,7 @@
 
 The bootloader is the first program get executed when the FPGA board power on. The default bootloader would not able to boot Linux kernel. 
 
-In this tutorial, we are going to modify the bootloader program so that it can boot Linux. OpenSBI and U-Boot will be loaded first by this bootloader program before it can boot Linux. Make sure the Efinity project already created. If not exists then create a new project. See [Generate Sapphire SoC for Linux](generate_sapphire_soc_for_linux.md) guide to generate a Sapphire SoC.
+In this tutorial, we are going to modify the bootloader program so that it can boot Linux. OpenSBI and U-Boot will be loaded first by this bootloader program before it can boot Linux. Make sure the Efinity project already created. If not exists then create a new project. See [Generate Sapphire SoC for Linux](../hw/generate_sapphire_soc_for_linux.md) guide to generate a Sapphire SoC.
 
 The `EFINITY_PROJECT` is set as `/home/user/my_proj` targeting Ti375C529 for this tutorial.
 

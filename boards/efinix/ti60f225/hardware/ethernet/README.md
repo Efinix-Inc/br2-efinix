@@ -1,3 +1,1 @@
-see [ethernet_example_design.md](../../../../../docs/ethernet_example_design.md).
-
-
+see [ethernet_example_design.md](../../../../../docs/hw/ethernet_example_design.md).

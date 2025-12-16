@@ -49,4 +49,4 @@ For example to build Linux kernel with ethernet support for the following board
   make -j$(nproc)
   ```
 
-See the [document](configure_the_board.md) to configure the board.
+See the [document](../setup/configure_the_board.md) to configure the board.

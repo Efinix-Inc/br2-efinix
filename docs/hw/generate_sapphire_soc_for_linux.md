@@ -210,7 +210,7 @@ Table below shows the best known configuration for assigning the pinout for SPI 
 
 ## Part 2: Modify Bootloader
 
-You are require to modify the bootloader when generating a custom SoC. See [Modify fpga bootloader](modify_fpga_bootloader.md) document.
+You are require to modify the bootloader when generating a custom SoC. See [Modify fpga bootloader](../setup/modify_fpga_bootloader.md) document.
 
 ## Part 3: Compile the Efinity Project
 
