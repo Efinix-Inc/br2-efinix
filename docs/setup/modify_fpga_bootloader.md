@@ -33,7 +33,7 @@ Modifying bootloader program can be challenging for beginner. There are **TWO** 
 
 ### 1a: Using modify_bootloader.sh script
 
-The `modify_bootloader.sh` script simplify the steps for modifying bootloader program and compilation. The `modify_bootloader.sh`  script located in [modify_bootloader.sh](../boards/efinix/common/modify_bootloader.sh). The compiled bootloader is store in `EFINITY_PROJECT/linux_bootloader`.
+The `modify_bootloader.sh` script simplify the steps for modifying bootloader program and compilation. The `modify_bootloader.sh`  script located in [modify_bootloader.sh](../../boards/efinix/common/modify_bootloader.sh). The compiled bootloader is store in `EFINITY_PROJECT/linux_bootloader`.
 
 ```bash
 This script used to modify and compile the first stage bootloader program for booting Linux.
@@ -65,7 +65,7 @@ To modify the bootloader and compile using this script
 
 ### 1b: Modify manually
 
-1. Copy and replace [bootloaderConfig.h](board/efinix/common/bootloaderConfig.h) to your project path.
+1. Copy and replace [bootloaderConfig.h](../../boards/efinix/common/bootloaderConfig.h) to your project path.
    
    - For Ti375C529
      
@@ -118,11 +118,11 @@ To modify the bootloader and compile using this script
    
    - Right click on the `Sapphire IP -> configure`.
      
-     ![](img/sapphire_configure.png)
+     ![](../img/sapphire_configure.png)
    
    - On the IP configuration of Sapphire SoC, goto `Cache/Memory` tab.
      
-     ![](img/on-chip-ram.png)
+     ![](../img/on-chip-ram.png)
      
      - Enable `Custom On-Chip RAM Application`.
      
@@ -136,7 +136,7 @@ To modify the bootloader and compile using this script
    
    - Open `Efinity Interface Designer`.
      
-     ![](img/on-chip-ram-harden-soc.png)
+     ![](../img/on-chip-ram-harden-soc.png)
    
    - At `Design Explorer`, select `Quad-Core RISC-V`.
    

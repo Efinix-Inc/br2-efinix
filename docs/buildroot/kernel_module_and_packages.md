@@ -107,7 +107,7 @@ insmod foo.ko
 
 In this repository, there are some examples of kernel modules which can guide you on how to enable your own kernel module.
 
-- [helloworld](../kernel_modules/helloworld/README.md)
+- [helloworld](../../kernel_modules/helloworld/README.md)
 
 Adding your own custom package
 ------------------------------

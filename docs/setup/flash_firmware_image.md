@@ -34,15 +34,15 @@ Follow these steps to flash OpenSBI and U-boot.
    ./efinity
    ```
 
-3. Click the `programmer` icon ![alt text](img/programmer_icon.jpg) on the Efinity to launch the `programmer`.
+3. Click the `programmer` icon ![alt text](../img/programmer_icon.jpg) on the Efinity to launch the `programmer`.
 
-4. At the `Image` section on `programmer`, click **Combine Multiple Image Files** ![alt text](img/combine_icon.jpg) to select FPGA bitstream (Sapphire SoC), OpenSBI and U-boot images.
+4. At the `Image` section on `programmer`, click **Combine Multiple Image Files** ![alt text](../img/combine_icon.jpg) to select FPGA bitstream (Sapphire SoC), OpenSBI and U-boot images.
 
 5. Select `Mode` and choose **Generic Image Combination**
 
 6. Click `Add Image` to add FPGA bitstream, OpenSBI and U-boot images. Then set the `Flash Address` for each image file. The flash address shown in the table above. Click **Apply** to save the output image.
    
-   <img title="" src="img/combine_programmer.jpg" alt="alt text" width="393">
+   <img title="" src="../img/combine_programmer.jpg" alt="alt text" width="393">
 
 7. Program the combine bitstream.
    
@@ -54,9 +54,9 @@ Follow these steps to flash OpenSBI and U-boot.
      
      - Click the icon `Start Program` to program the board.
        
-       <img src="img/programmer_ti180_ui.jpg" title="" alt="alt text" width="392">
+       <img src="../img/programmer_ti180_ui.jpg" title="" alt="alt text" width="392">
      
      - Press the `CRESET` button at `SW1` on the Ti180J484 once the programming finish.
 - Other devkit, on the `programmer` interface at section `Programming Mode`, select `SPI Active` then click icon **Start Program**. It will takes some time to program the SPI flash.
   
-  <img src="img/progrmmer_ui.jpg" title="" alt="alt text" width="375">
+  <img src="../img/progrmmer_ui.jpg" title="" alt="alt text" width="375">

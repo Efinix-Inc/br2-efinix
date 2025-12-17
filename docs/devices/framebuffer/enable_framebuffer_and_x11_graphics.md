@@ -2,7 +2,7 @@
 
 A framebuffer is a portion of RAM containing a bitmap that drives a video display. It represents the memory buffer that holds the pixel data for the screen, allowing the computer to render images, text, and other graphics.
 
-We are using [unified hardware design](https://github.com/Efinix-Inc/EmbeddedSystem-Solution) for Ti375C529 devkit. Please note that [init.sh](../init.sh) script already handle all these steps for unified hardware design by passing arguments `-u -x` to the `init.sh` script. However, in this tutorial, we show on how to enable it from the scratch.
+We are using [unified hardware design](https://github.com/Efinix-Inc/EmbeddedSystem-Solution) for Ti375C529 devkit. Please note that [init.sh](../../../init.sh) script already handle all these steps for unified hardware design by passing arguments `-u -x` to the `init.sh` script. However, in this tutorial, we show on how to enable it from the scratch.
 
 The display controller is connected to DMA1 channel 1 with `interrupt ID 16`. The framebuffer driver will start the transfer of bitmap from memory location `0x8000000` to the display controller using the DMA engine.
 

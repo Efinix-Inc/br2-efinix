@@ -42,7 +42,7 @@ Follow the official [document](https://www.efinixinc.com/support/docsdl.php?s=ef
 
 ## Part 2: Modify bootloader
 
-You are require to modify the bootloader when generating a custom SoC. See [Modify fpga bootloader](modify_fpga_bootloader.md) document.
+You are require to modify the bootloader when generating a custom SoC. See [Modify fpga bootloader](../setup/modify_fpga_bootloader.md) document.
 
 ## Part 3: Compile the Efinity Project
 

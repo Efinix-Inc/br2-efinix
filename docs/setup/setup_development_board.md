@@ -28,7 +28,7 @@ This guide show on how to setup the development board with UART and MicroSD card
 
 Setup the UART and PMOD MicroSD card modules for T120F324
 
-<img src="img/setup_t120f324.jpg" title="" alt="alt text" width="589">
+<img src="../img/setup_t120f324.jpg" title="" alt="alt text" width="589">
 
 Connect the MIPI and LVDS Expansion daughter card to the board at P2 header.
 

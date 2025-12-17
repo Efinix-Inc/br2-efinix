@@ -23,7 +23,7 @@ At the U-Boot terminal, run this command to boot from SD card
 - Linux device tree - linux.dtb
 
 - Root filesystem - rootfs.tar
-1. Prepare the binaries files as stated in the prerequiste. You need to build the Linux image if these files does not exists. Refer to unified hardware design [README](../../boards/efinix/ti375c529/hardware/unified_hw/README.md) file for more info.
+1. Prepare the binaries files as stated in the prerequiste. You need to build the Linux image if these files does not exists. Refer to unified hardware design [README](../../../boards/efinix/ti375c529/hardware/unified_hw/README.md) file for more info.
 
 2. Boot the Linux image from SD card first before programming the EMMC card with newer Linux image.
 
