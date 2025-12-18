@@ -1,3 +1,23 @@
+br2-efinix 2021.05.11,
+
+	Enable watchdog & EMMC drivers for U-Boot & Linux
+	Enable SPI flash access by leveraging the Linux MTD subsystem
+	Consolidate Buildroot, Linux & U-Boot defconfig files
+	Enable EXT4 as the default filesystem, depreciating EXT2
+	Update kernel 5.10.0 -> 5.10.147 for stability and security fixes
+	Update sapphire-soc-dt-generator v2.2 -> 3.1 for bug fixes
+	Update all example designs for supported boards
+	Restructure the docs folder
+	Upgrade htop 3.0.5 -> 3.1.0
+	Enable simple text editor package for X11
+	Add support for Ti375N1156 development board
+
+	Issues resolved
+	Fixed getting bootloader program directory
+	Fixed ethernet rx hang due to NAPI completion and descriptor handoff
+	Fixed init.sh script for preparing buildroot environment
+	Fix framebuffer and DMA SG drivers for supporting RV64
+
 br2-efinix 2021.05.10,
 
 	Add desktop environment packages for enabling X11 graphics
