@@ -726,10 +726,10 @@ function parser()
 				;;
 			u)
 				UNIFIED_HW=1
-				USE_EMMC_BOOT=1
 				EXTRA_HW_FEATURES="sdhc,ethernet,evsoc,"
 				if [ $BOARD = "ti375c529" ]; then
 					EXTRA_HW_FEATURES+="emmc,"
+					USE_EMMC_BOOT=1
 				fi
 				;;
 			s)
