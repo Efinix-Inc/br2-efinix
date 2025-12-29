@@ -1,0 +1,7 @@
+config BR2_PACKAGE_GPIOD
+	bool "GPIOD"
+	default n
+	select BR2_PACKAGE_LIBGPIOD
+	help
+	  Toggling LEDs on board using libgpiod library
+
