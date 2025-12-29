@@ -15,7 +15,7 @@
 
 #define UBOOT_MEMORY      0x02040000
 #define UBOOT_SBI_FLASH   0x00680000
-#define UBOOT_SIZE        0x0C0000
+#define UBOOT_SIZE        0x200000
 
 #define UART_0_SAMPLE_PER_BAUD  8
 #define UART_0_BAUD_RATE        115200
