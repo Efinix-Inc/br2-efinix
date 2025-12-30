@@ -429,7 +429,7 @@ function generate_device_tree() {
 				;;
 			gpio)
 				if [[ "$type" == "linux" ]]; then
-					add_board_cfg cmd "$generic_dir/gpio_led.json" "$override_dir" "$override_board_dir" "gpio_led.json"
+					add_board_cfg cmd "$generic_dir/gpio_irq.json" "$override_dir" "$override_board_dir" "gpio_irq.json"
 				fi
 				;;
 			ethernet)
