@@ -1,4 +1,4 @@
-From 5684ca4c0a22839c6d370586102a131c11bb50a8 Mon Sep 17 00:00:00 2001
+From 9c423da26977dae227cc6032dde64d5bd018c410 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Tue, 2 Dec 2025 11:33:53 +0800
 Subject: [PATCH] mmc: Add Efinix eMMC driver
@@ -6,20 +6,20 @@ Subject: [PATCH] mmc: Add Efinix eMMC driver
 Signed-off-by: Teoh Choon Zone <czteoh@efinixinc.com>
 Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
- board/vexriscv/saxon/default_env.txt |  11 +
+ board/vexriscv/saxon/default_env.txt |  10 +
  drivers/mmc/Kconfig                  |  12 +
  drivers/mmc/Makefile                 |   1 +
  drivers/mmc/efx_emmc.c               | 764 +++++++++++++++++++++++++++
- 4 files changed, 788 insertions(+)
+ 4 files changed, 787 insertions(+)
  create mode 100644 board/vexriscv/saxon/default_env.txt
  create mode 100644 drivers/mmc/efx_emmc.c
 
 diff --git a/board/vexriscv/saxon/default_env.txt b/board/vexriscv/saxon/default_env.txt
 new file mode 100644
-index 00000000000..4ca47c8645f
+index 00000000000..ffdc4ea9d8b
 --- /dev/null
 +++ b/board/vexriscv/saxon/default_env.txt
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,10 @@
 +baudrate=115200
 +bootcmd=run emmc_bootcmd
 +bootdelay=2
@@ -27,10 +27,9 @@ index 00000000000..4ca47c8645f
 +fdt_high=0xffffffff
 +fdt_addr_r=0x09000000
 +kernel_addr_r=0x08000000
-+emmc_bootargs=rootwait rootdelay=3 console=ttySL0 earlycon root=/dev/mmcblk1p2 init=/sbin/init mmc_core.use_spi_crc=0
++emmc_bootargs=rootwait rootdelay=3 console=ttySL0 earlycon root=/dev/mmcblk0p2 init=/sbin/init mmc_core.use_spi_crc=0
 +emmc_bootcmd=setenv bootargs ${emmc_bootargs}; mmc dev 1; ext2load mmc 1:1 ${kernel_addr_r} Image;ext2load mmc 1:1 ${fdt_addr_r} linux.dtb;booti ${kernel_addr_r} - ${fdt_addr_r}
-+sd_bootargs=rootwait console=ttySL0 earlycon root=/dev/mmcblk0p2 init=/sbin/init mmc_core.use_spi_crc=0
-+sd_bootcmd=setenv bootargs ${sd_bootargs}; fatload mmc 0:1 ${kernel_addr_r} Image;fatload mmc 0:1 ${fdt_addr_r} linux.dtb;booti ${kernel_addr_r} - ${fdt_addr_r}
++sd_bootcmd=fatload mmc 0:1 ${kernel_addr_r} Image;fatload mmc 0:1 ${fdt_addr_r} linux.dtb;booti ${kernel_addr_r} - ${fdt_addr_r}
 diff --git a/drivers/mmc/Kconfig b/drivers/mmc/Kconfig
 index 088aca686ed..25442ffdb4a 100644
 --- a/drivers/mmc/Kconfig
