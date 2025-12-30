@@ -175,7 +175,7 @@ w
         os.chdir(self.work_dir)
 
         # Download images
-        images = ["uImage", "linux.dtb", "rootfs.tar"]
+        images = ["uImage", "Image", "linux.dtb", "rootfs.tar"]
 
         for image in images:
             print(f"Downloading {image}...")
@@ -357,8 +357,11 @@ w
         os.chdir(self.work_dir)
 
         # Copy boot images
-        print("Copying boot images...")
+        print("Copying kernel image (uImage)...")
         self.run_command(f"cp uImage linux.dtb {self.boot_mount}/")
+
+        print("Copying kernel image (Image)...")
+        self.run_command(f"cp Image linux.dtb {self.boot_mount}/")
 
         # Extract rootfs
         print("Extracting rootfs...")
