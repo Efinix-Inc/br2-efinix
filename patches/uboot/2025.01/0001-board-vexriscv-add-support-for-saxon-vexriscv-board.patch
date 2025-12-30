@@ -1,4 +1,4 @@
-From 824c475337b9569071b3b26481938630d20b5eac Mon Sep 17 00:00:00 2001
+From bc8fcb159e6fc08430a7c83eefcac3a02fd271f1 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Mon, 23 Jun 2025 23:45:52 +0800
 Subject: [PATCH] board/vexriscv: add support for saxon vexriscv board
@@ -10,8 +10,8 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
  board/vexriscv/saxon/Kconfig  |  27 +++++++++
  board/vexriscv/saxon/Makefile |   5 ++
  board/vexriscv/saxon/saxon.c  | 100 ++++++++++++++++++++++++++++++++++
- include/configs/saxon.h       |  63 +++++++++++++++++++++
- 6 files changed, 199 insertions(+)
+ include/configs/saxon.h       |  56 +++++++++++++++++++
+ 6 files changed, 192 insertions(+)
  create mode 100644 board/vexriscv/saxon/Kconfig
  create mode 100644 board/vexriscv/saxon/Makefile
  create mode 100644 board/vexriscv/saxon/saxon.c
@@ -202,10 +202,10 @@ index 00000000000..a6b0e03e469
 +#endif /* CONFIG_SPL_BUILD */
 diff --git a/include/configs/saxon.h b/include/configs/saxon.h
 new file mode 100644
-index 00000000000..365f407e39f
+index 00000000000..2bb77cd8e9d
 --- /dev/null
 +++ b/include/configs/saxon.h
-@@ -0,0 +1,63 @@
+@@ -0,0 +1,56 @@
 +/* SPDX-License-Identifier: GPL-2.0+ */
 +/*
 + * Copyright (C) 2019 roman3017 <rbacik@hotmail.com>
@@ -233,13 +233,6 @@ index 00000000000..365f407e39f
 +/* Place the initial SP near the top of DRAM (below reserved/LMB cushion) */
 +#undef  CONFIG_SYS_INIT_SP_ADDR
 +#define CONFIG_SYS_INIT_SP_ADDR (CONFIG_SYS_SDRAM_BASE + CONFIG_SYS_SDRAM_SIZE - 0x10000UL)
-+
-+/* Early/normal malloc arenas inside DRAM */
-+#define CONFIG_SYS_MALLOC_LEN   (16 * 1024 * 1024) /* 16 MiB main heap */
-+#define CONFIG_SYS_MALLOC_F_LEN (1  * 1024 * 1024) /* 1 MiB early malloc (if enabled) */
-+
-+/* Text base: align with OpenSBI “Next Address” (from your boot log) */
-+#define CONFIG_SYS_TEXT_BASE         0x02040000UL
 +
 +/* Environment defaults */
 +#define CONFIG_EXTRA_ENV_SETTINGS "initrd_high=0xffffffff\0" \
