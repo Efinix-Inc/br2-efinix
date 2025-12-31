@@ -163,12 +163,12 @@ void graphics_set_pixel(int x, int y, float r, float g, float b) {
 // femtorv32 cores (quark, tachyon), the clock tick counter does not
 // have sufficient bits and will wrap during the time taken by
 // rendering a frame (up to several minutes).
-static inline stats_begin_pixel() {
+static inline void stats_begin_pixel() {
 }
 
 // Ends statistics collection for current pixel
 // Leave emtpy if not needed.
-static inline stats_end_pixel() {
+static inline void stats_end_pixel() {
 }
 
 // Print "fixed point" number (integer/1000)
@@ -190,7 +190,7 @@ static uint64_t cycles_start;
 
 // Begins statistics collection for current frame.
 // Leave emtpy if not needed.
-static inline stats_begin_frame() {
+static inline void stats_begin_frame() {
     instret_start = rdinstret();
     cycles_start  = rdcycle();
 }
@@ -198,7 +198,7 @@ static inline stats_begin_frame() {
 // Ends statistics collection for current frame
 // and displays result.
 // Leave emtpy if not needed.
-static inline stats_end_frame() {
+static inline void stats_end_frame() {
    graphics_terminate();
    uint64_t instret = rdinstret() - instret_start;
    uint64_t cycles = rdcycle()    - cycles_start ;
