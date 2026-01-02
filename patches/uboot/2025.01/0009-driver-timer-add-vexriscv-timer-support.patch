@@ -1,0 +1,115 @@
+From 2f77316b5d9f22a1f46c7463ba6cca56efee61a5 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Wed, 31 Dec 2025 17:26:34 +0800
+Subject: [PATCH] driver/timer: add vexriscv timer support
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ drivers/timer/Kconfig          |  7 ++++
+ drivers/timer/Makefile         |  1 +
+ drivers/timer/vexriscv-timer.c | 68 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 76 insertions(+)
+ create mode 100644 drivers/timer/vexriscv-timer.c
+
+diff --git a/drivers/timer/Kconfig b/drivers/timer/Kconfig
+index 090ae809f90..56114ee0daf 100644
+--- a/drivers/timer/Kconfig
++++ b/drivers/timer/Kconfig
+@@ -359,4 +359,11 @@ config SIFIVE_CLINT
+ 	depends on TIMER
+ 	help
+ 	  Clint timer for RISC-V platform.
++
++config VEXRISCV_TIMER
++	bool "Vexriscv timer support"
++	depends on TIMER
++	help
++	  Select this to enable support on the timer found on
++	  Vexriscv SoC
+ endmenu
+diff --git a/drivers/timer/Makefile b/drivers/timer/Makefile
+index 7a847e8388b..f66db2b44fa 100644
+--- a/drivers/timer/Makefile
++++ b/drivers/timer/Makefile
+@@ -37,3 +37,4 @@ obj-$(CONFIG_MCHP_PIT64B_TIMER)	+= mchp-pit64b-timer.o
+ obj-$(CONFIG_IMX_GPT_TIMER)	+= imx-gpt-timer.o
+ obj-$(CONFIG_XILINX_TIMER)	+= xilinx-timer.o
+ obj-$(CONFIG_STARFIVE_TIMER)	+= starfive-timer.o
++obj-$(CONFIG_VEXRISCV_TIMER)	+= vexriscv-timer.o
+diff --git a/drivers/timer/vexriscv-timer.c b/drivers/timer/vexriscv-timer.c
+new file mode 100644
+index 00000000000..9b1adeb09ed
+--- /dev/null
++++ b/drivers/timer/vexriscv-timer.c
+@@ -0,0 +1,68 @@
++// SPDX-License-Identifier: GPL-2.0+
++
++#include <config.h>
++#include <clk.h>
++#include <div64.h>
++#include <dm.h>
++#include <timer.h>
++#include <asm/io.h>
++#include <dm/device-internal.h>
++#include <linux/err.h>
++
++#define CLINT_MTIME_OFFSET		0xbff8
++
++/* mtime register */
++#define MTIME_REG(base, offset)		((ulong)(base) + (offset))
++
++static u64 notrace vexriscv_timer_get_count(struct udevice *dev)
++{
++	return readq((void __iomem *)MTIME_REG(dev_get_priv(dev),
++					       dev_get_driver_data(dev)));
++}
++
++#if CONFIG_IS_ENABLED(RISCV_MMODE) && IS_ENABLED(CONFIG_TIMER_EARLY)
++/**
++ * timer_early_get_rate() - Get the timer rate before driver model
++ */
++unsigned long notrace timer_early_get_rate(void)
++{
++	return RISCV_MMODE_TIMER_FREQ;
++}
++
++/**
++ * timer_early_get_count() - Get the timer count before driver model
++ *
++ */
++u64 notrace timer_early_get_count(void)
++{
++	return readq((void __iomem *)MTIME_REG(RISCV_MMODE_TIMERBASE,
++					       RISCV_MMODE_TIMEROFF));
++}
++#endif
++
++static const struct timer_ops vexriscv_timer_ops = {
++	.get_count = vexriscv_timer_get_count,
++};
++
++static int vexriscv_timer_probe(struct udevice *dev)
++{
++	dev_set_priv(dev, dev_read_addr_ptr(dev));
++	if (!dev_get_priv(dev))
++		return -EINVAL;
++
++	return timer_timebase_fallback(dev);
++}
++
++static const struct udevice_id vexriscv_timer_ids[] = {
++	{ .compatible = "riscv,clint0", .data = CLINT_MTIME_OFFSET },
++	{ }
++};
++
++U_BOOT_DRIVER(vexriscv_timer) = {
++	.name		= "vexriscv_timer",
++	.id		= UCLASS_TIMER,
++	.of_match	= vexriscv_timer_ids,
++	.probe		= vexriscv_timer_probe,
++	.ops		= &vexriscv_timer_ops,
++	.flags		= DM_FLAG_PRE_RELOC,
++};
+-- 
+2.43.0
+
