@@ -1,11 +1,7 @@
 /*
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2019 Western Digital Corporation or its affiliates.
- *
- * Authors:
- *   Anup Patel <anup.patel@wdc.com>
- *   Nick Kossifidis <mick@ics.forth.gr>
+ * Copyright (c) 2026 Efinix Inc
  */
 
 #include <sbi/riscv_asm.h>
@@ -14,48 +10,30 @@
 #include <sbi/sbi_const.h>
 #include <sbi/sbi_hart.h>
 #include <sbi/sbi_platform.h>
+#include <sbi/sbi_console.h>
 #include <sbi_utils/irqchip/plic.h>
 #include <sbi_utils/serial/spinal-uart.h>
 #include <sbi_utils/ipi/aclint_mswi.h>
 #include <sbi_utils/timer/aclint_mtimer.h>
 #include "soc.h"
 
-/* clang-format off */
 #ifndef SYSTEM_CORES_COUNT
 #define VEX_HART_COUNT  1
 #else
 #define VEX_HART_COUNT  SYSTEM_CORES_COUNT
 #endif
 
-#define VEX_PLATFORM_FEATURES  \
-	(SBI_PLATFORM_HAS_TIMER_VALUE | SBI_PLATFORM_HAS_MFAULTS_DELEGATION)
+#define VEX_PLATFORM_FEATURES  SBI_PLATFORM_HAS_MFAULTS_DELEGATION
 
-//#define VEX_HART_STACK_SIZE		4096
+#define VEX_CLINT_MTIME_LO	0xbff8
+#define VEX_CLINT_MTIME_HI	0xbffc
+#define VEX_CLINT_MTIMECMP_LO	0x4000
+#define VEX_CLINT_MTIMECMP_HI	0x4004
 
-
-/*
-#define UART_DATA 0x00
-#define UART_STATUS 0x04
-#define VEX_CLINT_ADDR SYSTEM_CLINT_CTRL
-*/
 #define VEX_UART_ADDR 		(void*)SYSTEM_UART_0_IO_CTRL
 #define VEX_CLINT_MSWI_ADDR	(SYSTEM_CLINT_CTRL + CLINT_MSWI_OFFSET)
-#define VEX_CLINT_MTIMER_ADDR	(SYSTEM_CLINT_CTRL + CLINT_MTIMER_OFFSET)
-
-/* clang-format on */
-
-/*
-static struct clint_data clint = {VEX_CLINT_ADDR, 0, VEX_HART_COUNT, true};
-
-void vex_putc(char ch){
-	while(((readl(VEX_UART_ADDR + UART_STATUS) >> 16) & 0xFF) == 0);
-	writel(ch, VEX_UART_ADDR);
-}
-
-int vex_getc(void){
-    return (readl(VEX_UART_ADDR + UART_STATUS) >> 24) == 0 ? -1 : readl(VEX_UART_ADDR + UART_DATA);
-}
-*/
+#define VEX_CLINT_MTIMER_ADDR	(SYSTEM_CLINT_CTRL + VEX_CLINT_MTIME_LO)
+#define VEX_CLINT_MTIMECMP_ADDR (SYSTEM_CLINT_CTRL + VEX_CLINT_MTIMECMP_LO)
 
 static struct aclint_mswi_data mswi = {
 	.addr = VEX_CLINT_MSWI_ADDR,
@@ -68,12 +46,17 @@ static struct aclint_mtimer_data mtimer = {
 	.mtime_freq = SYSTEM_CLINT_HZ,
 	.mtime_addr = VEX_CLINT_MTIMER_ADDR,
 	.mtime_size = ACLINT_DEFAULT_MTIME_SIZE,
-	.mtimecmp_addr = VEX_CLINT_MTIMER_ADDR +
-			ACLINT_DEFAULT_MTIMECMP_OFFSET,
+	.mtimecmp_addr = VEX_CLINT_MTIMECMP_ADDR,
 	.mtimecmp_size = ACLINT_DEFAULT_MTIMECMP_SIZE,
 	.first_hartid = 0,
 	.hart_count = VEX_HART_COUNT,
+#if __riscv_xlen == 32
+	.has_64bit_mmio = false,
+#elif __riscv_xlen == 64
+	.has_64bit_mmio = true,
+#endif
 };
+
 static int vex_final_init(bool cold_boot)
 {
 	return 0;
@@ -109,16 +92,14 @@ const struct sbi_platform_operations platform_ops = {
 	.ipi_init		= vex_ipi_init,
 	.timer_init		= vex_timer_init,
 };
+
 const struct sbi_platform platform = {
 	.opensbi_version	= OPENSBI_VERSION,
 	.platform_version	= SBI_PLATFORM_VERSION(0x0, 0x01),
 	.name			= "Efinix Titanium Ti375C529",
-	//.features		= VEX_PLATFORM_FEATURES,
-	.features		= 0,
+	.features		= VEX_PLATFORM_FEATURES,
 	.hart_count		= VEX_HART_COUNT,
 	.hart_stack_size	= SBI_PLATFORM_DEFAULT_HART_STACK_SIZE,
 	.heap_size		= SBI_PLATFORM_DEFAULT_HEAP_SIZE(VEX_HART_COUNT),
 	.platform_ops_addr	= (unsigned long)&platform_ops
 };
-
-

@@ -1,0 +1,26 @@
+From fe8746522fa5d9011d3fab9829fa1e5661a352ad Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Wed, 7 Jan 2026 13:27:52 +0800
+Subject: [PATCH] remove checking hpm for CSR_TIME
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ lib/sbi/sbi_emulate_csr.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/lib/sbi/sbi_emulate_csr.c b/lib/sbi/sbi_emulate_csr.c
+index c2253c82..fbf3399a 100644
+--- a/lib/sbi/sbi_emulate_csr.c
++++ b/lib/sbi/sbi_emulate_csr.c
+@@ -62,8 +62,6 @@ int sbi_emulate_csr_read(int csr_num, struct sbi_trap_regs *regs,
+ 		*csr_val = csr_read(CSR_MCYCLE);
+ 		break;
+ 	case CSR_TIME:
+-		if (!hpm_allowed(csr_num - CSR_CYCLE, prev_mode, virt))
+-			return SBI_ENOTSUPP;
+ 		/*
+ 		 * We emulate TIME CSR for both Host (HS/U-mode) and
+ 		 * Guest (VS/VU-mode).
+-- 
+2.43.0
+
