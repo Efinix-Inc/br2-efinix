@@ -1,0 +1,95 @@
+From c9e69d71b64f8e170eff4597add751f9f117fe32 Mon Sep 17 00:00:00 2001
+From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+Date: Mon, 12 Jan 2026 14:27:33 +0800
+Subject: [PATCH] package/pcmanfm: upgrade version 1.3.2 -> 1.4.0
+
+Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
+---
+ ...po-de-po-fix-build-with-gettext-tiny.patch | 35 -------------------
+ package/pcmanfm/pcmanfm.hash                  |  7 ++--
+ package/pcmanfm/pcmanfm.mk                    |  7 ++--
+ 3 files changed, 7 insertions(+), 42 deletions(-)
+ delete mode 100644 package/pcmanfm/0001-po-de-po-fix-build-with-gettext-tiny.patch
+
+diff --git a/package/pcmanfm/0001-po-de-po-fix-build-with-gettext-tiny.patch b/package/pcmanfm/0001-po-de-po-fix-build-with-gettext-tiny.patch
+deleted file mode 100644
+index ededd450ae..0000000000
+--- a/package/pcmanfm/0001-po-de-po-fix-build-with-gettext-tiny.patch
++++ /dev/null
+@@ -1,35 +0,0 @@
+-From 2e51d1015ffd58f26f4ddf03a858164edcf64a8c Mon Sep 17 00:00:00 2001
+-From: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+-Date: Fri, 26 Mar 2021 09:16:08 +0100
+-Subject: [PATCH] po/de.po: fix build with gettext-tiny
+-
+-Build of de.gmo is broken with gettext-tiny since version 1.3.2 and
+-commit 80e0f662861e6d0ad8888f61c19c0695978779bf:
+-
+-file=`echo de | sed 's,.*/,,'`.gmo \
+-  && rm -f $file && /home/buildroot/autobuild/instance-2/output-1/host/bin/msgfmt -o $file de.po
+-Makefile:102: recipe for target 'de.gmo' failed
+-
+-Fixes:
+- - http://autobuild.buildroot.org/results/69f4e5fa44208429b143011640971a61d709d5b1
+-
+-Signed-off-by: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+-[Upstream status: https://github.com/lxde/pcmanfm/pull/8]
+----
+- po/de.po | 3 +--
+- 1 file changed, 1 insertion(+), 2 deletions(-)
+-
+-diff --git a/po/de.po b/po/de.po
+-index 766a44e..9781ba3 100644
+---- a/po/de.po
+-+++ b/po/de.po
+-@@ -961,8 +961,7 @@ msgstr "Diese Ordneransicht merken"
+- #: ../src/main-win-ui.c:279
+- msgid ""
+- "Check to remember view and sort as folder setting rather than global one"
+--msgstr
+--"Ansicht und Sortierung für dieses Verzeichnis anstelle der globalen "
+-+msgstr "Ansicht und Sortierung für dieses Verzeichnis anstelle der globalen "
+- "Einstellung merken"
+- 
+- #: ../src/main-win-ui.c:281
+diff --git a/package/pcmanfm/pcmanfm.hash b/package/pcmanfm/pcmanfm.hash
+index 1911de20b1..cfd3ed11ce 100644
+--- a/package/pcmanfm/pcmanfm.hash
++++ b/package/pcmanfm/pcmanfm.hash
+@@ -1,7 +1,6 @@
+-# From https://sourceforge.net/projects/pcmanfm/files/PCManFM%20%2B%20Libfm%20%28tarball%20release%29/PCManFM/
+-md5  ef7c4417d2697ef138d175db7aeae15a  pcmanfm-1.3.2.tar.xz
+-sha1  bc4e468b0ec3089aaf817eafed43ae06350961ee  pcmanfm-1.3.2.tar.xz
++md5  fae5b9f3c39ece5129b2ed43415e3c3f  1.4.0.tar.gz
++sha1  f9c9ac48b186fb35ed8de8e747975bf3d2cf5888  1.4.0.tar.gz
+ 
+ # Locally computed:
+-sha256  14cb7b247493c4cce65fbb5902611e3ad00a7a870fbc1e50adc50428c5140cf7  pcmanfm-1.3.2.tar.xz
++sha256	cda4f5ad7e049dcdf3b051b9de4c779adcd55bd720e9c96c45275389aa84264e  1.4.0.tar.gz
+ sha256  231f7edcc7352d7734a96eef0b8030f77982678c516876fcb81e25b32d68564c  COPYING
+diff --git a/package/pcmanfm/pcmanfm.mk b/package/pcmanfm/pcmanfm.mk
+index 46d750b1e6..4c45cfe212 100644
+--- a/package/pcmanfm/pcmanfm.mk
++++ b/package/pcmanfm/pcmanfm.mk
+@@ -4,9 +4,9 @@
+ #
+ ################################################################################
+ 
+-PCMANFM_VERSION = 1.3.2
+-PCMANFM_SOURCE = pcmanfm-$(PCMANFM_VERSION).tar.xz
+-PCMANFM_SITE = http://sourceforge.net/projects/pcmanfm/files
++PCMANFM_VERSION = 1.4.0
++PCMANFM_SOURCE = $(PCMANFM_VERSION).tar.gz
++PCMANFM_SITE = https://github.com/lxde/pcmanfm/archive/refs/tags
+ PCMANFM_DEPENDENCIES = libglib2 menu-cache libfm libgtk3 $(TARGET_NLS_DEPENDENCIES)
+ PCMANFM_LICENSE = GPL-2.0+
+ PCMANFM_LICENSE_FILES = COPYING
+@@ -14,4 +14,5 @@ PCMANFM_CPE_ID_VALID = YES
+ PCMANFM_CONF_ENV = LIBS=$(TARGET_NLS_LIBS)
+ PCMANFM_CONF_OPTS = --with-gtk=3
+ 
++PCMANFM_AUTORECONF = YES
+ $(eval $(autotools-package))
+-- 
+2.43.0
+

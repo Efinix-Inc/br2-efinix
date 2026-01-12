@@ -1,0 +1,41 @@
+From 4abee5223f4d0a93215b149aa89ad4d4cc1e80ef Mon Sep 17 00:00:00 2001
+From: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Date: Wed, 10 Sep 2025 23:32:22 +0200
+Subject: [PATCH 2/3] package/mjpegtools: drop optional dependency on libgtk2
+
+As we're about to remove libgtk2, let's drop the optional dependency
+of mjpegtools on libgtk2, and forcefully disable gtk support.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Signed-off-by: Arnout Vandecappelle <arnout@rnout.be>
+---
+ package/mjpegtools/mjpegtools.mk | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
+
+diff --git a/package/mjpegtools/mjpegtools.mk b/package/mjpegtools/mjpegtools.mk
+index 8d6c475518..871d1b8f36 100644
+--- a/package/mjpegtools/mjpegtools.mk
++++ b/package/mjpegtools/mjpegtools.mk
+@@ -10,6 +10,7 @@ MJPEGTOOLS_DEPENDENCIES = host-pkgconf jpeg
+ MJPEGTOOLS_INSTALL_STAGING = YES
+ MJPEGTOOLS_LICENSE = GPL-2.0+
+ MJPEGTOOLS_LICENSE_FILES = COPYING
++MJPEGTOOLS_CONF_OPTS = --without-gtk
+ 
+ ifeq ($(BR2_PACKAGE_MJPEGTOOLS_SIMD_SUPPORT),y)
+ MJPEGTOOLS_CONF_OPTS += --enable-simd-accel
+@@ -53,11 +54,4 @@ else
+ MJPEGTOOLS_CONF_OPTS += --without-dga
+ endif
+ 
+-ifeq ($(BR2_PACKAGE_LIBGTK2),y)
+-MJPEGTOOLS_CONF_OPTS += --with-gtk
+-MJPEGTOOLS_DEPENDENCIES += libgtk2
+-else
+-MJPEGTOOLS_CONF_OPTS += --without-gtk
+-endif
+-
+ $(eval $(autotools-package))
+-- 
+2.43.0
+
