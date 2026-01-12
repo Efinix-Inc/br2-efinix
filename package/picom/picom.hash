@@ -1,3 +1,6 @@
+md5  0e1d2bd5a57853bfa03b24ce6a0b870f  picom-v12.5.tar.gz
+sha1  b184ad68ca12c288ebefa8ace567e23d04901190  picom-v12.5.tar.gz
+
 # Locally calculated
-sha256	4fa373657a01079324456826ff68e5c319e9a8421e90c68949d4af2ce036f720  picom-v9.tar.gz
+sha256	627fa5d7c590df3ba8d2c41eb35d3859f7826bd28fa49e92a0e04fb60ed77904  picom-v12.5.tar.gz
 sha256	8c41c7cbd4b94e782525bd9dd0bcbaa38363589fbebef4e1c5400787ece0b1a3  COPYING
