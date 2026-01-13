@@ -127,7 +127,7 @@ w
         self.run_command(f"mkfs.ext2 -F {self.device}p1")
 
         # Format root partition (remaining space) with ext4
-        self.run_command(f"mkfs.ext4 -F {self.device}p2")
+        self.run_command(f"mkfs.ext4 -F -E packed_meta_blocks=1 {self.device}p2")
 
         print("Partitions formatted successfully")
 
