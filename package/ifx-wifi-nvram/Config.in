@@ -1,0 +1,5 @@
+config BR2_PACKAGE_IFX_WIFI_NVRAM
+    bool "Infineon Wi-Fi firmware NVRAM"
+    help
+      NVRAM files for Infineon/Cypress WiFi chipsets.
+      File will be downloaded into /lib/firmware/cypress/ folder.

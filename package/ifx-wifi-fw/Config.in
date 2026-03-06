@@ -1,0 +1,5 @@
+config BR2_PACKAGE_IFX_WIFI_FW
+    bool "Infineon Wi-Fi firmware"
+    help
+      Infineon Wi-Fi firmware download. Firmwares will be downloaded
+      into /lib/firmware/cypress/ folder.

@@ -1,0 +1,50 @@
+From dbca88f1c333d9913b9cfd877a052fed6456504c Mon Sep 17 00:00:00 2001
+From: Swee Aun Khor <sakhor@efinixinc.com>
+Date: Thu, 12 Feb 2026 15:42:43 +0800
+Subject: [PATCH] Disable OOB interrupt.
+
+Signed-off-by: Swee Aun Khor <sakhor@efinixinc.com>
+---
+ cyfmac5557x-pcie_sdio.sant.2EA_2EC.txt | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
+
+diff --git a/cyfmac5557x-pcie_sdio.sant.2EA_2EC.txt b/cyfmac5557x-pcie_sdio.sant.2EA_2EC.txt
+index 3e71c21..2d44f02 100644
+--- a/cyfmac5557x-pcie_sdio.sant.2EA_2EC.txt
++++ b/cyfmac5557x-pcie_sdio.sant.2EA_2EC.txt
+@@ -347,16 +347,17 @@ clb5gslice0core1=0x200
+ btc_prisel_ant_mask=0x0
+ clb_swctrl_smask_ant0=0x33f
+ clb_swctrl_smask_ant1=0x3f7
+-muxenab=0x10
++#muxenab=0x10
++muxenab=0x1
+ 
+ #host wake
+-sd_gpout=0
+-sd_gpval=1
+-sd_oobonly=1
++#sd_gpout=0
++#sd_gpval=1
++#sd_oobonly=1
+ 
+ #wakeon wlan
+-wowl_gpio=0
+-wowl_gpiopol=1
++#wowl_gpio=0
++#wowl_gpiopol=1
+ 
+ 
+ 
+@@ -495,5 +496,5 @@ mcsbw406gpo_1024qam_ht=0x66
+ mcsbw806gpo_1024qam_ht=0x66
+ 
+ #Enable low power features
+-ocl=1
+-scd=1
+\ No newline at end of file
++#ocl=1
++#scd=1
+-- 
+2.43.0
+

@@ -1,0 +1,9 @@
+config BR2_PACKAGE_IFX_WIFI
+    bool "Infineon backports kernel modules"
+    select BR2_PACKAGE_IFX_WIFI_FW
+    select BR2_PACKAGE_IFX_WIFI_NVRAM
+    depends on BR2_LINUX_KERNEL
+    help
+      Infineon backports kernel modules (brcmfmac, etc.) built against
+      the target kernel.
+      IFX-backports version: 2026_0108 Release
