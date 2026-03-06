@@ -1,0 +1,2825 @@
+From 4da2de66a23736fb5ba2a7953e64247e6e280d60 Mon Sep 17 00:00:00 2001
+From: Swee Aun Khor <sakhor@efinixinc.com>
+Date: Thu, 5 Mar 2026 15:33:48 +0800
+Subject: [PATCH] Add a new SDIO controller driver for Efinix devices
+
+The driver supports UHS-I bus speed modes: SDR25, DDR50, and SDR104.
+By default, the controller operates in SDR25 mode. Higher-speed modes
+can be enabled via the Device Tree by adding the following properties
+to the SDIO node:
+
+  - sd-uhs-ddr50
+  - sd-uhs-sdr104
+
+When these properties are present, the driver negotiates the highest
+supported UHS mode with the card and host.
+
+Signed-off-by: Swee Aun Khor <sakhor@efinixinc.com>
+---
+ drivers/mmc/host/Kconfig             |   14 +
+ drivers/mmc/host/Makefile            |    2 +
+ drivers/mmc/host/efx_sdio.h          |  386 +++++++++
+ drivers/mmc/host/efx_sdio_core.c     | 1097 ++++++++++++++++++++++++++
+ drivers/mmc/host/efx_sdio_dma.c      |  227 ++++++
+ drivers/mmc/host/efx_sdio_platform.c |  426 ++++++++++
+ drivers/mmc/host/efx_sdio_tuning.c   |  588 ++++++++++++++
+ 7 files changed, 2740 insertions(+)
+ create mode 100644 drivers/mmc/host/efx_sdio.h
+ create mode 100644 drivers/mmc/host/efx_sdio_core.c
+ create mode 100644 drivers/mmc/host/efx_sdio_dma.c
+ create mode 100644 drivers/mmc/host/efx_sdio_platform.c
+ create mode 100644 drivers/mmc/host/efx_sdio_tuning.c
+
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 17aa83d4d..11ca7a253 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -1121,3 +1121,17 @@ config MMC_EFX_EMMC
+ 	  If you have an Efinix platform with an eMMC device, say Y here.
+ 
+ 	  If unsure, say N.
++
++config MMC_EFX_SDIO
++	tristate "Efinix SDIO host controller support"
++	depends on OF
++	help
++	  This selects support for the Efinix SDIO Host Controller.
++	  The current controller support USH bus speed mode SDR25, DDR50 and SDR104.
++	  By default, driver only support SDR25. To enable DDR50 and SDR104, add
++	  sd-uhs-ddr50 or sd-uhs-sdr104 in DTS.
++	  It includes hardware reset support and is designed for embedded applications.
++
++	  Say M here to build the driver as a module.
++
++	  Say N to exclude it.
+diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+index ef488f128..e75f710bf 100644
+--- a/drivers/mmc/host/Makefile
++++ b/drivers/mmc/host/Makefile
+@@ -108,6 +108,8 @@ obj-$(CONFIG_MMC_HSQ)			+= mmc_hsq.o
+ obj-$(CONFIG_MMC_SDHCI_EFX)		+= sdhci-efx.o
+ obj-$(CONFIG_MMC_EFX_EMMC)		+= efx-emmc.o
+ efx-emmc-y				+= efx_emmc_core.o efx_emmc_platform.o efx_emmc_dma.o efx_emmc_tuning.o
++obj-$(CONFIG_MMC_EFX_SDIO)		+= efx-sdio.o
++efx-sdio-y				+= efx_sdio_platform.o efx_sdio_core.o efx_sdio_dma.o efx_sdio_tuning.o
+ 
+ ifeq ($(CONFIG_CB710_DEBUG),y)
+ 	CFLAGS-cb710-mmc	+= -DDEBUG
+diff --git a/drivers/mmc/host/efx_sdio.h b/drivers/mmc/host/efx_sdio.h
+new file mode 100644
+index 000000000..5563f7b08
+--- /dev/null
++++ b/drivers/mmc/host/efx_sdio.h
+@@ -0,0 +1,386 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++/*
++ * Efinix SDIO Host Controller Driver Header with DMA Support
++ *
++ * Copyright (C) 2026 Efinix, Inc.
++ * Author: Khor Swee Aun <sakhor@efinixinc.com>
++ */
++
++#ifndef __EFX_SDIO_H__
++#define __EFX_SDIO_H__
++
++#include <linux/types.h>
++#include <linux/mmc/host.h>
++#include <linux/clk.h>
++#include <linux/platform_device.h>
++#include <linux/interrupt.h>
++#include <linux/dma-mapping.h>
++
++/* Compatibility macros */
++#ifndef min3
++#define min3(x, y, z) min(min(x, y), z)
++#endif
++
++/* ADMA descriptor definitions */
++#define EFX_ADMA_DESC_VALID     BIT(0)
++#define EFX_ADMA_DESC_END       BIT(1)
++#define EFX_ADMA_DESC_INT       BIT(2)
++#define EFX_ADMA_DESC_NOP       (0 << 4)
++#define EFX_ADMA_DESC_TRAN      (2 << 4)
++#define EFX_ADMA_DESC_LINK      (3 << 4)
++
++#define EFX_ADMA_MAX_LEN        65536
++#define EFX_ADMA_DESC_ALIGN     8
++#define EFX_ADMA_TABLE_SZ       (512 * 8) /* Support up to 512 descriptors */
++
++/* DMA boundary sizes */
++#define EFX_DMA_BOUNDARY_4K     0
++#define EFX_DMA_BOUNDARY_8K     1
++#define EFX_DMA_BOUNDARY_16K    2
++#define EFX_DMA_BOUNDARY_32K    3
++#define EFX_DMA_BOUNDARY_64K    4
++#define EFX_DMA_BOUNDARY_128K   5
++#define EFX_DMA_BOUNDARY_256K   6
++#define EFX_DMA_BOUNDARY_512K   7
++
++/* SDIO IP Register Offsets - Efinix SDIO Controller */
++#define EFX_SDIO_VERSION                0x000
++#define EFX_SDIO_BASE_REG0              0x004
++#define EFX_SDIO_BASE_STATUS_REG0       0x008
++#define EFX_SDIO_BASE_REG1              0x00C
++#define EFX_SDIO_ARG2                   0x100
++#define EFX_SDIO_BLOCK_SIZE             0x104
++#define EFX_SDIO_ARG1                   0x108
++#define EFX_SDIO_TRANSFER_MODE          0x10C
++#define EFX_SDIO_RESPONSE0              0x110
++#define EFX_SDIO_RESPONSE1              0x114
++#define EFX_SDIO_RESPONSE2              0x118
++#define EFX_SDIO_RESPONSE3              0x11C
++#define EFX_SDIO_BUFFER_DATA_PORT       0x120
++#define EFX_SDIO_PRESENT_STATE          0x124
++#define EFX_SDIO_HOST_CONTROL           0x128
++#define EFX_SDIO_INT_STATUS             0x130
++#define EFX_SDIO_INT_STATUS_EN          0x134
++#define EFX_SDIO_INT_SIGNAL_EN          0x138
++#define EFX_SDIO_HOST_CAPABILITIES      0x140
++#define EFX_SDIO_HOST_ADJUSTMENT        0x144
++#define EFX_SDIO_ADMA_SYS_ADDR_LOW      0x158
++#define EFX_SDIO_ADMA_SYS_ADDR_HIGH     0x15C
++
++/* System Register Offsets */
++#define EFX_SYS_DATE_REG                0x000
++#define EFX_SYS_TEST_REG                0x004
++#define EFX_SYS_RESET_REG               0x008
++
++/* Base Register 0 (0x004) */
++#define EFX_SDIO_BASE_REG0_CLK_EN       BIT(16)
++#define EFX_SDIO_BASE_REG0_CLK_DIV_MASK 0xFFFF
++
++/* Base Status Register 0 (0x008) */
++#define EFX_SDIO_BASE_STATUS_DAT_BUSY   BIT(1)
++#define EFX_SDIO_BASE_STATUS_CMD_BUSY   BIT(0)
++
++/* Base Register 1 (0x00C) */
++#define EFX_SDIO_BASE_REG1_SAMPLE_CNT_SHIFT 16
++#define EFX_SDIO_BASE_REG1_SAMPLE_CNT_MASK  (0xFFFF << 16)
++#define EFX_SDIO_BASE_REG1_PHASE_SHIFT      6
++#define EFX_SDIO_BASE_REG1_PHASE_MASK       (0x7 << 6)
++#define EFX_SDIO_BASE_REG1_PHASE_PULSE      BIT(0)
++
++/* Block Size Register (0x104) */
++#define EFX_SDIO_BLOCK_COUNT_SHIFT      16
++#define EFX_SDIO_BLOCK_COUNT_MASK       (0xFFFF << 16)
++#define EFX_SDIO_BLOCK_SIZE_MASK        0xFFF
++#define EFX_SDIO_DMA_BOUNDARY_SHIFT     12
++#define EFX_SDIO_DMA_BOUNDARY_MASK      (0x7 << 12)
++
++/* Transfer Mode Register (0x10C) */
++#define EFX_SDIO_CMD_INDEX_SHIFT        24
++#define EFX_SDIO_CMD_INDEX_MASK         (0x3F << 24)
++#define EFX_SDIO_DATA_PRESENT           BIT(21)
++#define EFX_SDIO_CMD_INDEX_CHECK_EN     BIT(20)
++#define EFX_SDIO_CMD_CRC_CHECK_EN       BIT(19)
++#define EFX_SDIO_RESP_TYPE_SHIFT        16
++#define EFX_SDIO_RESP_TYPE_MASK         (0x3 << 16)
++#define EFX_SDIO_RESP_TYPE_NONE         0
++#define EFX_SDIO_RESP_TYPE_136          1
++#define EFX_SDIO_RESP_TYPE_48           2
++#define EFX_SDIO_RESP_TYPE_48_BUSY      3
++#define EFX_SDIO_MULTI_BLOCK_SEL        BIT(5)
++#define EFX_SDIO_DATA_XFER_DIR          BIT(4)
++#define EFX_SDIO_AUTO_CMD_EN_SHIFT      2
++#define EFX_SDIO_AUTO_CMD_EN_MASK       (0x3 << 2)
++#define EFX_SDIO_BLOCK_COUNT_EN         BIT(1)
++#define EFX_SDIO_DMA_EN                 BIT(0)
++
++/* Present State Register (0x124) */
++#define EFX_SDIO_DAT_0_SIG_LVL          BIT(20)
++#define EFX_SDIO_BUFFER_READ_EN         BIT(11)
++#define EFX_SDIO_BUFFER_WRITE_EN        BIT(10)
++#define EFX_SDIO_READ_XFER_ACTIVE       BIT(9)
++#define EFX_SDIO_WRITE_XFER_ACTIVE      BIT(8)
++#define EFX_SDIO_DAT_LINE_ACTIVE        BIT(2)
++#define EFX_SDIO_CMD_INHIBIT_DAT        BIT(1)
++#define EFX_SDIO_CMD_INHIBIT_CMD        BIT(0)
++
++/* Host Control Register (0x128) */
++#define EFX_SDIO_DATA_SAMPLING_MODE     BIT(3)
++#define EFX_SDIO_DATA_WIDTH_SHIFT       1
++#define EFX_SDIO_DATA_WIDTH_MASK        (0x3 << 1)
++#define EFX_SDIO_DATA_WIDTH_1BIT        0
++#define EFX_SDIO_DATA_WIDTH_4BIT        1
++#define EFX_SDIO_DATA_WIDTH_8BIT        2
++
++/* Interrupt Status Register bits */
++#define EFX_SDIO_INT_ADMA_ERROR         BIT(25)
++#define EFX_SDIO_INT_DATA_TIMEOUT_ERR   BIT(22)
++#define EFX_SDIO_INT_DATA_CRC_ERR       BIT(21)
++#define EFX_SDIO_INT_DATA_END_BIT_ERR   BIT(20)
++#define EFX_SDIO_INT_CMD_INDEX_ERR      BIT(19)
++#define EFX_SDIO_INT_CMD_END_BIT_ERR    BIT(18)
++#define EFX_SDIO_INT_CMD_CRC_ERR        BIT(17)
++#define EFX_SDIO_INT_CMD_TIMEOUT_ERR    BIT(16)
++#define EFX_SDIO_INT_CARD               BIT(8)
++#define EFX_SDIO_INT_BUFFER_READ_RDY    BIT(5)
++#define EFX_SDIO_INT_BUFFER_WRITE_RDY   BIT(4)
++#define EFX_SDIO_INT_DMA_INTERRUPT      BIT(3)
++#define EFX_SDIO_INT_BLOCK_GAP_EVENT    BIT(2)
++#define EFX_SDIO_INT_XFER_COMPLETE      BIT(1)
++#define EFX_SDIO_INT_CMD_COMPLETE       BIT(0)
++
++#define EFX_SDIO_INT_ERROR_MASK         (EFX_SDIO_INT_ADMA_ERROR | \
++                                         EFX_SDIO_INT_DATA_TIMEOUT_ERR | \
++                                         EFX_SDIO_INT_DATA_CRC_ERR | \
++                                         EFX_SDIO_INT_DATA_END_BIT_ERR | \
++                                         EFX_SDIO_INT_CMD_INDEX_ERR | \
++                                         EFX_SDIO_INT_CMD_END_BIT_ERR | \
++                                         EFX_SDIO_INT_CMD_CRC_ERR | \
++                                         EFX_SDIO_INT_CMD_TIMEOUT_ERR)
++
++/* SDIO Ccard interrupt not included in ALL_MASK as it is handled separately
++ * by mmc core during SDIO IO driver initialization
++ */
++#define EFX_SDIO_INT_ALL_MASK           (EFX_SDIO_INT_ERROR_MASK | \
++                                         EFX_SDIO_INT_BUFFER_READ_RDY | \
++                                         EFX_SDIO_INT_BUFFER_WRITE_RDY | \
++                                         EFX_SDIO_INT_DMA_INTERRUPT | \
++                                         EFX_SDIO_INT_BLOCK_GAP_EVENT | \
++                                         EFX_SDIO_INT_XFER_COMPLETE | \
++                                         EFX_SDIO_INT_CMD_COMPLETE)
++
++/* System Reset Register bits */
++#define EFX_SYS_RESET_SDIO_DEV          BIT(3)
++#define EFX_SYS_RESET_SDIO_IP           BIT(2)
++
++/* Host capabilities */
++#define EFX_SDIO_BASE_CLK_FREQ_MHZ      200
++#define EFX_SDIO_MAX_BLOCK_LENGTH       512
++#define EFX_SDIO_TIMEOUT_CLK_FREQ       200000000
++#define EFX_SDIO_IO_VOLTAGE_1_8V        0
++#define EFX_SDIO_IO_VOLTAGE_3_3V        1
++
++/* Driver constants */
++#define EFX_SDIO_MIN_FREQ               400000    /* 400 KHz */
++#define EFX_SDIO_MAX_FREQ               200000000 /* 200 MHz */
++#define EFX_SDIO_PIO_TIMEOUT_MS         1000
++
++/* Hardware specific constants from documentation */
++#define EFX_SDIO_CLOCK_STABILIZE_DELAY  1000      /* 1ms + 74 clock cycles */
++#define EFX_SDIO_RESET_PULSE_WIDTH      1         /* 1us minimum */
++#define EFX_SDIO_POST_RESET_DELAY       200       /* 200us minimum */
++#define EFX_SDIO_CMD_RETRY_COUNT        3         /* Command retry attempts */
++
++/* Tuning algorithm constants */
++#define EFX_SDIO_MAX_PLL_SHIFT		8	/* 8 phase positions (45°) */
++#define EFX_SDIO_PLL_SETTLING_TIME	50	/* 50ms PLL settling time */
++#define EFX_SDIO_TUNING_TIMEOUT_MS	50	/* CMD19 timeout */
++#define EFX_SDIO_TUNING_POLL_INTERVAL	200	/* 200us polling interval */
++#define EFX_SDIO_TUNING_BLOCK_SIZE_4BIT	64	/* 4-bit bus tuning block */
++#define EFX_SDIO_TUNING_BLOCK_SIZE_8BIT	128	/* 8-bit bus tuning block */
++#define EFX_SDIO_MIN_TIMING_MARGIN	1	/* Min consecutive valid */
++
++/**
++ * struct efx_adma_desc - ADMA descriptor structure
++ * @attr: Descriptor attributes (valid, end, interrupt, type)
++ * @len: Data length for this descriptor
++ * @addr: 32-bit DMA address
++ *
++ * Hardware ADMA descriptor structure, must be 8-byte aligned
++ */
++struct efx_adma_desc {
++	u16 attr;
++	u16 len;
++	u32 addr;
++} __packed __aligned(8);
++
++/**
++ * struct efx_sdio_host - Efinix SDIO host controller instance
++ * @mmc: MMC host structure
++ * @ioaddr: Base address for SDIO registers
++ * @sys_ioaddr: Base address for system registers
++ * @clk: Controller clock
++ * @irq: Interrupt number
++ * @mrq: Current MMC request
++ * @cmd: Current MMC command
++ * @data: Current MMC data transfer
++ * @base_clk: Base clock frequency
++ * @current_clk: Current configured clock frequency
++ * @bytes_to_transfer: Remaining bytes for PIO transfer
++ * @blocks_done: Number of completed blocks
++ * @sg_offset: Current offset in scatter-gather list
++ * @adma_desc: ADMA descriptor table
++ * @adma_desc_dma: DMA address of descriptor table
++ * @adma_desc_sz: Size of descriptor table
++ * @bounce_buffer: Bounce buffer for unaligned transfers
++ * @bounce_dma: DMA address of bounce buffer
++ * @bounce_buffer_size: Size of bounce buffer
++ * @use_dma: Flag indicating DMA mode is active
++ * @dma_64bit: Flag indicating 64-bit DMA support
++ * @clk_div: Current clock divider value
++ * @optimal_sample_count: Optimal sample count from tuning
++ * @optimal_pll_shift: Optimal PLL shift from tuning
++ * @optimal_margin: Timing margin from tuning
++ * @tuning_done: Flag indicating tuning completion
++ * @tuning_in_progress: Flag indicating active tuning
++ * @prev_timing: Previous timing mode
++ * @hs400_retune_pending: Flag indicating HS400 retune needed
++ * @hs400_retune_work: Delayed work for HS400 retuning
++ * @tuned_timing_modes: Bitmap of successfully tuned timing modes
++ * @lock: Spinlock for protecting shared data
++ * @pdev: Platform device
++ */
++struct efx_sdio_host {
++	struct mmc_host *mmc;
++	void __iomem *ioaddr;
++	void __iomem *sys_ioaddr;
++	struct clk *clk;
++	int irq;
++    u32 io_voltage; 
++
++	struct mmc_request *mrq;
++	struct mmc_command *cmd;
++	struct mmc_data *data;
++
++	u32 base_clk;
++	u32 current_clk;
++
++	/* Transfer state tracking */
++	unsigned int bytes_to_transfer;
++	unsigned int blocks_done;
++	unsigned int sg_offset;
++
++	/* DMA related fields */
++	struct efx_adma_desc *adma_desc;
++	dma_addr_t adma_desc_dma;
++	size_t adma_desc_sz;
++
++	void *bounce_buffer;
++	dma_addr_t bounce_dma;
++	unsigned int bounce_buffer_size;
++    bool use_bounce;
++
++	bool use_dma;
++	bool dma_64bit;
++
++	/* Tuning related fields */
++	u32 clk_div;
++	u32 optimal_sample_count;
++	u32 optimal_pll_shift;
++	u32 optimal_margin;
++	bool tuning_done;
++	bool tuning_in_progress;
++	unsigned int prev_timing;
++	bool hs400_retune_pending;
++    bool tuning_crc_error;
++	struct delayed_work hs400_retune_work;
++
++	/* Tuning state bitmap - tracks which timing modes have been tuned */
++	unsigned long tuned_timing_modes;
++
++	spinlock_t lock;
++
++	struct platform_device *pdev;
++};
++
++/* Debug macros */
++#define efx_sdio_dbg_irq(host, fmt, ...) \
++	dev_dbg(&(host)->pdev->dev, fmt, ##__VA_ARGS__)
++#define efx_sdio_dbg_pio(host, fmt, ...) \
++	dev_dbg(&(host)->pdev->dev, fmt, ##__VA_ARGS__)
++#define efx_sdio_dbg_cmd(host, fmt, ...) \
++	dev_dbg(&(host)->pdev->dev, fmt, ##__VA_ARGS__)
++
++/* Platform driver function prototypes */
++int efx_sdio_probe(struct platform_device *pdev);
++int efx_sdio_remove(struct platform_device *pdev);
++int efx_sdio_init_hw(struct efx_sdio_host *host);
++void efx_sdio_reset_hw(struct efx_sdio_host *host);
++void efx_sdio_hs400_retune_work(struct work_struct *work);
++
++/* Core MMC host operation prototypes */
++void efx_sdio_request(struct mmc_host *mmc, struct mmc_request *mrq);
++void efx_sdio_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
++int efx_sdio_get_cd(struct mmc_host *mmc);
++int efx_sdio_card_busy_wrapper(struct mmc_host *mmc);
++int efx_sdio_get_ro(struct mmc_host *mmc);
++irqreturn_t efx_sdio_irq(int irq, void *dev_id);
++void efx_sdio_enable_sdio_irq(struct mmc_host *host, int enable);
++void efx_sdio_ack_sdio_irq(struct mmc_host *host);
++int efx_sdio_start_signal_voltage_switch(struct mmc_host *mmc, struct mmc_ios *ios);
++
++/* Core helper function prototypes */
++void efx_sdio_send_command(struct efx_sdio_host *host, struct mmc_command *cmd);
++void efx_sdio_finish_request(struct efx_sdio_host *host,
++			     struct mmc_request *mrq);
++void efx_sdio_finish_command(struct efx_sdio_host *host);
++void efx_sdio_finish_data(struct efx_sdio_host *host);
++void efx_sdio_transfer_pio(struct efx_sdio_host *host);
++void efx_sdio_set_clock(struct efx_sdio_host *host, unsigned int clock);
++void efx_sdio_set_bus_width(struct efx_sdio_host *host, int width);
++void efx_sdio_set_timing(struct efx_sdio_host *host, unsigned int timing);
++bool efx_sdio_card_busy(struct efx_sdio_host *host);
++
++/* DMA function prototypes */
++int efx_sdio_adma_table_pre(struct efx_sdio_host *host,
++			    struct mmc_data *data);
++void efx_sdio_adma_table_post(struct efx_sdio_host *host,
++			      struct mmc_data *data);
++void efx_sdio_prepare_dma(struct efx_sdio_host *host, struct mmc_data *data);
++void efx_sdio_cleanup_dma(struct efx_sdio_host *host, struct mmc_data *data);
++void efx_sdio_set_adma_addr(struct efx_sdio_host *host, dma_addr_t addr);
++
++/* Tuning function prototypes */
++int efx_sdio_execute_tuning(struct mmc_host *mmc, u32 opcode);
++int efx_sdio_execute_tuning_command(struct efx_sdio_host *host,
++				     int bus_width);
++int efx_sdio_execute_custom_tuning_command(struct efx_sdio_host *host,
++				     int bus_width);
++void efx_sdio_set_timing_config(struct efx_sdio_host *host,
++				 u32 sample_count, u32 pll_shift);
++int efx_sdio_find_optimal_timing(struct efx_sdio_host *host,
++				  u8 result_map[][EFX_SDIO_MAX_PLL_SHIFT],
++				  u32 max_sample_count);
++
++/* Register access helpers */
++static inline u32 efx_sdio_readl(struct efx_sdio_host *host, u32 reg)
++{
++    return readl(host->ioaddr + reg);
++}
++
++static inline void efx_sdio_writel(struct efx_sdio_host *host, u32 val, u32 reg)
++{
++    writel(val, host->ioaddr + reg);
++}
++
++static inline u32 efx_sdio_sys_readl(struct efx_sdio_host *host, u32 reg)
++{
++    return readl(host->sys_ioaddr + reg);
++}
++
++static inline void efx_sdio_sys_writel(struct efx_sdio_host *host, u32 val,
++				       u32 reg)
++{
++    writel(val, host->sys_ioaddr + reg);
++}
++
++#endif /* __EFX_SDIO_H__ */
+\ No newline at end of file
+diff --git a/drivers/mmc/host/efx_sdio_core.c b/drivers/mmc/host/efx_sdio_core.c
+new file mode 100644
+index 000000000..2db0cf4c6
+--- /dev/null
++++ b/drivers/mmc/host/efx_sdio_core.c
+@@ -0,0 +1,1097 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++/*
++ * Efinix SDIO Host Controller Core Operations
++ *
++ * Copyright (C) 2026 Efinix, Inc.
++ * Author: Khor Swee Aun <sakhor@efinixinc.com>
++ */
++
++#include <linux/delay.h>
++#include <linux/scatterlist.h>
++#include <linux/jiffies.h>
++#include <linux/mmc/mmc.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/card.h>
++#include <linux/mmc/sdio.h>
++
++#include "efx_sdio.h"
++
++void efx_sdio_enable_sdio_irq_without_lock(struct mmc_host *host, int enable)
++{
++    struct efx_sdio_host *sdio_host = mmc_priv(host);
++
++    u32 int_signal_en;
++    u32 int_status_en;
++
++    int_status_en = efx_sdio_readl(sdio_host, EFX_SDIO_INT_STATUS_EN);
++    int_signal_en = efx_sdio_readl(sdio_host, EFX_SDIO_INT_SIGNAL_EN);
++
++    if (enable) {
++        // Set EFX_SDIO_INT_CARD for EFX_SDIO_INT_STATUS_EN and EFX_SDIO_INT_SIGNAL_EN
++        int_status_en |= EFX_SDIO_INT_CARD;
++        int_signal_en |= EFX_SDIO_INT_CARD;
++        efx_sdio_writel(sdio_host, int_status_en, EFX_SDIO_INT_STATUS_EN);
++        efx_sdio_writel(sdio_host, int_signal_en, EFX_SDIO_INT_SIGNAL_EN);
++
++    } else {
++        // Clear EFX_SDIO_INT_CARD for EFX_SDIO_INT_STATUS_EN and EFX_SDIO_INT_SIGNAL_EN
++        int_status_en &= ~EFX_SDIO_INT_CARD;
++        int_signal_en &= ~EFX_SDIO_INT_CARD;
++        efx_sdio_writel(sdio_host, int_status_en, EFX_SDIO_INT_STATUS_EN);
++        efx_sdio_writel(sdio_host, int_signal_en, EFX_SDIO_INT_SIGNAL_EN);
++    }
++}
++
++bool efx_sdio_card_busy(struct efx_sdio_host *host)
++{
++    // return true when card is busy (DAT0 line low)
++    // DAT0 EFX_SDIO_DAT_0_SIG_LVL 0 = busy, 1 = not busy
++    dev_dbg(&host->pdev->dev, "Card busy status: %d\n",
++             !(efx_sdio_readl(host, EFX_SDIO_PRESENT_STATE) &
++               EFX_SDIO_DAT_0_SIG_LVL));
++
++    return !(efx_sdio_readl(host, EFX_SDIO_PRESENT_STATE) &
++               EFX_SDIO_DAT_0_SIG_LVL);
++}
++
++void efx_sdio_finish_request(struct efx_sdio_host *host,
++			     struct mmc_request *mrq)
++{
++
++	/* Cleanup DMA if used */
++	if (host->data) {
++		efx_sdio_cleanup_dma(host, host->data);
++	}
++
++	host->mrq = NULL;
++	host->cmd = NULL;
++	host->data = NULL;
++	host->bytes_to_transfer = 0;
++	host->blocks_done = 0;
++	host->use_dma = false;
++
++	mmc_request_done(host->mmc, mrq);
++}
++
++static void efx_sdio_transfer_pio_read(struct efx_sdio_host *host)
++{
++	struct mmc_data *data;
++	struct scatterlist *sg;
++	u32 *buf;
++	unsigned int words_in_fifo, words_transferred, i, remaining_bytes_transferred;
++	unsigned int sg_offset, remaining_in_sg, words_to_transfer;
++	u32 present_state;
++
++	data = host->data;
++	if (!data) {
++		return;
++	}
++
++	sg = data->sg;
++	if (!sg) {
++		dev_err(&host->pdev->dev, "No scatter-gather list for read\n");
++		return;
++	}
++
++	/* Pre-calculate words per block */
++	words_in_fifo = data->blksz / sizeof(u32);
++	sg_offset = host->sg_offset;
++	words_transferred = 0;
++	remaining_bytes_transferred = 0;
++
++    // sg_offset is current sg offset in bytes
++    // sg->length is total length of current sg entry
++    while (host->bytes_to_transfer > 0) {
++
++		while (sg && sg_offset >= sg->length) {
++		    sg_offset -= sg->length;
++		    sg = sg_next(sg);
++		}
++
++		if (!sg) {
++		    dev_err(&host->pdev->dev,
++			    "No more scatter-gather entries\n");
++		    break;
++		}
++
++		buf = (u32 *)(sg_virt(sg) + sg_offset);
++		remaining_in_sg = sg->length - sg_offset;
++
++        if (host->bytes_to_transfer > 3) {
++            /* Calculate words to transfer */
++           // Words to transfer depends the min of remaining in sg and bytes to transfer
++            words_to_transfer = min(remaining_in_sg / sizeof(u32),
++                                    (unsigned int)(host->bytes_to_transfer / sizeof(u32))
++                                );
++
++            // Having this checking to avoid remaining_in_sg = 0
++            // Need to sg_next in the upper while loop
++            if (words_to_transfer != 0) {
++                for (i = 0; i < words_to_transfer; i++) {
++                    buf[i] = efx_sdio_readl(host, EFX_SDIO_BUFFER_DATA_PORT);
++                }
++
++                words_transferred += words_to_transfer;
++                sg_offset += words_to_transfer * 4;
++                host->bytes_to_transfer -= words_to_transfer * 4;               
++            }
++
++        } else {
++            // Handle remaining bytes less than 4 bytes
++            // if bytes_to_copy = 4
++            // EFX_SDIO_BUFFER_DATA_PORT = 0xAABBCCDD
++            // buffer[0] = 0xDD
++            // buffer[1] = 0xCC
++            // buffer[2] = 0xBB
++            // buffer[3] = 0xAA
++            int bytes_to_copy = min(remaining_in_sg,
++                                    host->bytes_to_transfer
++                                );
++            
++            // Having this checking to avoid remaining_in_sg = 0
++            // Need to sg_next in the upper while loop
++            if (bytes_to_copy != 0) {
++                u32 received_data = efx_sdio_readl(host, EFX_SDIO_BUFFER_DATA_PORT);
++                for (i = 0; i < bytes_to_copy; i++) {
++                    ((u8 *)buf)[i] = (received_data >> ((4 - bytes_to_copy + i) * 8)) & 0xFF;
++                }
++                remaining_bytes_transferred += bytes_to_copy;
++                sg_offset += bytes_to_copy;
++                host->bytes_to_transfer -= bytes_to_copy;
++            }
++        }
++
++		efx_sdio_dbg_pio(host,
++			  "PIO read: %d words, %d bytes remaining\n",
++		         words_to_transfer, host->bytes_to_transfer);
++	}
++
++	host->sg_offset += words_transferred * 4 + remaining_bytes_transferred;
++	host->blocks_done = (data->blksz * data->blocks -
++			     host->bytes_to_transfer) / data->blksz;
++
++	efx_sdio_dbg_pio(host,
++			  "PIO read completed: %d words total, "
++              "with extra %d bytes, "
++			  "%d blocks done, %d bytes remaining\n",
++		     words_transferred, remaining_bytes_transferred,
++             host->blocks_done, host->bytes_to_transfer);
++    
++	present_state = efx_sdio_readl(host, EFX_SDIO_PRESENT_STATE);
++	efx_sdio_dbg_pio(host, "Present state after PIO read: 0x%08x\n",
++			  present_state);
++}
++
++static void efx_sdio_transfer_pio_write(struct efx_sdio_host *host)
++{
++	struct mmc_data *data;
++	struct scatterlist *sg;
++	u32 *buf;
++	unsigned int words_in_fifo, words_transferred, i, remaining_bytes_transferred;
++	unsigned int sg_offset, remaining_in_sg, words_to_transfer;
++	u32 present_state;
++
++	data = host->data;
++	if (!data) {
++		return;
++	}
++
++	sg = data->sg;
++	if (!sg) {
++		dev_err(&host->pdev->dev, "No scatter-gather list for write\n");
++		return;
++	}
++
++	/* Pre-calculate words per block */
++	words_in_fifo = data->blksz / sizeof(u32);
++	sg_offset = host->sg_offset;
++	words_transferred = 0;
++	remaining_bytes_transferred = 0;
++	
++	while (host->bytes_to_transfer > 0) {
++		while (sg && sg_offset >= sg->length) {
++		    sg_offset -= sg->length;
++		    sg = sg_next(sg);
++		}
++
++		if (!sg) {
++		    dev_err(&host->pdev->dev,
++			    "No more scatter-gather entries\n");
++		    break;
++		}
++
++		buf = (u32 *)(sg_virt(sg) + sg_offset);
++		remaining_in_sg = sg->length - sg_offset;
++
++        if (host->bytes_to_transfer > 3) {
++            /* Calculate words to transfer */       
++            words_to_transfer = min(remaining_in_sg / sizeof(u32),
++                                    (unsigned int)(host->bytes_to_transfer / sizeof(u32)));
++
++            // Having this checking to avoid remaining_in_sg = 0
++            // Need to sg_next in the upper while loop
++            if (words_to_transfer != 0) {
++
++                for (i = 0; i < words_to_transfer; i++) {
++                    efx_sdio_writel(host, buf[i], EFX_SDIO_BUFFER_DATA_PORT);
++                }
++
++                words_transferred += words_to_transfer;
++                sg_offset += words_to_transfer * 4;
++                host->bytes_to_transfer -= words_to_transfer * 4;
++            }
++        } else {
++            // Less than 4 bytes to copy
++            // Example 3 bytes to copy to WRITE_DATA_PORT
++            // buf[0] = 0xAA
++            // buf[1] = 0xBB
++            // buf[2] = 0xCC
++            // WRITE_DATA_PORT = 0x00CCBBAA
++            int bytes_to_copy = min(remaining_in_sg,
++                                    host->bytes_to_transfer
++                                );
++
++            // Having this checking to avoid remaining_in_sg = 0
++            // Need to sg_next in the upper while loop
++            if (bytes_to_copy != 0) {
++                u32 write_data = 0;
++                for (i = 0; i < bytes_to_copy; i++) {
++                    write_data |= ((u32)((u8 *)buf)[i]) << (i * 8);
++                }
++
++                efx_sdio_writel(host, write_data, EFX_SDIO_BUFFER_DATA_PORT);
++
++                remaining_bytes_transferred += bytes_to_copy;
++                sg_offset += bytes_to_copy;
++                host->bytes_to_transfer -= bytes_to_copy;
++            }
++        }
++
++		efx_sdio_dbg_pio(host,
++			  "PIO write: %d words, %d bytes remaining\n",
++		         words_to_transfer, host->bytes_to_transfer);
++	}
++
++	host->sg_offset += words_transferred * 4 + remaining_bytes_transferred;
++	host->blocks_done = (data->blksz * data->blocks -
++			     host->bytes_to_transfer) / data->blksz;
++
++	efx_sdio_dbg_pio(host,
++			  "PIO write completed: %d words total,"
++              "with extra %d bytes, "
++			   "%d blocks done, %d bytes remaining\n",
++		     words_transferred, remaining_bytes_transferred,
++             host->blocks_done, host->bytes_to_transfer);
++
++	present_state = efx_sdio_readl(host, EFX_SDIO_PRESENT_STATE);
++	efx_sdio_dbg_pio(host, "Present state after PIO write: 0x%08x\n",
++			  present_state);
++}
++
++void efx_sdio_transfer_pio(struct efx_sdio_host *host)
++{
++	struct mmc_data *data;
++	u32 present_state;
++
++	data = host->data;
++	if (!data) {
++		return;
++	}
++
++	/* Check buffer ready and perform transfer */
++	present_state = efx_sdio_readl(host, EFX_SDIO_PRESENT_STATE);
++
++	if (data->flags & MMC_DATA_READ) {
++		if (present_state & EFX_SDIO_BUFFER_READ_EN) {
++		    efx_sdio_transfer_pio_read(host);
++		}
++	} else {
++		if (present_state & EFX_SDIO_BUFFER_WRITE_EN) {
++		    efx_sdio_transfer_pio_write(host);
++		}
++	}
++}
++
++void efx_sdio_finish_data(struct efx_sdio_host *host)
++{
++	struct mmc_data *data;
++	u32 present_state;
++	int retry_count;
++
++	data = host->data;
++	if (!data) {
++		return;
++	}
++
++	if (data->error == 0) {
++		data->bytes_xfered = data->blksz * data->blocks;
++		efx_sdio_dbg_cmd(host,
++			  "Data transfer completed: %d bytes (DMA: %s)\n",
++		         data->bytes_xfered,
++		         host->use_dma ? "enabled" : "disabled");
++	} else {
++		data->bytes_xfered = 0;
++		dev_err(&host->pdev->dev,
++			"Data transfer failed with error %d\n",
++		         data->error);
++	}
++
++	/* Clear data pointer */
++	host->data = NULL;
++	host->bytes_to_transfer = 0;
++	host->blocks_done = 0;
++	host->sg_offset = 0;
++
++	efx_sdio_dbg_cmd(host, "Finishing request\n");
++	if (host->mrq) {
++	    efx_sdio_finish_request(host, host->mrq);
++    }
++}
++
++void efx_sdio_finish_command(struct efx_sdio_host *host)
++{
++	struct mmc_command *cmd;
++	u32 resp[4];
++	u32 present_state;
++    u32 instatus;
++
++	cmd = host->cmd;
++	if (!cmd) {
++		return;
++	}
++
++	if (cmd->flags & MMC_RSP_PRESENT) {
++		if (cmd->flags & MMC_RSP_136) {
++		    /* 120-bit response - read all 4 registers */
++		    resp[0] = efx_sdio_readl(host, EFX_SDIO_RESPONSE0);
++		    resp[1] = efx_sdio_readl(host, EFX_SDIO_RESPONSE1);
++		    resp[2] = efx_sdio_readl(host, EFX_SDIO_RESPONSE2);
++		    resp[3] = efx_sdio_readl(host, EFX_SDIO_RESPONSE3) & 0xFFFFFF;
++
++		    /* Convert hardware 120-bit response to MMC core 136-bit format
++		     * by shifting and concatenating registers with proper alignment */
++		    cmd->resp[0] = resp[3] << 8 | resp[2] >> 24;
++		    cmd->resp[1] = resp[2] << 8 | resp[1] >> 24;
++		    cmd->resp[2] = resp[1] << 8 | resp[0] >> 24;
++		    cmd->resp[3] = resp[0] << 8;
++
++		    efx_sdio_dbg_cmd(host,
++				     "CMD%d 136-bit response: %08x %08x %08x %08x\n",
++				     cmd->opcode, cmd->resp[0], cmd->resp[1],
++				     cmd->resp[2], cmd->resp[3]);
++		} else {
++		    /* 48-bit response */
++		    cmd->resp[0] = efx_sdio_readl(host, EFX_SDIO_RESPONSE0);
++		    efx_sdio_dbg_cmd(host, "CMD%d response: 0x%08x\n",
++				     cmd->opcode, cmd->resp[0]);
++		}
++	}
++
++	/* Clear the command pointer - we're done with command phase */
++	host->cmd = NULL;
++
++	/* If no data transfer, finish the request immediately */
++	if (!host->data) {
++		efx_sdio_dbg_cmd(host, "Command complete, finishing request\n");
++		if (host->mrq) {
++		    efx_sdio_finish_request(host, host->mrq);
++		}
++	} else {
++		efx_sdio_dbg_cmd(host,
++				  "Command complete, data transfer continues (DMA: %s)\n",
++		        host->use_dma ? "enabled" : "disabled");
++
++		/* For PIO transfers, check if buffer is ready - single register read */
++		if (!host->use_dma) {
++		    bool buffer_ready_read, buffer_ready_write;
++
++		    present_state = efx_sdio_readl(host,
++						   EFX_SDIO_PRESENT_STATE);
++		    efx_sdio_dbg_cmd(host,
++				     "Present state after command: 0x%08x\n",
++				     present_state);
++
++		    /* Cache register read result to avoid redundant access */
++		    buffer_ready_read = !!(present_state & EFX_SDIO_BUFFER_READ_EN);
++		    buffer_ready_write = !!(present_state & EFX_SDIO_BUFFER_WRITE_EN);
++
++            // Clear interrupts flag if write or read buffer ready is set
++            instatus = efx_sdio_readl(host, EFX_SDIO_INT_STATUS);
++
++		    if (host->data->flags & MMC_DATA_READ) {
++		        if (buffer_ready_read) {
++		            efx_sdio_dbg_pio(host,
++					     "Buffer immediately ready for read, starting PIO\n");
++		            efx_sdio_transfer_pio(host);
++                    // Clear EFX_SDIO_INT_BUFFER_READ_RDY interrupt flag
++                    if (instatus & EFX_SDIO_INT_BUFFER_READ_RDY) {
++                        efx_sdio_writel(host, EFX_SDIO_INT_BUFFER_READ_RDY,
++                                       EFX_SDIO_INT_STATUS);
++                    }
++		        }
++		    } else {
++		        if (buffer_ready_write) {
++		            efx_sdio_dbg_pio(host,
++					     "Buffer immediately ready for write, starting PIO\n");
++		            efx_sdio_transfer_pio(host);
++                    // Clear EFX_SDIO_INT_BUFFER_WRITE_RDY interrupt flag
++                    if (instatus & EFX_SDIO_INT_BUFFER_WRITE_RDY) {
++                        efx_sdio_writel(host, EFX_SDIO_INT_BUFFER_WRITE_RDY,
++                                       EFX_SDIO_INT_STATUS);
++                    }
++		        }
++		    }
++		}
++		/* For DMA transfers, hardware handles data transfer automatically */
++	}
++}
++
++void efx_sdio_send_command(struct efx_sdio_host *host, struct mmc_command *cmd)
++{
++	u32 command, present_state;
++	unsigned long timeout;
++	struct mmc_data *data;
++	u16 cmd_timeout;
++
++	data = cmd->data;
++	host->cmd = cmd;
++    
++	efx_sdio_dbg_cmd(host, "Sending CMD%d, arg=0x%08x%s\n",
++		    cmd->opcode, cmd->arg, (cmd->opcode == 12) ? " (STOP)" : "");
++
++    cmd_timeout = 500;  /* Default timeout for all commands */
++
++    timeout = jiffies + msecs_to_jiffies(cmd_timeout);
++    while (time_before(jiffies, timeout)) {
++        present_state = efx_sdio_readl(host, EFX_SDIO_BASE_STATUS_REG0);
++        if (!(efx_sdio_readl(host, EFX_SDIO_BASE_STATUS_REG0) &
++		      (EFX_SDIO_BASE_STATUS_CMD_BUSY |
++		       EFX_SDIO_BASE_STATUS_DAT_BUSY))) {
++		    break;
++		}
++        cpu_relax();
++    }
++    if (time_after_eq(jiffies, timeout)) {
++        dev_err(&host->pdev->dev,
++            "CMD/DAT line Busy timeout, base_status=0x%08x\n",
++            efx_sdio_readl(host, EFX_SDIO_BASE_STATUS_REG0));
++        cmd->error = -ETIMEDOUT;
++        if (host->mrq) {
++            efx_sdio_finish_request(host, host->mrq);
++        }
++        return;
++    }
++
++	/* Set command argument */
++	efx_sdio_writel(host, cmd->arg, EFX_SDIO_ARG1);
++
++	/* Build command register value */
++	command = (cmd->opcode << EFX_SDIO_CMD_INDEX_SHIFT) &
++		  EFX_SDIO_CMD_INDEX_MASK;
++
++	if (cmd->flags & MMC_RSP_PRESENT) {
++		if (cmd->flags & MMC_RSP_136) {
++		    command |= (EFX_SDIO_RESP_TYPE_136 << EFX_SDIO_RESP_TYPE_SHIFT);
++		} else if (cmd->flags & MMC_RSP_BUSY) {
++		    command |= (EFX_SDIO_RESP_TYPE_48_BUSY << EFX_SDIO_RESP_TYPE_SHIFT);
++		} else {
++		    command |= (EFX_SDIO_RESP_TYPE_48 << EFX_SDIO_RESP_TYPE_SHIFT);
++		}
++
++		if (cmd->flags & MMC_RSP_CRC) {
++		    command |= EFX_SDIO_CMD_CRC_CHECK_EN;
++		}
++
++		if (cmd->flags & MMC_RSP_OPCODE) {
++		    command |= EFX_SDIO_CMD_INDEX_CHECK_EN;
++		}
++	}
++
++	if (data) {
++
++		command |= EFX_SDIO_DATA_PRESENT;
++
++		/* Use DMA for transfers >= 64 bytes */
++		host->use_dma = (data->blksz * data->blocks >= 64);
++
++		/* Prepare DMA if enabled */
++		if (host->use_dma) {
++		    efx_sdio_prepare_dma(host, data);
++		}
++
++		/* Set up data transfer */
++		efx_sdio_writel(host, (data->blocks << EFX_SDIO_BLOCK_COUNT_SHIFT) |
++		                (data->blksz & EFX_SDIO_BLOCK_SIZE_MASK),
++		                EFX_SDIO_BLOCK_SIZE);
++
++		if (data->blocks > 1) {
++		    command |= EFX_SDIO_MULTI_BLOCK_SEL;
++		    command |= EFX_SDIO_BLOCK_COUNT_EN;
++		}
++
++		if (data->flags & MMC_DATA_READ) {
++		    command |= EFX_SDIO_DATA_XFER_DIR;
++		}
++
++		/* Enable DMA if prepared successfully */
++		if (host->use_dma) {
++		    command |= EFX_SDIO_DMA_EN;
++		    efx_sdio_dbg_cmd(host, "DMA enabled for data transfer\n");
++		} else {
++		    /* Initialize PIO transfer state */
++		    unsigned long total_bytes = (unsigned long)data->blksz * data->blocks;
++		    if (total_bytes > INT_MAX) {
++		        dev_err(&host->pdev->dev, "Transfer too large: %lu bytes\n", total_bytes);
++		        cmd->error = -EINVAL;
++		        if (host->mrq) {
++		            efx_sdio_finish_request(host, host->mrq);
++		        }
++		        return;
++		    }
++		    host->bytes_to_transfer = (int)total_bytes;
++		    host->blocks_done = 0;
++		    host->sg_offset = 0;
++		    efx_sdio_dbg_cmd(host, "Using PIO for data transfer\n");
++		}
++
++		/* Initialize data transfer state */
++		host->data = data;
++
++		efx_sdio_dbg_cmd(host, "Data transfer: %d blocks of %d bytes, %s, %s\n",
++		         data->blocks, data->blksz,
++		         (data->flags & MMC_DATA_READ) ? "read" : "write",
++		         host->use_dma ? "DMA" : "PIO");
++	}
++
++	efx_sdio_dbg_cmd(host, "Command register: 0x%08x\n", command);
++
++	efx_sdio_writel(host, command, EFX_SDIO_TRANSFER_MODE);
++}
++
++void efx_sdio_set_clock(struct efx_sdio_host *host, unsigned int clock)
++{
++	u32 div, reg;
++	unsigned long timeout;
++
++	if (clock == 0) {
++		/* Disable clock */
++		reg = efx_sdio_readl(host, EFX_SDIO_BASE_REG0);
++		reg &= ~EFX_SDIO_BASE_REG0_CLK_EN;
++		efx_sdio_writel(host, reg, EFX_SDIO_BASE_REG0);
++		host->current_clk = 0;
++        	dev_info(&host->pdev->dev, "Clock disabled\n");
++		return;
++	}
++
++	/* Calculate clock divider (hardware constraint: must be 1 or even number)
++	 * Formula: actual_freq = base_freq / divider
++	 * This ensures we don't exceed the requested frequency.
++	 */
++	/* Enforce maximum frequency limit */
++	if (clock > EFX_SDIO_MAX_FREQ) {
++		clock = EFX_SDIO_MAX_FREQ;
++	}
++
++	/* Calculate clock divider */
++	if (clock >= host->base_clk) {
++		div = 1;
++	} else {
++		div = (host->base_clk + clock - 1) / clock; /* Round up */
++		/* Ensure even divider for hardware compliance */
++		if (div > 1 && (div & 1)) {
++		    div += 1;
++		}
++	}
++
++	/* Disable clock first */
++	reg = efx_sdio_readl(host, EFX_SDIO_BASE_REG0);
++	reg &= ~EFX_SDIO_BASE_REG0_CLK_EN;
++	efx_sdio_writel(host, reg, EFX_SDIO_BASE_REG0);
++
++	/* Set divider */
++	reg = (reg & ~EFX_SDIO_BASE_REG0_CLK_DIV_MASK) |
++	      (div & EFX_SDIO_BASE_REG0_CLK_DIV_MASK);
++	efx_sdio_writel(host, reg, EFX_SDIO_BASE_REG0);
++
++	/* Enable clock */
++	reg |= EFX_SDIO_BASE_REG0_CLK_EN;
++	efx_sdio_writel(host, reg, EFX_SDIO_BASE_REG0);
++
++    /*Set sample count*/
++    reg = efx_sdio_readl(host, EFX_SDIO_BASE_REG1);
++    reg &= ~EFX_SDIO_BASE_REG1_SAMPLE_CNT_MASK;
++    reg |= (div / 4) << EFX_SDIO_BASE_REG1_SAMPLE_CNT_SHIFT;
++    efx_sdio_writel(host, reg, EFX_SDIO_BASE_REG1);
++
++    /* Set read pause delay based on clock speed
++     * N = 4
++     * clk_div = 1,     Read Pause Delay = 4 + 2  = 6
++     * clk_div = 2,     Read Pause Delay = 4 + 6  = 10
++     * clk_div = 4 or 6,Read Pause Delay = 4 + 9  = 13
++     * clk_div >= 8,    Read Pause Delay = 4 + 10 = 14
++     */
++    reg = efx_sdio_readl(host, EFX_SDIO_HOST_ADJUSTMENT);
++    reg &= ~0xFF; // Clear bit0~bit7
++
++    if (div == 1) {
++        reg |= 6;
++    } else if (div == 2) {
++        reg |= 10;
++    } else if (div == 4 || div == 6) {
++        reg |= 13;
++    } else {
++        reg |= 14;
++    }
++
++    dev_info(&host->pdev->dev, "Setting Read Pause Delay to %u\n", reg & 0xFF);
++    efx_sdio_writel(host, reg, EFX_SDIO_HOST_ADJUSTMENT);
++
++	/* Clock stabilization delays based on eMMC specification:
++	 * - Low freq (≤400kHz): 0.5-1ms for card identification mode
++	 * - Medium freq (≤25MHz): 100-200us for normal operation
++	 * - High freq (>25MHz): 50-100us for high-speed modes
++	 * These delays ensure PLL lock and signal integrity.
++	 */
++	if (clock <= 400000) {
++		usleep_range(500, 1000);
++	} else if (clock <= 25000000) {
++		usleep_range(100, 200);
++	} else {
++		usleep_range(50, 100);
++	}
++
++	/* Verify controller is ready */
++	timeout = jiffies + msecs_to_jiffies(50);
++	while (time_before(jiffies, timeout)) {
++		if (!(efx_sdio_readl(host, EFX_SDIO_BASE_STATUS_REG0) &
++		      (EFX_SDIO_BASE_STATUS_CMD_BUSY |
++		       EFX_SDIO_BASE_STATUS_DAT_BUSY))) {
++		    break;
++		}
++		cpu_relax();
++	}
++
++	host->current_clk = host->base_clk / div;
++	host->clk_div = div; /* Store for tuning algorithm */
++	dev_dbg(&host->pdev->dev, "Set clock to %u Hz (div=%u, actual=%u)\n",
++		    clock, div, host->current_clk);
++}
++
++void efx_sdio_set_bus_width(struct efx_sdio_host *host, int width)
++{
++	u32 reg;
++
++	reg = efx_sdio_readl(host, EFX_SDIO_HOST_CONTROL);
++	reg &= ~EFX_SDIO_DATA_WIDTH_MASK;
++
++	switch (width) {
++	case MMC_BUS_WIDTH_1:
++		reg |= (EFX_SDIO_DATA_WIDTH_1BIT << EFX_SDIO_DATA_WIDTH_SHIFT);
++		break;
++	case MMC_BUS_WIDTH_4:
++		reg |= (EFX_SDIO_DATA_WIDTH_4BIT << EFX_SDIO_DATA_WIDTH_SHIFT);
++		break;
++	default:
++		dev_warn(&host->pdev->dev, "Unsupported bus width: %d\n", width);
++		return;
++	}
++
++	efx_sdio_writel(host, reg, EFX_SDIO_HOST_CONTROL);
++	dev_dbg(&host->pdev->dev, "Set bus width to %d bits\n", width);
++}
++
++void efx_sdio_set_timing(struct efx_sdio_host *host, unsigned int timing)
++{
++	u32 reg;
++
++	reg = efx_sdio_readl(host, EFX_SDIO_HOST_CONTROL);
++
++	switch (timing) {
++	case MMC_TIMING_LEGACY:
++	case MMC_TIMING_MMC_HS:
++    	case MMC_TIMING_UHS_SDR12:
++    	case MMC_TIMING_UHS_SDR25:
++    	case MMC_TIMING_UHS_SDR50:
++    	case MMC_TIMING_UHS_SDR104:
++		reg &= ~EFX_SDIO_DATA_SAMPLING_MODE;
++		/* Set SDR mode */
++		break;
++	case MMC_TIMING_UHS_DDR50:
++		reg |= EFX_SDIO_DATA_SAMPLING_MODE;
++		/* Set DDR mode */
++		break;
++	default:
++		dev_warn(&host->pdev->dev, "Unsupported timing: %d\n", timing);
++		return;
++	}
++
++	efx_sdio_writel(host, reg, EFX_SDIO_HOST_CONTROL);
++	dev_dbg(&host->pdev->dev, "Set timing mode: %s (%d)\n",
++		     timing == MMC_TIMING_LEGACY ? "Legacy" :
++		     timing == MMC_TIMING_MMC_HS ? "High Speed" :
++             timing == MMC_TIMING_UHS_DDR50 ? "DDR50" :
++		     timing == MMC_TIMING_UHS_SDR12 ? "SDR12" :
++             timing == MMC_TIMING_UHS_SDR25 ? "SDR25" :
++             timing == MMC_TIMING_UHS_SDR50 ? "SDR50" :
++		     timing == MMC_TIMING_UHS_SDR104 ? "SDR104" : "Unknown", timing);
++
++	/* Update previous timing for reference */
++	host->prev_timing = timing;
++}
++
++irqreturn_t efx_sdio_irq(int irq, void *dev_id)
++{
++	struct efx_sdio_host *host;
++	u32 intstat, present_state;
++	irqreturn_t result;
++
++	host = dev_id;
++	result = IRQ_NONE;
++
++	spin_lock(&host->lock);
++	intstat = efx_sdio_readl(host, EFX_SDIO_INT_STATUS);
++	if (!intstat) {
++		goto out;
++	}
++
++	present_state = efx_sdio_readl(host, EFX_SDIO_PRESENT_STATE);
++	efx_sdio_dbg_irq(host, "IRQ: status=0x%08x, present=0x%08x\n",
++			  intstat, present_state);
++    
++    // Clear all interrupt status bits first
++    efx_sdio_writel(host, intstat, EFX_SDIO_INT_STATUS);
++	result = IRQ_HANDLED;
++
++	/* Handle error interrupts first */
++	if (intstat & EFX_SDIO_INT_ERROR_MASK) {
++		/* Handle ADMA error specifically */
++		if (intstat & EFX_SDIO_INT_ADMA_ERROR) {
++		    dev_err(&host->pdev->dev, "ADMA error detected\n");
++		    if (host->data) {
++		        host->data->error = -EIO;
++		    }
++		}
++
++		/* Log error but don't spam for expected errors during detection */
++		if (host->cmd && (host->cmd->opcode == 52 || host->cmd->opcode == 8 ||
++		                 host->cmd->opcode == 5 || host->cmd->opcode == 55)) {
++		    efx_sdio_dbg_irq(host,
++				     "Expected timeout for CMD%d during card detection\n",
++		            host->cmd->opcode);
++		} else if (host->tuning_in_progress) {
++            if (intstat & (EFX_SDIO_INT_CMD_CRC_ERR |
++                           EFX_SDIO_INT_DATA_CRC_ERR)) {
++                host->tuning_crc_error = true;
++            }
++		} else {
++            // Log message with CMD index if possible
++            if (host) {
++		        dev_err(&host->pdev->dev, "Error interrupt: 0x%08x CMD:%d\n",
++			            (unsigned int)(intstat & EFX_SDIO_INT_ERROR_MASK),
++                        host->cmd ? host->cmd->opcode : -1);
++            } else {
++                dev_err(&host->pdev->dev, "Error interrupt: 0x%08x CMD:host is NULL\n",
++                        (unsigned int)(intstat & EFX_SDIO_INT_ERROR_MASK));
++            }
++		}
++		if (host->cmd) {
++		    if (intstat & EFX_SDIO_INT_CMD_TIMEOUT_ERR) {
++		        host->cmd->error = -ETIMEDOUT;
++                dev_dbg(&host->pdev->dev, "CMD%d timeout\n", host->cmd->opcode);
++		            host->cmd = NULL;
++		            if (host->mrq) {
++		                efx_sdio_finish_request(host, host->mrq);
++		            }
++		            goto out;
++		    } else if (intstat & (EFX_SDIO_INT_CMD_CRC_ERR |
++		                          EFX_SDIO_INT_CMD_END_BIT_ERR |
++		                          EFX_SDIO_INT_CMD_INDEX_ERR)) {
++		        host->cmd->error = -EILSEQ;
++		        if (host->cmd->opcode == 6) {
++		            dev_err(&host->pdev->dev,
++				    "CMD6 (mode switch) CRC/protocol error - arg=0x%08x\n",
++				    host->cmd->arg);
++		        } else {
++		            dev_err(&host->pdev->dev,
++				    "CMD%d CRC/protocol error\n",
++				    host->cmd->opcode);
++		        }
++		    }
++		}
++
++		if (host->data) {
++		    if (intstat & EFX_SDIO_INT_DATA_TIMEOUT_ERR) {
++		        host->data->error = -ETIMEDOUT;
++		        dev_err(&host->pdev->dev, "Data timeout error\n");
++		    }
++		    if (intstat & EFX_SDIO_INT_DATA_CRC_ERR) {
++                host->data->error = -EILSEQ;
++                dev_err(&host->pdev->dev, "Data CRC error\n");
++		    }
++		    if (intstat & EFX_SDIO_INT_DATA_END_BIT_ERR) {
++		        host->data->error = -EILSEQ;
++		        dev_err(&host->pdev->dev, "Data end bit error\n");
++		    }
++		}
++
++		if (!(host->cmd && host->cmd->opcode == 12 &&
++		      (intstat & EFX_SDIO_INT_CMD_TIMEOUT_ERR))) {
++		    if (host->mrq) {
++		        efx_sdio_finish_request(host, host->mrq);
++                goto out;
++		    }
++		}
++	}
++
++	/* Handle DMA interrupt */
++	if (intstat & EFX_SDIO_INT_DMA_INTERRUPT) {
++        /* DMA boundary reached, but transfer continues automatically */
++		efx_sdio_dbg_irq(host, "DMA interrupt\n");
++	}
++
++        /* Handle command completion */
++	if (intstat & EFX_SDIO_INT_CMD_COMPLETE) {
++		efx_sdio_dbg_irq(host, "Command complete\n");
++		efx_sdio_finish_command(host);
++	}
++
++    /* Handle SDIO Card interrupt */
++    if (intstat & EFX_SDIO_INT_CARD) {
++        efx_sdio_dbg_irq(host, "SDIO card interrupt\n");
++        efx_sdio_enable_sdio_irq_without_lock(host->mmc, 0);
++        sdio_signal_irq(host->mmc);
++    }
++
++	/* Handle data buffer ready interrupts (for PIO only) */
++	if (likely(!host->use_dma) && host->data) {
++
++        if (intstat & (EFX_SDIO_INT_BUFFER_READ_RDY | EFX_SDIO_INT_BUFFER_WRITE_RDY)) {
++
++            if (host->bytes_to_transfer != 0) {
++
++                efx_sdio_dbg_irq(host, "Buffer ready interrupt for %s\n",
++                    (intstat & EFX_SDIO_INT_BUFFER_READ_RDY) ? "read" : "write");
++                efx_sdio_transfer_pio(host);
++
++                if (host->bytes_to_transfer > 0) {
++                    efx_sdio_dbg_pio(host,
++                            "Waiting for more data: %d bytes remaining\n",
++                            host->bytes_to_transfer);
++                }
++
++                // When bytes_to_transfer reaches 0, the transfer is complete
++                // Check again transfer complete interrupt status if current instatus transfer complete interrup is not set
++                if ((host->bytes_to_transfer == 0) && ((intstat & EFX_SDIO_INT_XFER_COMPLETE) == 0)) {
++                    if (efx_sdio_readl(host, EFX_SDIO_INT_STATUS) & EFX_SDIO_INT_XFER_COMPLETE) {
++                        // Update intstat to include transfer complete
++                        // So that it can be handled in subsequent Handle transfer completion code
++                        intstat |= EFX_SDIO_INT_XFER_COMPLETE;
++
++                        // Clear the transfer complete interrupt status bit
++                        efx_sdio_writel(host, EFX_SDIO_INT_XFER_COMPLETE, EFX_SDIO_INT_STATUS);
++                    }
++                }
++            }
++	    }
++
++        // Handle no more data bytes to transfer as handled during command completion
++        // Possible host->bytes_to_transfer == 0 here
++        if ((host->bytes_to_transfer == 0) && ((intstat & EFX_SDIO_INT_XFER_COMPLETE) == 0)) {
++            if (efx_sdio_readl(host, EFX_SDIO_INT_STATUS) & EFX_SDIO_INT_XFER_COMPLETE) {
++                // Update intstat to include transfer complete
++                // So that it can be handled in subsequent Handle transfer completion code
++                intstat |= EFX_SDIO_INT_XFER_COMPLETE;
++
++                // Clear the transfer complete interrupt status bit
++                efx_sdio_writel(host, EFX_SDIO_INT_XFER_COMPLETE, EFX_SDIO_INT_STATUS);
++            }
++        }
++    }
++
++	/* Handle transfer completion */
++	if (intstat & EFX_SDIO_INT_XFER_COMPLETE) {
++		efx_sdio_dbg_irq(host, "Transfer complete interrupt (DMA: %s)\n",
++		        host->use_dma ? "enabled" : "disabled");
++
++        if (!host->use_dma && host->data && host->bytes_to_transfer != 0) {
++            dev_err(&host->pdev->dev,
++                "Error! PIO transfer complete interrupt but %d bytes remain\n",
++                host->bytes_to_transfer);
++        }
++		efx_sdio_finish_data(host);
++	}
++
++	/* Debug: Check for any unhandled interrupts */
++	if (intstat & ~(EFX_SDIO_INT_CMD_COMPLETE | EFX_SDIO_INT_BUFFER_READ_RDY |
++		            EFX_SDIO_INT_BUFFER_WRITE_RDY | EFX_SDIO_INT_DMA_INTERRUPT |
++		            EFX_SDIO_INT_XFER_COMPLETE | EFX_SDIO_INT_ERROR_MASK |
++                    EFX_SDIO_INT_CARD)) {
++		efx_sdio_dbg_irq(host, "Unhandled interrupt bits: 0x%08x\n",
++		         (unsigned int)(intstat &
++					~(EFX_SDIO_INT_CMD_COMPLETE |
++					  EFX_SDIO_INT_BUFFER_READ_RDY |
++					  EFX_SDIO_INT_BUFFER_WRITE_RDY |
++					  EFX_SDIO_INT_DMA_INTERRUPT |
++					  EFX_SDIO_INT_XFER_COMPLETE |
++					  EFX_SDIO_INT_ERROR_MASK |
++                      EFX_SDIO_INT_CARD)));
++	}
++
++out:
++	spin_unlock(&host->lock);
++	return result;
++}
++
++void efx_sdio_request(struct mmc_host *mmc, struct mmc_request *mrq)
++{
++	struct efx_sdio_host *host;
++	unsigned long flags;
++
++	host = mmc_priv(mmc);
++
++	spin_lock_irqsave(&host->lock, flags);
++
++	if (!host->clk) {
++		dev_err(&host->pdev->dev, "No clock available\n");
++		mrq->cmd->error = -ENODEV;
++		mmc_request_done(mmc, mrq);
++		spin_unlock_irqrestore(&host->lock, flags);
++		return;
++	}
++
++	efx_sdio_dbg_cmd(host, "New request: CMD%d\n", mrq->cmd->opcode);
++
++	host->mrq = mrq;
++    efx_sdio_send_command(host, mrq->cmd);
++	spin_unlock_irqrestore(&host->lock, flags);
++}
++
++void efx_sdio_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
++{
++	struct efx_sdio_host *host;
++	unsigned long flags;
++	bool need_host_control_update = false;
++
++	host = mmc_priv(mmc);
++
++	spin_lock_irqsave(&host->lock, flags);
++
++	if (ios->clock != host->current_clk) {
++
++        // info print
++        dev_info(&host->pdev->dev, "Changing clock from %u Hz to %u Hz\n",
++                host->current_clk, ios->clock);
++		efx_sdio_set_clock(host, ios->clock);
++	}
++
++	if (ios->bus_width != MMC_BUS_WIDTH_1) {
++		efx_sdio_set_bus_width(host, ios->bus_width);
++		need_host_control_update = true;
++	}
++
++	/* Log significant timing mode changes */
++	if (ios->timing != host->prev_timing) {
++		dev_dbg(&host->pdev->dev, "Timing mode: %u -> %u, Clock: %u Hz\n",
++		        host->prev_timing, ios->timing, ios->clock);
++	}
++
++	efx_sdio_set_timing(host, ios->timing);
++
++	spin_unlock_irqrestore(&host->lock, flags);
++
++    // Custom tuning handling for SDR12, SDR25 or DDR50 && clock >= 12.5MHz
++    if (host->current_clk >= 12500000 &&
++        (host->prev_timing == MMC_TIMING_UHS_SDR12 ||
++         host->prev_timing == MMC_TIMING_UHS_SDR25 ||
++         host->prev_timing == MMC_TIMING_UHS_DDR50 )) {
++
++        dev_info(&host->pdev->dev,
++                "Timing mode changed to %d, performing custom tuning\n", host->prev_timing);
++
++        // Use UINT32_MAX to indicate custom tuning for SDR12, SDR25 and DDR50
++        efx_sdio_execute_tuning(host->mmc, UINT_MAX);
++    }
++}
++
++int efx_sdio_get_cd(struct mmc_host *mmc)
++{
++	return 1;  /* always present */
++}
++
++int efx_sdio_card_busy_wrapper(struct mmc_host *mmc)
++{
++	struct efx_sdio_host *host;
++ 
++	host = mmc_priv(mmc);
++    	return !(efx_sdio_readl(host, EFX_SDIO_PRESENT_STATE) &
++            EFX_SDIO_DAT_0_SIG_LVL);
++}
++
++int efx_sdio_get_ro(struct mmc_host *mmc)
++{
++	return 0;  /* Never read-only */
++}
++
++int efx_sdio_start_signal_voltage_switch(struct mmc_host *mmc, struct mmc_ios *ios)
++{
++    struct efx_sdio_host *host;
++    unsigned long flags;
++    int ret = 0;
++
++    host = mmc_priv(mmc);
++    spin_lock_irqsave(&host->lock, flags);
++
++    switch(ios->signal_voltage) {
++    case MMC_SIGNAL_VOLTAGE_330:
++        if (host->io_voltage != EFX_SDIO_IO_VOLTAGE_3_3V)
++        {
++            dev_warn(&host->pdev->dev,
++                 "Voltage switching to 3.3V not supported\n");
++            ret = -EOPNOTSUPP;
++        } else {
++            dev_dbg(&host->pdev->dev, "Switching to 3.3V signal voltage\n");
++        }
++        break;
++    case MMC_SIGNAL_VOLTAGE_180:
++        if (host->io_voltage != EFX_SDIO_IO_VOLTAGE_1_8V)
++        {
++            dev_warn(&host->pdev->dev,
++                 "Voltage switching to 1.8V not supported\n");
++            ret = -EOPNOTSUPP;
++            break;
++        } else {
++            dev_dbg(&host->pdev->dev, "Switching to 1.8V signal voltage\n");
++        }
++        break;
++    default:
++        dev_warn(&host->pdev->dev,
++             "Unsupported signal voltage: %d\n", ios->signal_voltage);
++        ret = -EOPNOTSUPP;
++        break;
++    }
++
++    spin_unlock_irqrestore(&host->lock, flags);
++    return ret;
++}
++
++void efx_sdio_enable_sdio_irq(struct mmc_host *host, int enable)
++{
++	struct efx_sdio_host *sdio_host = mmc_priv(host);
++	unsigned long flags;
++
++	spin_lock_irqsave(&sdio_host->lock, flags);
++	efx_sdio_enable_sdio_irq_without_lock(host, enable);
++	spin_unlock_irqrestore(&sdio_host->lock, flags);
++}
++
++void efx_sdio_ack_sdio_irq(struct mmc_host *host)
++{
++    struct efx_sdio_host *sdio_host = mmc_priv(host);
++    unsigned long flags;
++
++    spin_lock_irqsave(&sdio_host->lock, flags);
++    efx_sdio_enable_sdio_irq_without_lock(host, 1);
++    spin_unlock_irqrestore(&sdio_host->lock, flags);
++}
++
++
+diff --git a/drivers/mmc/host/efx_sdio_dma.c b/drivers/mmc/host/efx_sdio_dma.c
+new file mode 100644
+index 000000000..6d62fab47
+--- /dev/null
++++ b/drivers/mmc/host/efx_sdio_dma.c
+@@ -0,0 +1,227 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++/*
++ * Efinix SDIO Host Controller DMA Support
++ *
++ * Copyright (C) 2026 Efinix, Inc.
++ * Author: Khor Swee Aun <sakhor@efinixinc.com>
++ */
++
++#include <linux/dma-mapping.h>
++#include <linux/scatterlist.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++
++#include "efx_sdio.h"
++
++void efx_sdio_set_adma_addr(struct efx_sdio_host *host, dma_addr_t addr)
++{
++	efx_sdio_writel(host, (u32)addr, EFX_SDIO_ADMA_SYS_ADDR_LOW);
++
++	if (host->dma_64bit) {
++		efx_sdio_writel(host, (u32)((u64)addr >> 32),
++				 EFX_SDIO_ADMA_SYS_ADDR_HIGH);
++	}
++}
++
++static void efx_sdio_adma_mark_end(struct efx_adma_desc *desc)
++{
++	desc->attr |= EFX_ADMA_DESC_END;
++}
++
++static void efx_sdio_adma_set_desc(struct efx_adma_desc *desc, u32 addr,
++				    u16 len, u16 attr)
++{
++	desc->attr = attr;
++	desc->len = len;
++	desc->addr = addr;
++}
++
++int efx_sdio_adma_table_pre(struct efx_sdio_host *host, struct mmc_data *data)
++{
++	struct efx_adma_desc *desc;
++	struct scatterlist *sg;
++	dma_addr_t addr, align_addr;
++	u32 len, offset, align_len;
++	int i, desc_count = 0;
++
++    /* Init use_bounce flag */
++	host->use_bounce = false;
++
++	/* Check if we need bounce buffer due to alignment requirements */
++	for_each_sg(data->sg, sg, data->sg_len, i) {
++        addr = sg_dma_address(sg);
++        len = sg_dma_len(sg);
++
++        /* Check 4-byte alignment len requirement for DMA */
++        if (len & 0x3) {
++            host->use_bounce = true;
++            break;
++        }
++	}
++
++	if (host->use_bounce) {
++        /* Use bounce buffer for unaligned transfers */
++        if (!host->bounce_buffer) {
++            dev_err(&host->pdev->dev, "Bounce buffer not available\n");
++            return -ENOMEM;
++        }
++
++        if (data->blksz * data->blocks > host->bounce_buffer_size) {
++            dev_err(&host->pdev->dev, "Transfer too large for bounce buffer\n");
++            return -EINVAL;
++        }
++
++        /* Copy data to bounce buffer for write operations */
++        if (data->flags & MMC_DATA_WRITE) {
++            struct scatterlist *sg;
++            char *bounce_pos;
++            int i;
++
++            bounce_pos = host->bounce_buffer;
++
++            for_each_sg(data->sg, sg, data->sg_len, i) {
++                /* Copy data to bounce buffer */
++                memcpy(bounce_pos, sg_virt(sg), sg->length);
++                bounce_pos += sg->length;
++            }
++        }
++
++        /* Setup single descriptor for bounce buffer */
++        desc = host->adma_desc;
++        efx_sdio_adma_set_desc(desc, host->bounce_dma,
++                            data->blksz * data->blocks,
++                            EFX_ADMA_DESC_VALID | EFX_ADMA_DESC_TRAN);
++        efx_sdio_adma_mark_end(desc);
++        desc_count = 1;
++
++	} else {
++
++        /*Not using bounce buffer */
++        /* Setup descriptors for scatter-gather list */
++        desc = host->adma_desc;
++
++        for_each_sg(data->sg, sg, data->sg_len, i) {
++            addr = sg_dma_address(sg);
++            len = sg_dma_len(sg);
++            offset = 0;
++
++            while (len > 0) {
++                align_addr = addr + offset;
++                align_len = min(len, (u32)EFX_ADMA_MAX_LEN);
++
++                if (desc_count >=
++                    (EFX_ADMA_TABLE_SZ / sizeof(struct efx_adma_desc))) {
++                    dev_err(&host->pdev->dev, "Too many ADMA descriptors\n");
++                    return -EINVAL;
++                }
++
++                efx_sdio_adma_set_desc(&desc[desc_count], align_addr, align_len,
++                                    EFX_ADMA_DESC_VALID | EFX_ADMA_DESC_TRAN);
++
++                offset += align_len;
++                len -= align_len;
++                desc_count++;
++            }
++        }
++
++        if (desc_count > 0) {
++            efx_sdio_adma_mark_end(&desc[desc_count - 1]);
++        }
++	}
++
++	if (desc_count == 0) {
++	dev_err(&host->pdev->dev, "No ADMA descriptors created\n");
++	return -EINVAL;
++	}
++
++	return 0;
++}
++
++void efx_sdio_adma_table_post(struct efx_sdio_host *host, struct mmc_data *data)
++{
++
++	/* If bounce buffer is used, copy data from bounce buffer for read operations */
++	if (data->flags & MMC_DATA_READ) {
++
++        if (host->use_bounce) {
++            struct scatterlist *sg;
++            char *bounce_pos;
++            int i;
++
++            bounce_pos = host->bounce_buffer;
++
++            dma_sync_single_for_cpu(&host->pdev->dev, host->bounce_dma,
++                             data->blksz * data->blocks, DMA_FROM_DEVICE);
++
++            for_each_sg(data->sg, sg, data->sg_len, i) {
++                /* Copy data from bounce buffer */
++                memcpy(sg_virt(sg), bounce_pos, sg->length);
++                bounce_pos += sg->length;
++            }
++
++        } else {
++            // Sync scatter-gather list for CPU from device
++            dma_sync_sg_for_cpu(&host->pdev->dev, data->sg, data->sg_len,
++                            DMA_FROM_DEVICE);
++        }
++	}
++}
++
++void efx_sdio_prepare_dma(struct efx_sdio_host *host, struct mmc_data *data)
++{
++	int ret;
++
++	if (!host->use_dma || !data) {
++	return;
++	}
++
++    // Can not do DMA on a block size is not 4-byte aligned
++    if ( (data->blksz ) & 3) {
++        dev_warn(&host->pdev->dev,
++             "Data block size %u not 4-byte aligned, falling back to PIO\n",
++             data->blksz);
++        host->use_dma = false;
++        return;
++    }
++
++	/* Map scatter-gather list for DMA */
++	ret = dma_map_sg(&host->pdev->dev, data->sg, data->sg_len,
++	             (data->flags & MMC_DATA_READ) ?
++			     DMA_FROM_DEVICE : DMA_TO_DEVICE);
++	if (ret == 0) {
++	dev_err(&host->pdev->dev, "Failed to map DMA scatter-gather list\n");
++	host->use_dma = false;
++	return;
++	}
++
++	data->sg_len = ret;
++	/* Setup ADMA descriptor table */
++	ret = efx_sdio_adma_table_pre(host, data);
++	if (ret) {
++        dev_err(&host->pdev->dev, "Failed to setup ADMA table: %d\n", ret);
++        dma_unmap_sg(&host->pdev->dev, data->sg, data->sg_len,
++                    (data->flags & MMC_DATA_READ) ?
++                    DMA_FROM_DEVICE : DMA_TO_DEVICE);
++        host->use_dma = false;
++        return;
++	}
++
++	/* Set ADMA system address */
++	efx_sdio_set_adma_addr(host, host->adma_desc_dma);
++
++}
++
++void efx_sdio_cleanup_dma(struct efx_sdio_host *host, struct mmc_data *data)
++{
++	if (!host->use_dma || !data) {
++		return;
++	}
++
++	/* Post-process ADMA table */
++	efx_sdio_adma_table_post(host, data);
++
++	/* Unmap scatter-gather list */
++	dma_unmap_sg(&host->pdev->dev, data->sg, data->sg_len,
++		     (data->flags & MMC_DATA_READ) ?
++			DMA_FROM_DEVICE : DMA_TO_DEVICE);
++}
+diff --git a/drivers/mmc/host/efx_sdio_platform.c b/drivers/mmc/host/efx_sdio_platform.c
+new file mode 100644
+index 000000000..d7a7d1d20
+--- /dev/null
++++ b/drivers/mmc/host/efx_sdio_platform.c
+@@ -0,0 +1,426 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++/*
++ * Efinix SDIO Host Controller Platform Driver
++ *
++ * Copyright (C) 2026 Efinix, Inc.
++ * Author: Khor Swee Aun <sakhor@efinixinc.com>
++ */
++
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/mmc.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/dma-mapping.h>
++#include <linux/io.h>
++#include <linux/interrupt.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/workqueue.h>
++
++#include "efx_sdio.h"
++
++static const struct mmc_host_ops efx_sdio_ops = {
++    .request = efx_sdio_request,
++    .set_ios = efx_sdio_set_ios,
++    .get_cd = efx_sdio_get_cd,
++    .get_ro = efx_sdio_get_ro,
++    .card_busy = efx_sdio_card_busy_wrapper,
++    .enable_sdio_irq = efx_sdio_enable_sdio_irq,
++    .ack_sdio_irq = efx_sdio_ack_sdio_irq,
++    .execute_tuning = efx_sdio_execute_tuning,
++    .start_signal_voltage_switch = efx_sdio_start_signal_voltage_switch,
++};
++
++/**
++ * efx_sdio_reset_hw - Reset SDIO IP and device
++ * @host: SDIO host controller instance
++ *
++ * Performs hardware reset sequence according to SDIO specification:
++ * 1. Reset IP core (minimum 1us pulse)
++ * 2. Reset SDIO device (minimum 1us pulse)
++ * 3. Wait for device initialization (200us minimum)
++ */
++void efx_sdio_reset_hw(struct efx_sdio_host *host)
++{
++	u32 reg;
++
++	/* Reset SDIO IP - minimum 1us pulse width per documentation */
++	reg = efx_sdio_sys_readl(host, EFX_SYS_RESET_REG);
++	reg |= EFX_SYS_RESET_SDIO_IP;
++	efx_sdio_sys_writel(host, reg, EFX_SYS_RESET_REG);
++	udelay(EFX_SDIO_RESET_PULSE_WIDTH);
++
++	/* Release IP reset */
++	reg &= ~EFX_SYS_RESET_SDIO_IP;
++	efx_sdio_sys_writel(host, reg, EFX_SYS_RESET_REG);
++	udelay(EFX_SDIO_RESET_PULSE_WIDTH);
++
++	/* Reset SDIO device - minimum 1us pulse width (tRSTW) */
++	reg |= EFX_SYS_RESET_SDIO_DEV;
++	efx_sdio_sys_writel(host, reg, EFX_SYS_RESET_REG);
++	udelay(EFX_SDIO_RESET_PULSE_WIDTH);
++
++	/* Release device reset */
++	reg &= ~EFX_SYS_RESET_SDIO_DEV;
++	efx_sdio_sys_writel(host, reg, EFX_SYS_RESET_REG);
++
++	/* Wait 200us (tRSCA) or 74 clock cycles per documentation */
++	udelay(EFX_SDIO_POST_RESET_DELAY);
++}
++
++/**
++ * efx_sdio_init_hw - Initialize SDIO hardware
++ * @host: SDIO host controller instance
++ *
++ * Initializes the SDIO controller hardware including:
++ * - Hardware reset
++ * - Capability reading and base clock setup
++ * - Interrupt configuration
++ * - Initial bus width and clock settings
++ *
++ * Return: 0 on success, negative error code on failure
++ */
++int efx_sdio_init_hw(struct efx_sdio_host *host)
++{
++	u32 caps, reg;
++
++	/* Reset hardware */
++	efx_sdio_reset_hw(host);
++
++	/* Read capabilities */
++	caps = efx_sdio_readl(host, EFX_SDIO_HOST_CAPABILITIES);
++	host->base_clk = (caps & 0x3FF) * 1000000; /* Convert MHz to Hz */
++
++	if (host->base_clk == 0) {
++	host->base_clk = EFX_SDIO_BASE_CLK_FREQ_MHZ * 1000000;
++	}
++
++    host->io_voltage = (caps >> 12) & 0xF;
++
++	dev_info(&host->pdev->dev, "Base clock: %u Hz, IO Voltage: %sV, Capabilities: 0x%08x\n",
++	     host->base_clk, host->io_voltage == EFX_SDIO_IO_VOLTAGE_1_8V ? "1.8" : "3.0", caps);
++
++	/* Disable all interrupts initially */
++	efx_sdio_writel(host, 0, EFX_SDIO_INT_SIGNAL_EN);
++	efx_sdio_writel(host, 0, EFX_SDIO_INT_STATUS_EN);
++
++	/* Clear any pending interrupts */
++	efx_sdio_writel(host, EFX_SDIO_INT_ALL_MASK, EFX_SDIO_INT_STATUS);
++
++	/* Set initial bus width to 1-bit */
++	reg = efx_sdio_readl(host, EFX_SDIO_HOST_CONTROL);
++	reg &= ~EFX_SDIO_DATA_WIDTH_MASK;
++	reg |= (EFX_SDIO_DATA_WIDTH_1BIT << EFX_SDIO_DATA_WIDTH_SHIFT);
++
++    /*Bit 4 for IB or OOB interrupt
++     * Mask bit 4 for IB interrupt
++     *reg |= 0x10; Set bit 4 for OOB interrupt
++     */
++    reg &= ~0x10;
++    
++	efx_sdio_writel(host, reg, EFX_SDIO_HOST_CONTROL);
++
++	/* Set initial clock to identification frequency */
++	efx_sdio_set_clock(host, EFX_SDIO_MIN_FREQ);
++
++	/* Wait for hardware to stabilize */
++	msleep(10);
++
++	/* Enable interrupts */
++	efx_sdio_writel(host, EFX_SDIO_INT_ALL_MASK, EFX_SDIO_INT_STATUS_EN);
++	efx_sdio_writel(host, EFX_SDIO_INT_ALL_MASK, EFX_SDIO_INT_SIGNAL_EN);
++
++	dev_info(&host->pdev->dev, "Hardware initialized successfully\n");
++
++	return 0;
++}
++
++int efx_sdio_probe(struct platform_device *pdev)
++{
++	struct mmc_host *mmc;
++	struct efx_sdio_host *host;
++	struct resource *res;
++	int ret;
++	u32 version, present_state;
++
++	mmc = mmc_alloc_host(sizeof(struct efx_sdio_host), &pdev->dev);
++	if (!mmc) {
++	return -ENOMEM;
++	}
++
++	host = mmc_priv(mmc);
++	host->mmc = mmc;
++	host->pdev = pdev;
++
++	spin_lock_init(&host->lock);
++
++	/* Initialize tuning-related fields */
++	host->tuning_done = false;
++	host->tuning_in_progress = false;
++	host->optimal_sample_count = 0;
++	host->optimal_pll_shift = 0;
++	host->optimal_margin = 0;
++	host->prev_timing = MMC_TIMING_LEGACY;
++	host->hs400_retune_pending = false;
++	host->tuned_timing_modes = 0; /* Clear all bits - no modes tuned yet */
++
++	/* Get memory resources */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	host->ioaddr = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(host->ioaddr)) {
++	ret = PTR_ERR(host->ioaddr);
++	goto err_free_host;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	host->sys_ioaddr = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(host->sys_ioaddr)) {
++	ret = PTR_ERR(host->sys_ioaddr);
++	goto err_free_host;
++	}
++
++	/* Get clock */
++	host->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(host->clk)) {
++	ret = PTR_ERR(host->clk);
++	dev_err(&pdev->dev, "Failed to get clock: %d\n", ret);
++	goto err_free_host;
++	}
++
++	ret = clk_prepare_enable(host->clk);
++	if (ret) {
++	dev_err(&pdev->dev, "Failed to enable clock: %d\n", ret);
++	goto err_free_host;
++	}
++
++	/* Set up DMA mask */
++	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
++	if (ret) {
++	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
++	if (ret) {
++	    dev_err(&pdev->dev, "Failed to set DMA mask\n");
++	    goto err_clk_disable;
++	}
++	host->dma_64bit = false;
++	} else {
++	host->dma_64bit = true;
++	}
++
++	/* Allocate ADMA descriptor table */
++	host->adma_desc_sz = EFX_ADMA_TABLE_SZ;
++	host->adma_desc = dma_alloc_coherent(&pdev->dev, host->adma_desc_sz,
++	                                &host->adma_desc_dma, GFP_KERNEL);
++	if (!host->adma_desc) {
++	dev_err(&pdev->dev, "Failed to allocate ADMA descriptor table\n");
++	ret = -ENOMEM;
++	goto err_clk_disable;
++	}
++
++	/* Allocate bounce buffer for unaligned transfers */
++	host->bounce_buffer_size = 512 * 1024;
++	host->bounce_buffer = dma_alloc_coherent(&pdev->dev,
++					     host->bounce_buffer_size,
++	                                   &host->bounce_dma, GFP_KERNEL);
++	if (!host->bounce_buffer) {
++	dev_warn(&pdev->dev,
++		 "Failed to allocate bounce buffer, using software alignment\n");
++	host->bounce_buffer_size = 0;
++	}
++
++	/* Get IRQ */
++	host->irq = platform_get_irq(pdev, 0);
++	if (host->irq < 0) {
++	ret = host->irq;
++	goto err_free_dma;
++	}
++
++	ret = devm_request_irq(&pdev->dev, host->irq, efx_sdio_irq,
++	                   IRQF_SHARED, mmc_hostname(mmc), host);
++	if (ret) {
++	dev_err(&pdev->dev, "Failed to request IRQ: %d\n", ret);
++	goto err_free_dma;
++	}
++
++	/* Initialize hardware */
++	ret = efx_sdio_init_hw(host);
++	if (ret) {
++	goto err_free_dma;
++	}
++
++	/* Read version register to verify hardware is accessible */
++	version = efx_sdio_readl(host, EFX_SDIO_VERSION);
++	present_state = efx_sdio_readl(host, EFX_SDIO_PRESENT_STATE);
++	dev_info(&pdev->dev, "Version: 0x%08x, Present state: 0x%08x\n",
++	     version, present_state);
++
++	/* Set up MMC host */
++	mmc->ops = &efx_sdio_ops;
++	mmc->f_min = EFX_SDIO_MIN_FREQ;
++	mmc->f_max = EFX_SDIO_MAX_FREQ;
++
++    /* SDIO-specific capabilities */
++    mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
++
++    /* Not support SD and eMMC
++       SDIO IRQ NOTHREAD
++    */
++    mmc->caps2 = MMC_CAP2_NO_SD | MMC_CAP2_NO_MMC | MMC_CAP2_SDIO_IRQ_NOTHREAD;
++
++    /* Clear all UHS capability bits first */
++    mmc->caps &= ~MMC_CAP_UHS;
++
++    /* Read UHS mode flags directly from DTS */
++    struct device_node *np = pdev->dev.of_node;
++    bool uhs_set = false;
++
++    if (np) {
++        if (of_property_read_bool(np, "sd-uhs-sdr25")) {
++            mmc->caps |= MMC_CAP_UHS_SDR25;
++            uhs_set = true;
++        }
++
++        if (of_property_read_bool(np, "sd-uhs-ddr50")) {
++            mmc->caps |= MMC_CAP_UHS_DDR50;
++            uhs_set = true;
++        }
++
++        if (of_property_read_bool(np, "sd-uhs-sdr104")) {
++            mmc->caps |= MMC_CAP_UHS_SDR104;
++            uhs_set = true;
++        }
++    }
++
++    /* Default if no UHS mode specified in DTS */
++    if (!uhs_set) {
++        mmc->caps |= MMC_CAP_UHS_SDR25;
++        dev_info(&pdev->dev,
++                 "No UHS mode in DTS, defaulting to SDR25\n");
++    } else {
++        dev_info(&pdev->dev,
++                 "UHS modes: %s%s%s\n",
++                 (mmc->caps & MMC_CAP_UHS_SDR25)  ? "SDR25 "  : "",
++                 (mmc->caps & MMC_CAP_UHS_DDR50)  ? "DDR50 "  : "",
++                 (mmc->caps & MMC_CAP_UHS_SDR104) ? "SDR104 " : "");
++    }
++
++	/* Voltage support: 1.7-1.95V and 2.7-3.6V */
++	mmc->ocr_avail = MMC_VDD_165_195 | MMC_VDD_27_28 | MMC_VDD_28_29 |
++	             MMC_VDD_29_30 | MMC_VDD_30_31 | MMC_VDD_31_32 |
++	             MMC_VDD_32_33 | MMC_VDD_33_34 | MMC_VDD_34_35 |
++	             MMC_VDD_35_36;
++
++    // Maximum segment size each scatter-gather descriptor can handle
++	mmc->max_seg_size = 65536;
++    // Maximum number of scatter-gather segments per request
++	mmc->max_segs = 128;
++    // Maximum request size in bytes for all scatter-gather descriptors
++	mmc->max_req_size = mmc->max_seg_size * mmc->max_segs;
++    // Maximum block size
++	mmc->max_blk_size = EFX_SDIO_MAX_BLOCK_LENGTH;
++    // Maximum number of blocks per request
++	mmc->max_blk_count = 65535;
++
++	platform_set_drvdata(pdev, mmc);
++
++	ret = mmc_add_host(mmc);
++	if (ret) {
++	dev_err(&pdev->dev, "Failed to add SDIO host: %d\n", ret);
++	goto err_free_dma;
++	}
++
++	/* Force card detection after a delay */
++	mmc_detect_change(mmc, msecs_to_jiffies(500));
++
++	dev_info(&pdev->dev, "Efinix SDIO Host Controller registered (DMA: %s)\n",
++	     host->adma_desc ? "enabled" : "disabled");
++	dev_info(&pdev->dev, "SDIO caps: 0x%08x, OCR: 0x%08x\n",
++	     mmc->caps, mmc->ocr_avail);
++	dev_info(&pdev->dev, "Clock range: %u - %u Hz\n", mmc->f_min, mmc->f_max);
++	dev_info(&pdev->dev, "Max block size: %u, Max segments: %u\n",
++	     mmc->max_blk_size, mmc->max_segs);
++	dev_info(&pdev->dev,
++	     "ADMA desc table: %zu bytes, Bounce buffer: %u bytes\n",
++	     host->adma_desc_sz, host->bounce_buffer_size);
++
++	return 0;
++
++err_free_dma:
++	if (host->bounce_buffer) {
++	dma_free_coherent(&pdev->dev, host->bounce_buffer_size,
++	                 host->bounce_buffer, host->bounce_dma);
++	}
++	if (host->adma_desc) {
++	    dma_free_coherent(&pdev->dev, host->adma_desc_sz,
++            host->adma_desc, host->adma_desc_dma);
++	}
++err_clk_disable:
++	clk_disable_unprepare(host->clk);
++err_free_host:
++	mmc_free_host(mmc);
++	return ret;
++}
++
++int efx_sdio_remove(struct platform_device *pdev)
++{
++	struct mmc_host *mmc;
++	struct efx_sdio_host *host;
++
++	mmc = platform_get_drvdata(pdev);
++	host = mmc_priv(mmc);
++
++	mmc_remove_host(mmc);
++
++	/* Cancel any pending delayed work */
++	//SA cancel_delayed_work_sync(&host->hs400_retune_work);
++
++	/* Disable interrupts */
++	efx_sdio_writel(host, 0, EFX_SDIO_INT_SIGNAL_EN);
++	efx_sdio_writel(host, 0, EFX_SDIO_INT_STATUS_EN);
++
++	/* Reset hardware */
++	efx_sdio_reset_hw(host);
++
++	/* Free DMA resources */
++	if (host->bounce_buffer) {
++	dma_free_coherent(&pdev->dev, host->bounce_buffer_size,
++	                 host->bounce_buffer, host->bounce_dma);
++	}
++	if (host->adma_desc) {
++	dma_free_coherent(&pdev->dev, host->adma_desc_sz,
++	                 host->adma_desc, host->adma_desc_dma);
++	}
++
++	clk_disable_unprepare(host->clk);
++	mmc_free_host(mmc);
++
++    dev_info(&pdev->dev, "Efinix SDIO Host Controller removed\n");
++
++	return 0;
++}
++
++static const struct of_device_id efx_sdio_of_match[] = {
++	{ .compatible = "efinix,sdio-host-controller", },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, efx_sdio_of_match);
++
++static struct platform_driver efx_sdio_driver = {
++	.probe = efx_sdio_probe,
++	.remove = efx_sdio_remove,
++	.driver = {
++	.name = "efx-sdio",
++	.of_match_table = efx_sdio_of_match,
++	},
++};
++
++module_platform_driver(efx_sdio_driver);
++
++MODULE_DESCRIPTION("Efinix SDIO Host Controller Driver with DMA Support");
++MODULE_AUTHOR("Khor Swee Aun <sakhor@efinixinc.com>");
++MODULE_LICENSE("GPL v2");
++MODULE_VERSION("1.0");
+diff --git a/drivers/mmc/host/efx_sdio_tuning.c b/drivers/mmc/host/efx_sdio_tuning.c
+new file mode 100644
+index 000000000..4d77dd620
+--- /dev/null
++++ b/drivers/mmc/host/efx_sdio_tuning.c
+@@ -0,0 +1,588 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++/*
++ * Efinix SDIO Host Controller Tuning Support
++ *
++ * Copyright (C) 2026 Efinix, Inc.
++ * Author: Khor Swee Aun <sakhor@efinixinc.com>
++ */
++
++#include <linux/delay.h>
++#include <linux/slab.h>
++#include <linux/jiffies.h>
++#include <linux/mmc/mmc.h>
++
++#include "efx_sdio.h"
++
++/* Standard eMMC/SDIO tuning block patterns from bare metal driver */
++static const u32 tuning_block_pattern_8b_mode[] = {
++	0xff00ffff, 0x0000ffff, 0xccccffff, 0xcccc33cc,
++	0xcc3333cc, 0xffffcccc, 0xffffeeff, 0xffeeeeff,
++	0xffddffff, 0xddddffff, 0xbbffffff, 0xbbffffff,
++	0xffffffbb, 0xffffff77, 0x77ff7777, 0xffeeddbb,
++	0x00ffffff, 0x00ffffff, 0xccffff00, 0xcc33cccc,
++	0x3333cccc, 0xffcccccc, 0xffeeffff, 0xeeeeffff,
++	0xddffffff, 0xddffffff, 0xffffffdd, 0xffffffbb,
++	0xffffbbbb, 0xffff77ff, 0xff7777ff, 0xeeddbb77
++};
++
++static const u32 tuning_block_pattern_4b_mode[] = {
++	0x00ff0fff, 0xccc3ccff, 0xffcc3cc3, 0xeffefffe,
++	0xddffdfff, 0xfbfffbff, 0xff7fffbf, 0xefbdf777,
++	0xf0fff0ff, 0x3cccfc0f, 0xcfcc33cc, 0xeeffefff,
++	0xfdfffdff, 0xffbfffdf, 0xfff7ffbb, 0xde7b7ff7
++};
++
++void efx_sdio_set_timing_config(struct efx_sdio_host *host,
++				 u32 sample_count, u32 pll_shift)
++{
++	u32 config_value;
++
++	/* Build timing configuration: sample_count[31:16] | pll_shift[8:6] */
++	config_value = (sample_count << 16) | (pll_shift << 6);
++
++	/* Apply timing configuration with hardware trigger sequence:
++	 * 1. Write config with trigger bit clear (bit 0 = 0)
++	 * 2. Write config with trigger bit set (bit 0 = 1) to latch settings
++	 */
++	efx_sdio_writel(host, config_value | 0x0, EFX_SDIO_BASE_REG1);
++	efx_sdio_writel(host, config_value | 0x1, EFX_SDIO_BASE_REG1);
++	efx_sdio_writel(host, config_value | 0x0, EFX_SDIO_BASE_REG1);
++
++	/* Wait for PLL settling */
++	udelay(100); /* 100us is sufficient for PLL settling */
++}
++
++/* Execute custom tuning command for SDR12, SDR25 and DDR50 modes
++ * Reminder : This function is called with host lock held
++ */
++int efx_sdio_execute_custom_tuning_command(struct efx_sdio_host *host, int bus_width)
++{
++	u32 block_size, command_config, word_count;
++	//const u32 *reference_pattern;
++	u32 received_data;
++	int i, mismatches = 0;
++	unsigned long timeout;
++	u32 tuning_present_state;
++    unsigned long flags;
++    u32 reg_addr = 0x0;
++
++    // Reset CRC error flag at start of tuning command
++    host->tuning_crc_error = false;
++
++	/* Determine block size and reference pattern based on bus width */
++    block_size = 16;
++    word_count = block_size/4;
++    //reference_pattern = NULL;
++
++    /* Configure arguments for CMD53
++    [31]     R/W flag = 0
++    [30:28]  Function number = 0
++    [27]     Block mode = 0
++    [26]     OP code (fixed/increment) = 1
++    [25:9]   Register address = reg_addr
++    [8:0]    Byte count / block count = 16 (byte)
++    */
++    u32 arg = 0;
++    arg |= ( 1 << 26 | reg_addr << 9 | 16 );
++    efx_sdio_writel(host, arg, EFX_SDIO_ARG1);
++
++	/* Byte mode
++     For byte mode, block size is set to the byte count and block count is set to 1
++     Might not neeeded as this is a byte mode transfer
++    */
++	efx_sdio_writel(host, (1 << 16) | block_size, EFX_SDIO_BLOCK_SIZE);
++
++
++    /* Configure command based on single or multi-block transfer */
++    u32 val                 = 0;
++    u32 cmd_index           = 53;   // READ_SINGLE_BLOCK command
++    u32 data_available      = 1;    // Data transfer expected
++    u32 cmd_index_check_en  = 1;    // Enable command index check
++    u32 cmd_crc_en          = 1;    // Enable command CRC check
++    u32 resp_type           = 2;    // R1 response type (48-bit)
++    u32 data_direction      = 1;    // Read from card
++    u32 auto_cmd_en         = 0;    // No auto command
++    u32 multi_block_en      = 0;    // Single block transfer
++    u32 block_counter_en    = 0;    // Block counter disabled
++    u32 dma_mode            = 0;    // DMA mode disabled
++
++    /* Build command register value from configuration bits */
++    val = (cmd_index << 24) | (data_available << 21) | (cmd_index_check_en << 20) |
++          (cmd_crc_en << 19) | (resp_type << 16) | (multi_block_en << 5) |
++          (data_direction << 4) | (auto_cmd_en << 2) | (block_counter_en << 1) | (dma_mode << 0);
++
++	efx_sdio_writel(host, val, EFX_SDIO_TRANSFER_MODE);
++
++	/* Wait for buffer ready with timeout */
++	timeout = jiffies + msecs_to_jiffies(5);
++
++	do {
++        tuning_present_state = efx_sdio_readl(host, EFX_SDIO_PRESENT_STATE);
++        if (tuning_present_state & EFX_SDIO_BUFFER_READ_EN) {
++            break;
++        }
++
++        if (time_after(jiffies, timeout)) {
++            dev_dbg(&host->pdev->dev, "Custom tuning command timeout after 5ms\n");
++            return 0; /* Failure */
++        }
++
++        cpu_relax();
++	} while (1);
++
++	/* Read custom tuning data */
++	for (i = 0; i < word_count; i++) {
++        received_data = efx_sdio_readl(host, EFX_SDIO_BUFFER_DATA_PORT);
++        /* Print received data for debugging */
++        dev_dbg(&host->pdev->dev, "Received custom tuning data word %d: 0x%08x\n", i, received_data);
++	}
++
++    /* Delay 1ms */
++    udelay(1000);
++    if (host->tuning_crc_error) {
++        dev_dbg(&host->pdev->dev,
++            "Custom tuning command CRC error detected\n");
++        host->tuning_crc_error = false; /* Reset CRC error flag after handling */
++        return 0; /* Failure due to CRC error */
++    }
++    return 1; /* Success */ 
++}
++
++int efx_sdio_execute_tuning_command(struct efx_sdio_host *host, int bus_width)
++{
++	u32 block_size, command_config, word_count;
++	const u32 *reference_pattern;
++	u32 received_data;
++	int i, mismatches = 0;
++	unsigned long timeout;
++	u32 tuning_present_state;
++    unsigned long flags;
++
++	/* Determine block size and reference pattern based on bus width */
++	if (bus_width == 8) {
++	block_size = EFX_SDIO_TUNING_BLOCK_SIZE_8BIT;
++	word_count = 32;
++	reference_pattern = tuning_block_pattern_8b_mode;
++	} else {
++	block_size = EFX_SDIO_TUNING_BLOCK_SIZE_4BIT;
++	word_count = 16;
++	reference_pattern = tuning_block_pattern_4b_mode;
++	}
++
++	/* Configure command parameters for CMD19 */
++	efx_sdio_writel(host, (1 << 16) | block_size, EFX_SDIO_BLOCK_SIZE);
++	efx_sdio_writel(host, 0x0, EFX_SDIO_ARG1);
++
++	/* Issue CMD19 tuning command with specific configuration */
++	/* CMD19 (index=19), data present, CRC check, 48-bit response */
++    // 
++	command_config = 0x133A0010;
++    spin_lock_irqsave(&host->lock, flags);
++    host->tuning_crc_error = false; // Reset CRC error flag at start of tuning command
++    spin_unlock_irqrestore(&host->lock, flags);
++	efx_sdio_writel(host, command_config, EFX_SDIO_TRANSFER_MODE);
++
++	/* Wait for buffer ready with timeout */
++	timeout = jiffies + msecs_to_jiffies(5);
++
++	do {
++	tuning_present_state = efx_sdio_readl(host, EFX_SDIO_PRESENT_STATE);
++	if (tuning_present_state & EFX_SDIO_BUFFER_READ_EN) {
++	    break;
++	}
++
++	if (time_after(jiffies, timeout)) {
++	    dev_dbg(&host->pdev->dev, "Tuning command timeout after 5ms\n");
++	    return 0; /* Failure */
++	}
++
++	cpu_relax();
++	} while (1);
++
++	/* Read tuning data and compare against expected pattern */
++	for (i = 0; i < word_count; i++) {
++
++        received_data = efx_sdio_readl(host, EFX_SDIO_BUFFER_DATA_PORT);
++        /* Compare against standard pattern */
++        if (received_data != reference_pattern[i]) {
++            mismatches++;
++            dev_dbg(&host->pdev->dev,
++                "Tuning data mismatch at word %d: got 0x%08x, expected 0x%08x\n",
++                i, received_data, reference_pattern[i]);
++        }
++	}
++
++    udelay(1000);
++    if (host->tuning_crc_error) {
++        dev_dbg(&host->pdev->dev,
++            "Tuning command CRC error detected\n");
++        host->tuning_crc_error = false; /* Reset CRC error flag after handling */
++        return 0; /* Failure due to CRC error */
++    }
++
++	/* Allow up to 2 mismatches due to electrical noise during tuning */
++    // SDIO: change to 0 mismatches for stricter tuning
++	if (mismatches == 0) {
++	    return 1; /* Success */
++	} else {
++	    dev_dbg(&host->pdev->dev, "Too many mismatches: %d\n", mismatches);
++	    return 0; /* Failure */
++	}
++}
++
++static int efx_sdio_find_longest_consecutive_ones(u8 *row, int length)
++{
++	int max_len, current_len, i;
++
++	max_len = 0;
++	current_len = 0;
++
++	for (i = 0; i < length; i++) {
++	if (row[i] == 1) {
++	    current_len++;
++	    if (current_len > max_len) {
++	        max_len = current_len;
++	    }
++	} else {
++	    current_len = 0;
++	}
++	}
++
++	return max_len;
++}
++
++static int efx_sdio_find_center_of_consecutive_ones(u8 *row, int length)
++{
++	int max_len, current_len, max_start, current_start, center, i;
++
++	max_len = 0;
++	current_len = 0;
++	max_start = 0;
++	current_start = 0;
++
++	for (i = 0; i < length; i++) {
++	if (row[i] == 1) {
++	    if (current_len == 0) {
++	        current_start = i;
++	    }
++	    current_len++;
++	    if (current_len > max_len) {
++	        max_len = current_len;
++	        max_start = current_start;
++	    }
++	} else {
++	    current_len = 0;
++	}
++	}
++
++	/* Return center of longest consecutive sequence */
++	center = max_start + (max_len / 2);
++	return center;
++}
++
++int efx_sdio_find_optimal_timing(struct efx_sdio_host *host,
++				  u8 result_map[][EFX_SDIO_MAX_PLL_SHIFT],
++				  u32 max_sample_count)
++{
++	int max_consecutive_length, row_length, optimal_sample_count,
++	optimal_pll_shift;
++	int *optimal_rows;
++	int optimal_row_count, center_row, i;
++	char optimal_row_str[32];
++
++	optimal_rows = kmalloc(max_sample_count * sizeof(int), GFP_KERNEL);
++	if (!optimal_rows) {
++	return -ENOMEM;
++	}
++
++	/* Find rows with longest consecutive 1's */
++	dev_dbg(&host->pdev->dev, "Analyzing timing results\n");
++	max_consecutive_length = 0;
++	for (i = 0; i < max_sample_count; i++) {
++	row_length = efx_sdio_find_longest_consecutive_ones(result_map[i],
++							     EFX_SDIO_MAX_PLL_SHIFT);
++	dev_dbg(&host->pdev->dev, "Sample[%u]: consecutive_length=%d\n",
++			i, row_length);
++	if (row_length > max_consecutive_length) {
++	    dev_dbg(&host->pdev->dev,
++			    "New best: Sample[%u] length=%d\n",
++			    i, row_length);
++	    max_consecutive_length = row_length;
++	}
++	}
++	dev_dbg(&host->pdev->dev, "Best consecutive length: %d\n",
++	     max_consecutive_length);
++
++
++	if (max_consecutive_length < EFX_SDIO_MIN_TIMING_MARGIN) {
++	dev_warn(&host->pdev->dev,
++			  "Insufficient timing margin: %d (minimum %d)\n",
++	        max_consecutive_length, EFX_SDIO_MIN_TIMING_MARGIN);
++	}
++
++	/* Collect all rows with maximum consecutive length */
++	optimal_row_count = 0;
++	for (i = 0; i < max_sample_count; i++) {
++	if (efx_sdio_find_longest_consecutive_ones(result_map[i],
++							     EFX_SDIO_MAX_PLL_SHIFT) ==
++	    max_consecutive_length) {
++	    optimal_rows[optimal_row_count++] = i;
++	}
++	}
++
++	if (optimal_row_count == 0) {
++	kfree(optimal_rows);
++	return -ENODEV; /* No valid configurations found */
++	}
++
++	/* Find center row */
++	center_row = optimal_row_count / 2;
++	optimal_sample_count = optimal_rows[center_row];
++
++	/* Find center column within optimal row */
++	dev_dbg(&host->pdev->dev,
++	     "Selected sample_count=%d from %d optimal rows\n",
++	     optimal_sample_count, optimal_row_count);
++
++	/* Debug: Show the row being analyzed for center calculation */
++	optimal_row_str[0] = '\0';
++	for (i = 0; i < EFX_SDIO_MAX_PLL_SHIFT; i++) {
++	sprintf(optimal_row_str + strlen(optimal_row_str), "%d",
++		result_map[optimal_sample_count][i]);
++	}
++	dev_dbg(&host->pdev->dev,
++	     "Analyzing row[%d]: [%s] for center calculation\n",
++	     optimal_sample_count, optimal_row_str);
++
++	optimal_pll_shift =
++	efx_sdio_find_center_of_consecutive_ones(result_map[optimal_sample_count],
++						   EFX_SDIO_MAX_PLL_SHIFT);
++
++	dev_dbg(&host->pdev->dev,
++	     "Center PLL calculation result: pll_shift=%d\n",
++	     optimal_pll_shift);
++
++	/* Store optimal configuration */
++	host->optimal_sample_count = optimal_sample_count;
++	host->optimal_pll_shift = optimal_pll_shift;
++	host->optimal_margin = max_consecutive_length;
++
++	dev_dbg(&host->pdev->dev,
++	     "Optimal timing found: sample_count=%u, pll_shift=%u, margin=%d\n",
++	     optimal_sample_count, optimal_pll_shift, max_consecutive_length);
++
++	kfree(optimal_rows);
++	return 0;
++}
++
++/* Execute tuning procedure for given opcode
++ * Reminder: For custom tuning, this function is called with host lock released
++ */
++int efx_sdio_execute_tuning(struct mmc_host *mmc, u32 opcode)
++{
++	struct efx_sdio_host *host;
++	u32 max_sample_count, sample_count, pll_shift;
++	int bus_width, success, ret;
++	unsigned long flags, timeout;
++	u8 (*tuning_result_map)[EFX_SDIO_MAX_PLL_SHIFT];
++    u32 tuning_loop = 10;
++
++	host = mmc_priv(mmc);
++
++	/* Set tuning in progress flag to suppress error logging */
++	host->tuning_in_progress = true;
++
++	dev_dbg(&host->pdev->dev, "Starting tuning: timing=%u, clock=%u Hz\n",
++	     mmc->ios.timing, mmc->ios.clock);
++
++	/* Skip tuning if already tuned for current mode */
++	if (host->prev_timing == mmc->ios.timing && host->tuning_done) {
++        dev_dbg(&host->pdev->dev,
++                "Tuning skipped: already tuned for timing=%u (sample=%u, pll=%u)\n",
++                mmc->ios.timing, host->optimal_sample_count,
++                host->optimal_pll_shift);
++        return 0;
++	}
++
++    /* Validate SDIO tuning opcode
++     * MMC_SEND_TUNING_BLOCK or UINT_MAX for custom tuning
++     */
++	if (opcode != MMC_SEND_TUNING_BLOCK && opcode != UINT_MAX) {
++	dev_err(&host->pdev->dev, "Unsupported tuning opcode: %u\n", opcode);
++	return -EINVAL;
++	}
++
++    /* Valid bus widths is 4-bit */
++    if (mmc->ios.bus_width != MMC_BUS_WIDTH_4) {
++        dev_warn(&host->pdev->dev,
++                 "UHS-I Tuning only supported for 4-bit bus width, current width=%d\n",
++                 mmc->ios.bus_width);
++        return -EINVAL;
++    }
++	bus_width = 4;
++
++	/* max_sample_count should match clk_div - sample count can't exceed
++	 * clock divider
++	 */
++	/* Use actual clock divider */
++	max_sample_count = host->clk_div ? host->clk_div : 1;
++
++	dev_dbg(&host->pdev->dev,
++	     "Starting tuning algorithm (bus_width=%d, max_sample=%u)\n",
++	     bus_width, max_sample_count);
++
++	/* Dynamically allocate tuning result map */
++	tuning_result_map = kmalloc(max_sample_count *
++				sizeof(u8[EFX_SDIO_MAX_PLL_SHIFT]),
++				GFP_KERNEL);
++	if (!tuning_result_map) {
++	dev_err(&host->pdev->dev, "Failed to allocate tuning result map\n");
++	return -ENOMEM;
++	}
++
++    // Init entire map to 1
++    memset(tuning_result_map, 1,
++    max_sample_count * sizeof(u8[EFX_SDIO_MAX_PLL_SHIFT]));
++
++	dev_dbg(&host->pdev->dev, "Using clk_div=%u for sample count\n",
++	     max_sample_count);
++
++	/* Set tuning timeout to 10 seconds */
++	timeout = jiffies + msecs_to_jiffies(10000);
++
++    /* Tuning loop */
++    for (tuning_loop = 0; tuning_loop < 10; tuning_loop++) {
++        dev_dbg(&host->pdev->dev, "Tuning loop %d:\n", tuning_loop + 1);
++        /* Phase 2: Timing configuration search */
++        dev_dbg(&host->pdev->dev, "Testing %d samples × %d PLL positions\n",
++            max_sample_count, EFX_SDIO_MAX_PLL_SHIFT);
++
++        for (sample_count = 0; sample_count < max_sample_count; sample_count++) {
++        
++            int consecutive_passes = 0;
++            for (pll_shift = 0; pll_shift < EFX_SDIO_MAX_PLL_SHIFT; pll_shift++) {
++
++                dev_dbg(&host->pdev->dev,
++                    "Tuning loop %d: Testing sample_count=%u, pll_shift=%u\n",
++                    tuning_loop + 1, sample_count, pll_shift);
++
++                /* Apply timing configuration */
++                efx_sdio_set_timing_config(host, sample_count, pll_shift);
++
++                /* Execute validation test */
++                if (opcode == MMC_SEND_TUNING_BLOCK) {
++                    success = efx_sdio_execute_tuning_command(host, bus_width);
++                } else {
++                    /* Custom tuning - implement specific test if needed */
++                    success = efx_sdio_execute_custom_tuning_command(host, bus_width);
++                }
++
++                /* Update result map */
++                if (!success) {
++                    dev_dbg(&host->pdev->dev,
++                        "Tuning [%u][%u]: FAIL\n",
++                        sample_count, pll_shift);
++
++                    // Only update the unsuccessful result
++                    tuning_result_map[sample_count][pll_shift] = 0;
++                    consecutive_passes = 0;
++                } else {
++                    //SA tuning_result_map[sample_count][pll_shift] = 1;
++                    consecutive_passes++;
++                }
++
++                dev_dbg(&host->pdev->dev,
++                    "Tuning [%u][%u]: %s (consecutive: %d)\n",
++                    sample_count, pll_shift, success ? "PASS" : "FAIL",
++                    consecutive_passes);
++
++                /* Check timeout */
++                if (time_after(jiffies, timeout)) {
++                    dev_warn(&host->pdev->dev, "Tuning timeout after 10 seconds\n");
++                    goto find_optimal;
++                }
++            }
++        }
++    }
++
++find_optimal:
++
++	/* Print timing map results - only for new timing modes */
++	if (!test_bit(mmc->ios.timing, &host->tuned_timing_modes)) {
++        dev_info(&host->pdev->dev, "Tuning result map:\n");
++        for (sample_count = 0; sample_count < max_sample_count;
++            sample_count++) {
++            char row_str[32] = "";
++            for (pll_shift = 0; pll_shift < EFX_SDIO_MAX_PLL_SHIFT;
++            pll_shift++) {
++                sprintf(row_str + strlen(row_str), "%d",
++                tuning_result_map[sample_count][pll_shift]);
++            }
++            dev_info(&host->pdev->dev, "Sample[%u]: [%s]\n",
++                sample_count, row_str);
++        }
++	}
++
++	/* Phase 4: Find optimal timing configuration using dynamic map */
++	ret = efx_sdio_find_optimal_timing(host, tuning_result_map,
++					max_sample_count);
++	if (ret == 0) {
++        /* Use optimal timing found by tuning algorithm */
++        efx_sdio_set_timing_config(host, host->optimal_sample_count,
++                    host->optimal_pll_shift);
++
++        /* Show detailed results only for new timing modes */
++        if (!test_bit(mmc->ios.timing, &host->tuned_timing_modes)) {
++            dev_info(&host->pdev->dev,
++                "Tuning completed: sample=%u, pll=%u, margin=%u\n",
++                    host->optimal_sample_count, host->optimal_pll_shift,
++                    host->optimal_margin);
++        } else {
++            dev_info(&host->pdev->dev,
++                "Tuning reconfirmed: sample=%u, pll=%u\n",
++                    host->optimal_sample_count, host->optimal_pll_shift);
++        }
++
++        host->tuning_done = true;
++        /* Mark this timing mode as successfully tuned */
++        set_bit(mmc->ios.timing, &host->tuned_timing_modes);
++	} else {
++        /* Fallback to safe timing configuration */
++        dev_warn(&host->pdev->dev,
++                "Tuning failed: %d, using fallback configuration\n",
++                ret);
++        if (max_sample_count == 1) {
++            efx_sdio_set_timing_config(host, 0, 2); /* Safe for 200MHz */
++            host->optimal_sample_count = 0;
++            host->optimal_pll_shift = 2;
++        } else {
++            /* Conservative default timing */
++            efx_sdio_set_timing_config(host, 1, 1);
++            host->optimal_sample_count = 1;
++            host->optimal_pll_shift = 1;
++        }
++        host->tuning_done = true; /* Mark as done to prevent retry loops */
++        /* Mark this timing mode as successfully tuned (fallback) */
++        set_bit(mmc->ios.timing, &host->tuned_timing_modes);
++        ret = 0; /* Return success to allow operation to continue */
++    }
++
++    /* Update previous timing for reference */
++	spin_lock_irqsave(&host->lock, flags);
++	host->prev_timing = mmc->ios.timing;
++	spin_unlock_irqrestore(&host->lock, flags);
++
++	/* Free dynamically allocated tuning result map */
++	kfree(tuning_result_map);
++
++	/* Clear tuning in progress flag */
++	host->tuning_in_progress = false;
++
++	if (ret == 0) {
++	dev_dbg(&host->pdev->dev, "Tuning completed successfully\n");
++	} else {
++	dev_err(&host->pdev->dev, "Tuning failed: %d\n", ret);
++	}
++
++	return ret;
++}
+-- 
+2.25.1
+
