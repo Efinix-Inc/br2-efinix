@@ -235,6 +235,10 @@ function check_soc_configuration()
 				#define SYSTEM_AXI_SLAVE_3_io_CTRL_SIZE 0x10000
 				#define SYSTEM_AXI_SLAVE_4_IO_CTRL 0xe9300000
 				#define SYSTEM_AXI_SLAVE_4_IO_CTRL_SIZE 0x10000
+				#define SYSTEM_AXI_SLAVE_5_IO_CTRL 0xe9400000
+				#define SYSTEM_AXI_SLAVE_5_IO_CTRL_SIZE 0x10000
+				#define SYSTEM_AXI_SLAVE_6_IO_CTRL 0xe9500000
+				#define SYSTEM_AXI_SLAVE_6_IO_CTRL_SIZE 0x10000
 				#define SYSTEM_AXI_A_BMB 0xe8000000
 				#define SYSTEM_AXI_A_BMB_SIZE 0x1000000
 				#define SYSTEM_AXI_B_BMB 0xe9000000
@@ -245,6 +249,10 @@ function check_soc_configuration()
 				#define SYSTEM_AXI_D_BMB_SIZE 0x10000
 				#define SYSTEM_AXI_E_BMB 0xe9300000
 				#define SYSTEM_AXI_E_BMB_SIZE 0x10000
+				#define SYSTEM_AXI_F_BMB 0xe9400000
+				#define SYSTEM_AXI_F_BMB_SIZE 0x10000
+				#define SYSTEM_AXI_G_BMB 0xe9500000
+				#define SYSTEM_AXI_G_BMB_SIZE 0x10000
 				EOF
 			fi
 		elif [ $BOARD = "ti180j484" ]; then
@@ -411,6 +419,9 @@ function generate_device_tree() {
 				;;
 			emmc)
 				add_board_cfg cmd "$generic_dir/emmc.json" "$override_dir" "$override_board_dir" "emmc.json"
+				;;
+			sdio)
+				add_board_cfg cmd "$generic_dir/sdio.json" "$override_dir" "$override_board_dir" "sdio.json"
 				;;
 			spi)
 				if ! contains_feature "sdhc"; then
@@ -642,6 +653,9 @@ function set_kernel_config()
 			emmc)
 				br2_linux_kernel_cfg+=" $kernel_frag_dir/emmc.config"
 				;;
+			sdio)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/sdio.config"
+				;;
 			esac
 		done
 	fi
@@ -665,6 +679,11 @@ function add_packages()
 		pr_info "Append ${BR2_DEFCONFIG_DIR}/evsoc_fragment"
 		grep -q EVSOC ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
 		cat ${BR2_DEFCONFIG_DIR}/evsoc_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
+
+		pr_info "Append ${BR2_DEFCONFIG_DIR}/wifi_fragment"
+		grep -q WIFI ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
+		cat ${BR2_DEFCONFIG_DIR}/wifi_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
+
 	fi
 
         if [ $X11_GRAPHICS ]; then
@@ -728,7 +747,7 @@ function parser()
 				UNIFIED_HW=1
 				EXTRA_HW_FEATURES="sdhc,ethernet,evsoc,"
 				if [ $BOARD = "ti375c529" ]; then
-					EXTRA_HW_FEATURES+="emmc,"
+					EXTRA_HW_FEATURES+="emmc,sdio,"
 					USE_EMMC_BOOT=1
 				fi
 				;;
@@ -740,7 +759,7 @@ function parser()
 					X11_GRAPHICS=1
 					EXTRA_HW_FEATURES="sdhc,ethernet,fb,dma,usb,"
 					if [ $BOARD = "ti375c529" ]; then
-						EXTRA_HW_FEATURES="sdhc,ethernet,fb,dma,usb,emmc,"
+						EXTRA_HW_FEATURES="sdhc,ethernet,fb,dma,usb,emmc,sdio,"
 					fi
 				else
 					pr_err "-x option requires -u to be set first."
