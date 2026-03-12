@@ -1,4 +1,4 @@
-From bc8fcb159e6fc08430a7c83eefcac3a02fd271f1 Mon Sep 17 00:00:00 2001
+From a4a4e30a8d09e7d251f261d17017779da2463abb Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Mon, 23 Jun 2025 23:45:52 +0800
 Subject: [PATCH] board/vexriscv: add support for saxon vexriscv board
@@ -10,8 +10,8 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
  board/vexriscv/saxon/Kconfig  |  27 +++++++++
  board/vexriscv/saxon/Makefile |   5 ++
  board/vexriscv/saxon/saxon.c  | 100 ++++++++++++++++++++++++++++++++++
- include/configs/saxon.h       |  56 +++++++++++++++++++
- 6 files changed, 192 insertions(+)
+ include/configs/saxon.h       |  79 +++++++++++++++++++++++++++
+ 6 files changed, 215 insertions(+)
  create mode 100644 board/vexriscv/saxon/Kconfig
  create mode 100644 board/vexriscv/saxon/Makefile
  create mode 100644 board/vexriscv/saxon/saxon.c
@@ -202,10 +202,10 @@ index 00000000000..a6b0e03e469
 +#endif /* CONFIG_SPL_BUILD */
 diff --git a/include/configs/saxon.h b/include/configs/saxon.h
 new file mode 100644
-index 00000000000..2bb77cd8e9d
+index 00000000000..399b9dcfca1
 --- /dev/null
 +++ b/include/configs/saxon.h
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,79 @@
 +/* SPDX-License-Identifier: GPL-2.0+ */
 +/*
 + * Copyright (C) 2019 roman3017 <rbacik@hotmail.com>
@@ -217,32 +217,55 @@ index 00000000000..2bb77cd8e9d
 +
 +#include <linux/sizes.h>
 +
-+/* DRAM window (matches bdinfo): 0x0040_0000 .. 0x3FFF_FFFF (≈1020 MiB)  */
-+#define CONFIG_SYS_SDRAM_BASE	0x00400000UL
-+#define CONFIG_SYS_SDRAM_SIZE	0x3FC00000UL   /* 1020 MiB */
++#ifdef CONFIG_64BIT
++    #define CONFIG_SYS_SDRAM_BASE	0x800000000UL
++#else
++    #define CONFIG_SYS_SDRAM_BASE	0x00400000UL
++#endif
 +
-+/* Default load address for images (kernel/FIT/DTB) — keep low in DRAM */
-+//#define CONFIG_SYS_LOAD_ADDR	0x00400000UL
++#define CONFIG_SYS_SDRAM_SIZE	0x40000000UL   /* 1 GB */
 +
-+/* Initial stack and malloc must live in DRAM — do NOT tie to LOAD_ADDR */
++/* Initial stack and malloc must live in DRAM — do NOT tie to LOAD_ADDR.
++ * Choose a small DRAM window for early stack/GD, far from U-Boot image.
++   U-Boot starts at 0x801040000. Let's use DRAM + 2 MiB as a safe cushion. */
++#ifdef __ASSEMBLY__
++# define CFG_SYS_INIT_RAM_ADDR   (CONFIG_SYS_SDRAM_BASE + 0x00200000)
++# define CFG_SYS_INIT_RAM_SIZE   0x00010000                  /* 64 KiB */
++#else
++# define CFG_SYS_INIT_RAM_ADDR   (CONFIG_SYS_SDRAM_BASE + 0x00200000ULL)
++# define CFG_SYS_INIT_RAM_SIZE   0x00010000ULL
++#endif
 +
-+/* Small on-chip SRAM (if present) for very early use; otherwise keep minimal */
-+#define CFG_SYS_INIT_RAM_ADDR        0x00f90000UL  /* optional, if you really have SRAM here */
-+#define CFG_SYS_INIT_RAM_SIZE        0x00004000UL   /* 16 KiB */
++/* Optional but common: set where GD will sit in that window.
++   GENERATED_GBL_DATA_SIZE is provided by U-Boot build. */
++#define CFG_SYS_INIT_GD_ADDR (CFG_SYS_INIT_RAM_ADDR + CFG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
++
++/* ---- Early malloc (malloc_simple) for U-Boot proper ---- */
++/* Put the pre-relocation malloc pool in DRAM, away from text and BSS */
++#undef CONFIG_SYS_MALLOC_LEN
++#define CONFIG_SYS_MALLOC_LEN         (SZ_8M)                 /* regular malloc after relocation */
++#undef CONFIG_SYS_MALLOC_F_LEN
++#define CONFIG_SYS_MALLOC_F_LEN       (SZ_1M)                 /* early malloc pool size */
++#define CONFIG_MALLOC_F_ADDR          (CONFIG_SYS_SDRAM_BASE + 0x00200000) /* 2 MiB offset into DRAM */
 +
 +/* Place the initial SP near the top of DRAM (below reserved/LMB cushion) */
 +#undef  CONFIG_SYS_INIT_SP_ADDR
 +#define CONFIG_SYS_INIT_SP_ADDR (CONFIG_SYS_SDRAM_BASE + CONFIG_SYS_SDRAM_SIZE - 0x10000UL)
 +
 +/* Environment defaults */
-+#define CONFIG_EXTRA_ENV_SETTINGS "initrd_high=0xffffffff\0" \
-+                                  "fdt_high=0xffffffff\0"
++#define CONFIG_EXTRA_ENV_SETTINGS "initrd_high=0xffffffffffffffff\0" \
++                                  "fdt_high=0xffffffffffffffff\0"
 +
 +/* SPL section — keep everything inside DRAM (DRAM starts at 0x0040_0000) */
 +#ifdef CONFIG_SPL_BUILD
 +/* Scratch RAM and sizes for SPL */
-+#define CONFIG_SYS_SPL_RAM_BASE		0x02000000UL     /* 32 MiB region in DRAM */
-+#define CONFIG_SYS_SPL_RAM_SIZE		(SZ_8M)/* 8 MiB scratch */
++#define CONFIG_SYS_SPL_RAM_BASE		CONFIG_SYS_SDRAM_BASE     /* 32 MiB region in DRAM */
++#define CONFIG_SYS_SPL_RAM_SIZE		(SZ_8M) /* 8 MiB scratch */
++
++/* SPL runs in DRAM on platform: place its early malloc pool in that region */
++#define CONFIG_SPL_SYS_MALLOC_SIMPLE          /* make sure simple malloc is enabled in SPL */
++#define CONFIG_SPL_SYS_MALLOC_F_LEN   (SZ_256K)
++#define CONFIG_SPL_MALLOC_F_ADDR      (CONFIG_SYS_SPL_RAM_BASE + 0x00100000) /* inside your SPL RAM window */
 +
 +/* SPL .bss placement - keep inside DRAM */
 +#define CONFIG_SPL_MAX_SIZE		CONFIG_SPL_SIZE_LIMIT
@@ -254,8 +277,8 @@ index 00000000000..2bb77cd8e9d
 +#define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION 1
 +
 +/* Arguments/Kernel handoff buffer (in DRAM) */
-+#define CONFIG_SYS_SPL_ARGS_ADDR 0x02047000UL
-+#define CONFIG_SYS_SPL_KERNEL_ADDR 0x02048000UL
++#define CONFIG_SYS_SPL_ARGS_ADDR	(CONFIG_SYS_TEXT_BASE + 7000UL)
++#define CONFIG_SYS_SPL_KERNEL_ADDR	(CONFIG_SYS_TEXT_BASE + 8000UL)
 +
 +/* Filename for SPL filesystem loaders */
 +#define CONFIG_SPL_FS_LOAD_ARGS_NAME "dtb"

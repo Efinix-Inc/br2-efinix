@@ -1,2 +1,8 @@
 # 32-bit specific: Disable compressed extension
 # CONFIG_RISCV_ISA_C is not set
+
+CONFIG_TEXT_BASE=0x2040000
+CONFIG_SYS_TEXT_BASE=0x02040000
+CONFIG_DEBUG_UART_BASE=0xF8010000
+
+CONFIG_BOOTCOMMAND="setenv kernel_addr_r 0x08000000;setenv fdt_addr_r 0x09000000;setenv fdt_high 0xffffffffffffffff;fatload mmc 0:1 ${kernel_addr_r} Image;fatload mmc 0:1 ${fdt_addr_r} linux.dtb;booti ${kernel_addr_r} - ${fdt_addr_r}"
