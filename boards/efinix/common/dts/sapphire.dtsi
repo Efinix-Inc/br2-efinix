@@ -1,125 +1,142 @@
+
 /dts-v1/;
 
-//include "dt-bindings/interrupt-controller/irq.h"
-//include "dt-bindings/gpio/gpio.h"
-
 / {
-    #address-cells = <0x1>;
-    #size-cells = <0x1>;
-    compatible = "spinal,vexriscv";
-    model = "spinal,vexriscv_saxon";
+	#address-cells = <2>;
+	#size-cells = <2>;
+	
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		timebase-frequency = <50000000>;
+		
+		cpu0: cpu@0 {
+			reg = <0x0>;
+			compatible = "riscv";
+			device_type = "cpu";
+			riscv,isa = "rv64imacfd_zicsr_zifencei";
+			board = "Ti375C529 Development Board";
+			mmu_type = "riscv,sv39";
+			i-cache-size = <8192>;
+			i-cache-sets = <2>;
+			i-cache-block-size = <64>;
+			d-cache-size = <8192>;
+			d-cache-sets = <2>;
+			d-cache-block-size = <64>;
+			l2-cache-ways = <8>;
+			l2-cache-size = <131072>;
+			tlb-split;
+			status = "okay";
+			
+			intc0: interrupt-controller {
+				#interrupt-cells = <1>;
+				interrupt-controller;
+				compatible = "riscv,cpu-intc";
+			};
+		};
+		
+	};
+	
 
-    chosen {
-    };
-
-    cpus {
-        #address-cells = <0x1>;
-        #size-cells = <0x0>;
-        cpu@0 {
-            device_type = "cpu";
-            compatible = "riscv";
-            riscv,isa = "rv32imafd";
-            mmu-type = "riscv,sv32";
-            reg = <0>;
-            status = "okay";
-            i-cache-block-size = <32>;
-            i-cache-size = <0x1000>;
-            i-cache-sets = <1>;
-            d-cache-block-size = <32>;
-            d-cache-size = <0x1000>;
-            d-cache-sets = <1>;
-            tlb-split;
-            L0: interrupt-controller {
-                #interrupt-cells = <0x00000001>;
-                interrupt-controller;
-                compatible = "riscv,cpu-intc";
-            };
-        };
-    };
-
-    clocks {
-        compatible = "simple-bus";
-        #address-cells = <1>;
-        #size-cells = <0>;
-
-        apbA_clock: clock@1 {
-            compatible = "fixed-clock";
-            reg = <1 0>;
-            #clock-cells = <0>;
-        };
-    };
-
-    apbA@F8000000 {
-        compatible = "simple-bus";
-        #address-cells = <0x1>;
-        #size-cells = <0x1>;
-        ranges = <0x0 0xF8000000 0x01000000>;
-
-        plic: interrupt-controller@c00000 {
-            compatible = "sifive,plic-1.0.0", "sifive,fu540-c000-plic";
-            #interrupt-cells = <1>;
-            interrupt-controller;
-            interrupts-extended = <
-                &L0 11 &L0 9
-               >;
-            reg = <0x00C00000 0x400000>;
-            riscv,ndev = <32>;
-            status = "okay";
+        clock: clock@0 {
+        	compatible = "fixed-clock";
+         	device_type = "clock";
+        	clock-frequency = <50000000>;
+        	#clock-cells = <0>;
+        	status = "okay";
         };
 
-        gpioA: gpio@16000 {
-	        compatible = "spinal-lib,gpio-1.0";
-	        interrupt-parent = <&plic>;
-	        ngpio = <4>;
-	        interrupts = <12 13>;
-	        reg = <0x16000 0x1000>;
-	        gpio-controller;
-	        #gpio-cells = <2>;
-	        interrupt-controller;
-	        #interrupt-cells = <2>;
-                status = "disabled";
+
+        bmb0 {
+                #address-cells = <2>;
+                #size-cells = <2>;
+                compatible = "simple-bus";
+		ranges = <0x0 0x0 0x0 0x0 0x0 0x4000000>;
+
+                plic: plic@2400000 {
+                        #interrupt-cells = <1>;
+                        reg = <0x0 0x2400000 0x0 0x400000>;
+                        compatible = "sifive,plic-1.0.0", "sifive,fu540-c000-plic";
+                        interrupt-controller;
+                        interrupts-extended = <&intc0  11 &intc0  9>;
+                        clocks = <&clock>;
+                        clock-frequency = <50000000>;
+                        status = "disabled";
+                };
+
+                clint0: clint@2000000 {
+                        reg = <0x0 0x2000000 0x0 0x10000>;
+                        compatible = "riscv,clint0";
+                        interrupts-extended = <&intc0  3 &intc0  7>;
+                        clocks = <&clock>;
+                        clock-frequency = <50000000>;
+                        status = "disabled";
+                };
+
+		watchdog0: watchdog@3000000 {
+                        reg = <0x0 0x3000000 0x0 0x100>;
+                        compatible = "efx,efx-wdt";
+                        interrupts = <26>;
+                        interrupt-parent = <&plic>;
+                        clocks = <&clock>;
+                        clock-frequency = <50000000>;
+                        status = "disabled";
+                };
+
         };
 
-	uartA: uart@10000 {
-            compatible = "spinal-lib,uart-2.0";
-            reg = <0x10000 0x1000>;
-            clocks = <&apbA_clock 0>;
-            status = "disabled";
-        };
+        axi0 {
+                #address-cells = <2>;
+                #size-cells = <2>;
+                compatible = "simple-bus";
+                //ranges = <0x0 0x0 0x0 0x8000000 0x0 0x1000000>;
+		ranges = <0x0 0x0 0x0 0x08000000 0x0 0x2400000>;
 
-        spiA: spi@14000 {
-            compatible = "spinal-lib,spi-1.0";
-            #address-cells = <1>;
-            #size-cells = <0>;
-            reg = <0x014000 0x1000>;
-            cmd_fifo_depth = <256>;
-            rsp_fifo_depth = <256>;
-            num-cs = <1>;
-            clocks = <&apbA_clock 0>;
-            status = "disabled";
-        };
+                uart0: uart@30000 {
+                        reg = <0x0 0x30000 0x0 0x10000>;
+                        compatible = "spinal-lib,uart-2.0";
+                        interrupts = <1>;
+                        interrupt-parent = <&plic>;
+                        clocks = <&clock>;
+                        clock-frequency = <50000000>;
+                        status = "disabled";
+                };
 
-        spiB: spi@15000 {
-            compatible = "spinal-lib,spi-1.0";
-            #address-cells = <1>;
-            #size-cells = <0>;
-            reg = <0x015000 0x1000>;
-            cmd_fifo_depth = <256>;
-            rsp_fifo_depth = <256>;
-            clocks = <&apbA_clock 0>;
-            num-cs = <1>;
-            status = "disabled";
-        };
+                spi1: spi@70000 {
+                        reg = <0x0 0x70000 0x0 0x10000>;
+                        compatible = "spinal-lib,spi-1.0";
+                        clocks = <&clock>;
+                        clock-frequency = <50000000>;
+                        status = "disabled";
+                };
 
-        i2cA: i2c@17000 {
-           compatible = "spinal-lib,spi-1.0";
-            #address-cells = <1>;
-            #size-cells = <0>;
-            reg = <0x017000 0x1000>;
-            clocks = <&apbA_clock 0>;
-            status = "disabled";
-        };
+		spi0: spi@60000 {
+                        reg = <0x0 0x60000 0x0 0x10000>;
+                        compatible = "spinal-lib,spi-1.0";
+                        clocks = <&clock>;
+                        clock-frequency = <50000000>;
+                        status = "disabled";
+                };
 
-    };
+		i2c0: i2c@90000 {
+			reg = <0x0 0x90000 0x0 0x10000>;
+			compatible = "efinix,efx-i2c";
+			interrupts = <11>;
+                        interrupt-parent = <&plic>;
+                        clocks = <&clock>;
+                        clock-frequency = <100000>;
+			status = "disabled";
+		};
 
+		gpio0: gpio@e0000 {
+                        #interrupt-cells = <2>;
+			reg = <0x0 0xe0000 0x0 0x10000>;
+                        compatible = "spinal-lib,gpio-1.0";
+                        interrupts = <16 17>;
+                        interrupt-parent = <&plic>;
+                        clocks = <&clock>;
+                        clock-frequency = <50000000>;
+                        status = "disabled";
+                };
+	};
 };
