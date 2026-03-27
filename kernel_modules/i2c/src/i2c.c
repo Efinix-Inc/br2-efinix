@@ -537,10 +537,10 @@ static int efx_i2c_xfer_msg(struct efx_i2c_dev *i2c_dev, struct i2c_msg *msgs,
 	}
 
 	/*
-	 * SMBus protocol require repeated start for read operation while
-	 * I2C protocol only perform stop and start
+	 * Issue a repeated-start before each non-first message in a combined
+	 * transfer sequence.
 	 */
-	if ((num > 1) && (i2c_msg->flags & I2C_M_RD)) {
+	if ((num > 1) && !is_first) {
 		ret = efx_i2c_start(i2c_dev, i2c_msg);
 		if (ret)
 			goto i2c_terminate;
@@ -557,16 +557,14 @@ static int efx_i2c_xfer_msg(struct efx_i2c_dev *i2c_dev, struct i2c_msg *msgs,
 				goto i2c_terminate;
                 }
 
-		if (i2c_msg->count == 1) {
-			if (msgs->len > 1)
-				efx_i2c_rx_nack(i2c_dev);
-			else
-				efx_i2c_rx_ack(i2c_dev);
-		} else
-			efx_i2c_rx_ack(i2c_dev);
+		if (!(i2c_msg->flags & I2C_M_RD)) {
+			ret = efx_i2c_rx_ack(i2c_dev);
+			if (ret)
+				goto i2c_terminate;
+		}
 
 		// increase the pointer to the next buffer
-		i2c_msg->buf = ++msgs->buf;
+		i2c_msg->buf++;
 		i2c_msg->count--;
 	}
 
@@ -596,6 +594,8 @@ static int efx_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 	for (i = 0; i < num; i++) {
 		ret = efx_i2c_xfer_msg(i2c_dev, &msgs[i], num,
 				i == 0, i == (num - 1));
+		if (ret)
+			break;
 	}
 
 	return (ret < 0) ? ret : num;
