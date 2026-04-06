@@ -57,6 +57,15 @@ static struct aclint_mtimer_data mtimer = {
 #endif
 };
 
+void vex_enable_cbo(void)
+{
+    unsigned long menvcfg = csr_read(CSR_MENVCFG);
+    menvcfg |= ENVCFG_CBCFE;  // enable CBO clean/flush
+    menvcfg |= ENVCFG_CBIE_INV << ENVCFG_CBIE_SHIFT; //enable CBO invalidate
+    csr_write(CSR_MENVCFG, menvcfg);
+    sbi_printf("CBO extensions enabled in MENVCFG: 0x%lx\n", menvcfg);
+}
+
 static int vex_final_init(bool cold_boot)
 {
 	return 0;
@@ -64,6 +73,13 @@ static int vex_final_init(bool cold_boot)
 
 static int vex_early_init(bool cold_boot)
 {
+
+#if defined(__riscv_xlen) && __riscv_xlen == 64
+#if defined(SYSTEM_RISCV_ISA_EXT_ZICBOM) && SYSTEM_RISCV_ISA_EXT_ZICBOM
+	vex_enable_cbo();
+#endif
+#endif
+
 	if (!cold_boot)
 		return 0;
 

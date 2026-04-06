@@ -306,6 +306,65 @@ function check_soc_configuration()
 	fi
 	self_check "Compressed extension support ..." "$ext_c"
 
+	# ISA EXTRA configuration for ZBA, ZBB, ZBC and ZICBOM
+	ext_zba=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_ZBA | awk '{print $3}' | head -1)
+	if [ $ext_zba == 1 ]; then
+		# Enable ZBA extension flag in buildroot defconfig
+		pr_info "Enable ZBA extension in linux.config"
+		sed -i 's/CONFIG_RISCV_ISA_ZBA=n/CONFIG_RISCV_ISA_ZBA=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
+	fi
+	self_check "ZBA extension support ..." "$ext_zba"
+
+	ext_zbb=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_ZBB | awk '{print $3}' | head -1)
+	if [ $ext_zbb == 1 ]; then
+		# Enable ZBB extension flag in buildroot defconfig
+		pr_info "Enable ZBB extension in linux.config"
+		sed -i 's/CONFIG_RISCV_ISA_ZBB=n/CONFIG_RISCV_ISA_ZBB=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
+	fi
+	self_check "ZBB extension support ..." "$ext_zbb"
+
+	ext_zbs=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_ZBS | awk '{print $3}' | head -1)
+	if [ $ext_zbs == 1 ]; then
+		# Enable ZBS extension flag in buildroot defconfig
+		pr_info "Enable ZBS extension in linux.config"
+		sed -i 's/CONFIG_RISCV_ISA_ZBS=n/CONFIG_RISCV_ISA_ZBS=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
+	fi
+	self_check "ZBS extension support ..." "$ext_zbs"
+
+	ext_zicbom=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_ZICBOM | awk '{print $3}' | head -1)
+	if [ $ext_zicbom == 1 ]; then
+		# Enable ZICBOM extension flag in buildroot defconfig
+		pr_info "Enable ZICBOM extension in linux.config"
+		sed -i 's/CONFIG_RISCV_ISA_ZICBOM=n/CONFIG_RISCV_ISA_ZICBOM=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
+	fi
+	self_check "ZICBOM extension support ..." "$ext_zicbom"
+
+
+	# ---------------------------------------------------------
+	# Update BR2_RISCV_ISA_EXTRA based on extension flags
+	# ---------------------------------------------------------
+
+	isa_extra=""
+
+	[ "$ext_zba" = "1" ] && isa_extra="${isa_extra}_zba"
+	[ "$ext_zbb" = "1" ] && isa_extra="${isa_extra}_zbb"
+	[ "$ext_zbs" = "1" ] && isa_extra="${isa_extra}_zbs"
+	[ "$ext_zicbom" = "1" ] && isa_extra="${isa_extra}_zicbom"
+
+	# Remove leading underscore if present
+	isa_extra=$(echo "$isa_extra" | sed 's/^_//')
+
+	pr_info "Computed BR2_RISCV_ISA_EXTRA: $isa_extra"
+
+	# Only update if any extension is enabled
+	if [ -n "$isa_extra" ]; then
+		pr_info "Updating BR2_RISCV_ISA_EXTRA \"$isa_extra\" in $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG"
+		sed -i "s/^BR2_RISCV_ISA_EXTRA=.*/BR2_RISCV_ISA_EXTRA=\"${isa_extra}\"/g" \
+		$BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG
+	fi
+	# ISA EXTRA configuration for ZBA, ZBB, ZBC and ZICBOM --END
+
+
 	# change the size of DDR to 1024MB due to limitation of physical DDR.
 	ddr_size=$(grep SYSTEM_DDR_BMB_SIZE $SOC_H | awk '{print $3}')
 	phy_ddr_size=0x40000000

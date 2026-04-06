@@ -1,0 +1,57 @@
+From 166bfd3e6690979ba6b044809a86651f6eb3f440 Mon Sep 17 00:00:00 2001
+From: Charlie Jenkins <charlie@rivosinc.com>
+Date: Wed, 7 May 2025 15:50:53 -0700
+Subject: [PATCH] arch: riscv: Add RISCV_ISA_EXTRA config string
+
+Adds a new user-configurable string to arch/Config.in.riscv, and in
+arch/arch.mk.riscv appends it to GCC_TARGET_ARCH.
+
+This enables custom extensions/combinations to be easily configured.
+
+Signed-off-by: Charlie Jenkins <charlie@rivosinc.com>
+Reviewed-by: Jesse Taube <Mr.Bossman075@gmail.com>
+[Arnout:
+ - fix check-package warnings
+ - introduce ARCH_RISV_ISA_EXTRA to simplify stripping of quotes
+]
+Signed-off-by: Arnout Vandecappelle <arnout@rnout.be>
+---
+ arch/Config.in.riscv | 7 +++++++
+ arch/arch.mk.riscv   | 5 +++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/arch/Config.in.riscv b/arch/Config.in.riscv
+index 23d095d1a6..299190f364 100644
+--- a/arch/Config.in.riscv
++++ b/arch/Config.in.riscv
+@@ -45,6 +45,13 @@ config BR2_RISCV_ISA_RVV
+ 	bool "Vector Instructions (V)"
+ 	select BR2_ARCH_NEEDS_GCC_AT_LEAST_12
+ 
++config BR2_RISCV_ISA_EXTRA
++	string "Append extra RISC-V ISA extensions"
++	help
++	  Extra ISA extensions to append to the ISA extensions string.
++	  They are underscore-separated.  For example,
++	  "zba_zbb_zvl256b".
++
+ choice
+ 	prompt "Target Architecture Size"
+ 	default BR2_RISCV_64
+diff --git a/arch/arch.mk.riscv b/arch/arch.mk.riscv
+index ee5c434b97..e47666eadd 100644
+--- a/arch/arch.mk.riscv
++++ b/arch/arch.mk.riscv
+@@ -39,4 +39,9 @@ ifeq ($(BR2_TOOLCHAIN_GCC_AT_LEAST_12),y)
+ GCC_TARGET_ARCH := $(GCC_TARGET_ARCH)_zicsr_zifencei
+ endif
+ 
++ARCH_RISV_ISA_EXTRA = $(call qstrip, $(BR2_RISCV_ISA_EXTRA))
++ifneq ($(ARCH_RISV_ISA_EXTRA),)
++GCC_TARGET_ARCH := $(GCC_TARGET_ARCH)_$(ARCH_RISV_ISA_EXTRA)
++endif
++
+ endif
+-- 
+2.25.1
+
