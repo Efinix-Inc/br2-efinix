@@ -1,0 +1,283 @@
+From 4bb1dfc8589efad9a268114d01e2957d677028fa Mon Sep 17 00:00:00 2001
+From: Swee Aun Khor <sakhor@efinixinc.com>
+Date: Fri, 10 Apr 2026 13:52:28 +0800
+Subject: [PATCH] Enhance SDIO tuning algorithm
+
+Improve the SDIO tuning algorithm to increase stability and
+performance under low-temperature conditions.
+
+Signed-off-by: Swee Aun Khor <sakhor@efinixinc.com>
+---
+ drivers/mmc/host/efx_sdio_tuning.c | 223 ++++++++++++++++++++---------
+ 1 file changed, 158 insertions(+), 65 deletions(-)
+
+diff --git a/drivers/mmc/host/efx_sdio_tuning.c b/drivers/mmc/host/efx_sdio_tuning.c
+index e9fcf26ad..027decabc 100644
+--- a/drivers/mmc/host/efx_sdio_tuning.c
++++ b/drivers/mmc/host/efx_sdio_tuning.c
+@@ -286,81 +286,164 @@ int efx_sdio_find_optimal_timing(struct efx_sdio_host *host,
+ {
+ 	int max_consecutive_length, row_length, optimal_sample_count,
+ 	optimal_pll_shift;
+-	int *optimal_rows;
++	int *optimal_rows = NULL;
+ 	int optimal_row_count, center_row, i;
+ 	char optimal_row_str[32];
+ 
+-	optimal_rows = kmalloc(max_sample_count * sizeof(int), GFP_KERNEL);
+-	if (!optimal_rows) {
+-	return -ENOMEM;
+-	}
++    // Max sample count should be less than 8 With system clock is 200Mhz and target SDIO clock is 25Mhz.
++    // Shall perform basic tuning if the max sample count more than 8.
++    if (max_sample_count > 8) {
++        optimal_rows = kmalloc(max_sample_count * sizeof(int), GFP_KERNEL);
++        if (!optimal_rows) {
++        return -ENOMEM;
++        }
+ 
+-	/* Find rows with longest consecutive 1's */
+-	dev_dbg(&host->pdev->dev, "Analyzing timing results\n");
+-	max_consecutive_length = 0;
+-	for (i = 0; i < max_sample_count; i++) {
+-	row_length = efx_sdio_find_longest_consecutive_ones(result_map[i],
+-							     EFX_SDIO_MAX_PLL_SHIFT);
+-	dev_dbg(&host->pdev->dev, "Sample[%u]: consecutive_length=%d\n",
+-			i, row_length);
+-	if (row_length > max_consecutive_length) {
+-	    dev_dbg(&host->pdev->dev,
+-			    "New best: Sample[%u] length=%d\n",
+-			    i, row_length);
+-	    max_consecutive_length = row_length;
+-	}
+-	}
+-	dev_dbg(&host->pdev->dev, "Best consecutive length: %d\n",
+-	     max_consecutive_length);
++        /* Find rows with longest consecutive 1's */
++        dev_dbg(&host->pdev->dev, "Analyzing timing results\n");
++        max_consecutive_length = 0;
++        for (i = 0; i < max_sample_count; i++) {
++            row_length = efx_sdio_find_longest_consecutive_ones(result_map[i],
++                                        EFX_SDIO_MAX_PLL_SHIFT);
++            dev_dbg(&host->pdev->dev, "Sample[%u]: consecutive_length=%d\n",
++                    i, row_length);
++            if (row_length > max_consecutive_length) {
++                dev_dbg(&host->pdev->dev,
++                        "New best: Sample[%u] length=%d\n",
++                        i, row_length);
++                max_consecutive_length = row_length;
++            }
++        }
++        dev_dbg(&host->pdev->dev, "Best consecutive length: %d\n",
++            max_consecutive_length);
+ 
+ 
+-	if (max_consecutive_length < EFX_SDIO_MIN_TIMING_MARGIN) {
+-	dev_warn(&host->pdev->dev,
+-			  "Insufficient timing margin: %d (minimum %d)\n",
+-	        max_consecutive_length, EFX_SDIO_MIN_TIMING_MARGIN);
+-	}
++        if (max_consecutive_length < EFX_SDIO_MIN_TIMING_MARGIN) {
++        dev_warn(&host->pdev->dev,
++                "Insufficient timing margin: %d (minimum %d)\n",
++                max_consecutive_length, EFX_SDIO_MIN_TIMING_MARGIN);
++        }
+ 
+-	/* Collect all rows with maximum consecutive length */
+-	optimal_row_count = 0;
+-	for (i = 0; i < max_sample_count; i++) {
+-	if (efx_sdio_find_longest_consecutive_ones(result_map[i],
+-							     EFX_SDIO_MAX_PLL_SHIFT) ==
+-	    max_consecutive_length) {
+-	    optimal_rows[optimal_row_count++] = i;
+-	}
+-	}
++        /* Collect all rows with maximum consecutive length */
++        optimal_row_count = 0;
++        for (i = 0; i < max_sample_count; i++) {
++            if (efx_sdio_find_longest_consecutive_ones(result_map[i],
++                                        EFX_SDIO_MAX_PLL_SHIFT) ==
++                max_consecutive_length) {
++                optimal_rows[optimal_row_count++] = i;
++            }
++        }
+ 
+-	if (optimal_row_count == 0) {
+-	kfree(optimal_rows);
+-	return -ENODEV; /* No valid configurations found */
+-	}
++        if (optimal_row_count == 0) {
++        kfree(optimal_rows);
++        return -ENODEV; /* No valid configurations found */
++        }
+ 
+-	/* Find center row */
+-	center_row = optimal_row_count / 2;
+-	optimal_sample_count = optimal_rows[center_row];
++        /* Find center row */
++        center_row = optimal_row_count / 2;
++        optimal_sample_count = optimal_rows[center_row];
+ 
+-	/* Find center column within optimal row */
+-	dev_dbg(&host->pdev->dev,
+-	     "Selected sample_count=%d from %d optimal rows\n",
+-	     optimal_sample_count, optimal_row_count);
+-
+-	/* Debug: Show the row being analyzed for center calculation */
+-	optimal_row_str[0] = '\0';
+-	for (i = 0; i < EFX_SDIO_MAX_PLL_SHIFT; i++) {
+-	sprintf(optimal_row_str + strlen(optimal_row_str), "%d",
+-		result_map[optimal_sample_count][i]);
+-	}
+-	dev_dbg(&host->pdev->dev,
+-	     "Analyzing row[%d]: [%s] for center calculation\n",
+-	     optimal_sample_count, optimal_row_str);
++        /* Find center column within optimal row */
++        dev_dbg(&host->pdev->dev,
++            "Selected sample_count=%d from %d optimal rows\n",
++            optimal_sample_count, optimal_row_count);
++
++        /* Debug: Show the row being analyzed for center calculation */
++        optimal_row_str[0] = '\0';
++        for (i = 0; i < EFX_SDIO_MAX_PLL_SHIFT; i++) {
++        sprintf(optimal_row_str + strlen(optimal_row_str), "%d",
++            result_map[optimal_sample_count][i]);
++        }
++        dev_dbg(&host->pdev->dev,
++            "Analyzing row[%d]: [%s] for center calculation\n",
++            optimal_sample_count, optimal_row_str);
+ 
+-	optimal_pll_shift =
+-	efx_sdio_find_center_of_consecutive_ones(result_map[optimal_sample_count],
+-						   EFX_SDIO_MAX_PLL_SHIFT);
++        optimal_pll_shift =
++        efx_sdio_find_center_of_consecutive_ones(result_map[optimal_sample_count],
++                            EFX_SDIO_MAX_PLL_SHIFT);
+ 
+-	dev_dbg(&host->pdev->dev,
+-	     "Center PLL calculation result: pll_shift=%d\n",
+-	     optimal_pll_shift);
++        dev_dbg(&host->pdev->dev,
++            "Center PLL calculation result: pll_shift=%d\n",
++            optimal_pll_shift);
++
++        // Check before free
++        if (optimal_rows) {
++            kfree(optimal_rows);
++        }
++
++    } else {
++
++        u8 *flat_map;
++        int flat_length;
++
++        // Append the same result_map to make it look like 1D for better center calculation
++        flat_length = max_sample_count * 2 * EFX_SDIO_MAX_PLL_SHIFT;
++        flat_map = kmalloc(flat_length, GFP_KERNEL);
++        if (!flat_map) {
++            return -ENOMEM;
++        }
++        int idx = 0;
++        for (i = 0; i < max_sample_count; i++) {
++            memcpy(&flat_map[idx], result_map[i], EFX_SDIO_MAX_PLL_SHIFT);
++            idx += EFX_SDIO_MAX_PLL_SHIFT;
++        }
++        for (i = 0; i < max_sample_count; i++) {
++            memcpy(&flat_map[idx], result_map[i], EFX_SDIO_MAX_PLL_SHIFT);
++            idx += EFX_SDIO_MAX_PLL_SHIFT;
++        }
++
++        //Debug: Print the flat map for analysis
++        dev_dbg(&host->pdev->dev, "Flat map:\n");
++        for (i = 0; i < flat_length; i++) {
++            dev_dbg(&host->pdev->dev, "flat_map[%d] = %d\n", i, flat_map[i]);
++        }
++
++        max_consecutive_length = efx_sdio_find_longest_consecutive_ones(flat_map, flat_length);
++        dev_dbg(&host->pdev->dev, "Best consecutive length in flat map: %d\n", max_consecutive_length);
++        if (max_consecutive_length < EFX_SDIO_MIN_TIMING_MARGIN) {
++            dev_warn(&host->pdev->dev,
++                    "Insufficient timing margin in flat map: %d (minimum %d)\n",
++                    max_consecutive_length, EFX_SDIO_MIN_TIMING_MARGIN);
++        }
++
++        // DDR and SDR modes using different selection strategy for better tuning results
++        // DDR mode: select center of longest consecutive 1's for better stability as DDR is more sensitive to timing
++        // SDR mode: select first occurrence of longest consecutive 1's for better performance as SDR is less sensitive to timing and can benefit from more aggressive settings
++        if (host->mmc->ios.timing == MMC_TIMING_UHS_DDR50) {
++            int center_idx = efx_sdio_find_center_of_consecutive_ones(flat_map, flat_length);
++            optimal_sample_count = (center_idx%(EFX_SDIO_MAX_PLL_SHIFT * max_sample_count)) / EFX_SDIO_MAX_PLL_SHIFT;
++            optimal_pll_shift = center_idx % EFX_SDIO_MAX_PLL_SHIFT;
++            dev_info(&host->pdev->dev,
++                "DDR mode: Selected center of longest sequence at index %d (sample_count=%d, pll_shift=%d)\n",
++                center_idx, optimal_sample_count, optimal_pll_shift);
++        } else {
++            // For SDR modes, find the first occurrence of the longest consecutive 1's
++            int i, j;
++            optimal_sample_count = 0;
++            optimal_pll_shift = 0;
++            bool found = false;
++            for (i = 0; i < flat_length; i++) {
++                if (flat_map[i] == 1) {
++                    int current_length = 1;
++                    for (j = i + 1; j < flat_length && flat_map[j] == 1; j++) {
++                        current_length++;
++                    }
++                    if (current_length == max_consecutive_length) {
++                        optimal_sample_count = (i%(EFX_SDIO_MAX_PLL_SHIFT * max_sample_count))/EFX_SDIO_MAX_PLL_SHIFT;
++                        optimal_pll_shift = i % EFX_SDIO_MAX_PLL_SHIFT;
++                        found = true;
++                        break;
++                    }
++                }
++            }
++
++            dev_info(&host->pdev->dev,
++            "SDR mode: Selected first occurrence of longest sequence at index %d (sample_count=%d, pll_shift=%d)\n",
++            optimal_sample_count * EFX_SDIO_MAX_PLL_SHIFT + optimal_pll_shift,
++            optimal_sample_count, optimal_pll_shift);
++        }
++
++        kfree(flat_map);
++    }
+ 
+ 	/* Store optimal configuration */
+ 	host->optimal_sample_count = optimal_sample_count;
+@@ -371,7 +454,6 @@ int efx_sdio_find_optimal_timing(struct efx_sdio_host *host,
+ 	     "Optimal timing found: sample_count=%u, pll_shift=%u, margin=%d\n",
+ 	     optimal_sample_count, optimal_pll_shift, max_consecutive_length);
+ 
+-	kfree(optimal_rows);
+ 	return 0;
+ }
+ 
+@@ -477,6 +559,18 @@ int efx_sdio_execute_tuning(struct mmc_host *mmc, u32 opcode)
+                     success = efx_sdio_execute_custom_tuning_command(host, bus_width);
+                 }
+ 
++                // for non-DDR modes, additional checking needed to ensure result is successful
++                // success only 1 if bit 8 and bit 9 of EFX_SDIO_HOST_ADJUSTMENT register are both 1
++                 if (success && mmc->ios.timing != MMC_TIMING_UHS_DDR50) {
++                    u32 host_adjustment = efx_sdio_readl(host, EFX_SDIO_HOST_ADJUSTMENT);
++                    if ((host_adjustment & 0x300) != 0x300) {
++                        success = 0; // Mark as failure if either bit 8 or bit 9 is not set
++                        dev_dbg(&host->pdev->dev,
++                            "Additional check failed: host_adjustment=0x%08x\n",
++                            host_adjustment);
++                    }
++                }
++
+                 /* Update result map */
+                 if (!success) {
+                     dev_dbg(&host->pdev->dev,
+@@ -487,7 +581,6 @@ int efx_sdio_execute_tuning(struct mmc_host *mmc, u32 opcode)
+                     tuning_result_map[sample_count][pll_shift] = 0;
+                     consecutive_passes = 0;
+                 } else {
+-                    //SA tuning_result_map[sample_count][pll_shift] = 1;
+                     consecutive_passes++;
+                 }
+ 
+-- 
+2.25.1
+

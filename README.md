@@ -43,7 +43,7 @@ Tested on Ubuntu 18.04 LTS
 sudo apt-get update && sudo apt-get upgrade -y
 sudo apt-get install -y sed make binutils build-essential bash patch gzip \
 bzip2 perl tar cpio unzip rsync file bc wget autoconf automake libtool \
-mtools jq minicom python3-pip
+mtools jq minicom python3-pip flex bison
 
 pip3 install jinja2
 ```
