@@ -439,7 +439,7 @@ function generate_device_tree() {
 				fi
 				;;
 			ethernet)
-				if [[ "$type" == "linux" ]]; then
+				if [[ "$type" == "linux" ]] || [[ "$type" == "uboot" ]]; then
 					add_board_cfg cmd "$generic_dir/ethernet.json" "$override_dir" "$override_board_dir" "ethernet.json"
 				fi
 				;;
@@ -517,13 +517,20 @@ function prepare_buildroot_env()
 		storage_fragment="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_sd_defconfig"
 	fi
 
+	# Add ethernet-specific u-boot fragment when ethernet feature is enabled
+	local eth_fragment=""
+	if [[ "$HW_FEATURES" == *"ethernet"* ]]; then
+		pr_info "Adding Ethernet u-boot configuration fragment to build config"
+		eth_fragment="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_eth_defconfig"
+	fi
+
 	# Append U-Boot defconfig fragments
 	if grep -q "BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES" "${machine_fragments}"; then
 		# If fragment files line exists, append to it
-		sed -i "/BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES/ s|\"$| $uboot_dev_fragment $storage_fragment\"|" "${machine_fragments}"
+		sed -i "/BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES/ s|\"$| $uboot_dev_fragment $eth_fragment $storage_fragment\"|" "${machine_fragments}"
 	else
 		# If no fragment files line exists, add it them
-		echo "BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES=\"\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_base_defconfig $uboot_dev_fragment $storage_fragment\"" >> "${machine_fragments}"
+		echo "BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES=\"\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_base_defconfig $uboot_dev_fragment $eth_fragment $storage_fragment\"" >> "${machine_fragments}"
 	fi
 
 	# Merge Buildroot defconfig

@@ -1,0 +1,1051 @@
+From ae365b9d28a31c3c4a379edca4605c9ae896499f Mon Sep 17 00:00:00 2001
+From: Teoh Choon Zone <czteoh@efinixinc.com>
+Date: Mon, 30 Mar 2026 20:59:24 +0800
+Subject: [PATCH] drivers: Add Efinix Ethernet TSE driver
+
+---
+ drivers/net/Kconfig      |   8 +
+ drivers/net/Makefile     |   1 +
+ drivers/net/efinix_tse.c | 849 +++++++++++++++++++++++++++++++++++++++
+ drivers/net/efinix_tse.h | 142 +++++++
+ 4 files changed, 1000 insertions(+)
+ create mode 100644 drivers/net/efinix_tse.c
+ create mode 100644 drivers/net/efinix_tse.h
+
+diff --git a/drivers/net/Kconfig b/drivers/net/Kconfig
+index 0e84c22..714467a 100644
+--- a/drivers/net/Kconfig
++++ b/drivers/net/Kconfig
+@@ -115,6 +115,14 @@ config ALTERA_TSE
+ 	  Please find details on the "Triple-Speed Ethernet MegaCore Function
+ 	  Resource Center" of Altera.
+ 
++config EFINIX_TSE
++	bool "Efinix Triple-Speed Ethernet MAC support"
++	depends on DM_ETH
++	select PHYLIB
++	help
++	  This driver supports the Efinix Triple-Speed Ethernet MAC together
++	  with its integrated MDIO controller and descriptor-based DMA engine.
++
+ config BCM_SF2_ETH
+ 	bool "Broadcom SF2 (Starfighter2) Ethernet support"
+ 	select PHYLIB
+diff --git a/drivers/net/Makefile b/drivers/net/Makefile
+index a19511a..bd8cf88 100644
+--- a/drivers/net/Makefile
++++ b/drivers/net/Makefile
+@@ -9,6 +9,7 @@ obj-$(CONFIG_ARMADA100_FEC) += armada100_fec.o
+ obj-$(CONFIG_BCM6348_ETH) += bcm6348-eth.o
+ obj-$(CONFIG_BCM6368_ETH) += bcm6368-eth.o
+ obj-$(CONFIG_BCMGENET) += bcmgenet.o
++obj-$(CONFIG_EFINIX_TSE) += efinix_tse.o
+ obj-$(CONFIG_DRIVER_AT91EMAC) += at91_emac.o
+ obj-$(CONFIG_DRIVER_AX88180) += ax88180.o
+ obj-$(CONFIG_BCM_SF2_ETH) += bcm-sf2-eth.o
+diff --git a/drivers/net/efinix_tse.c b/drivers/net/efinix_tse.c
+new file mode 100644
+index 0000000..0c29d36
+--- /dev/null
++++ b/drivers/net/efinix_tse.c
+@@ -0,0 +1,849 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Efinix Triple-Speed Ethernet MAC driver
++ *
++ * Copyright (C) 2026 Efinix, Inc.
++ * Author: Teoh Choon Zone <czteoh@efinixinc.com>
++ *
++ */
++
++#include <clk.h>
++#include <common.h>
++#include <cpu_func.h>
++#include <dm.h>
++#include <dm/device_compat.h>
++#include <log.h>
++#include <malloc.h>
++#include <miiphy.h>
++#include <net.h>
++#include <phy.h>
++#include <wait_bit.h>
++#include <asm/io.h>
++#include <linux/dma-mapping.h>
++
++#include "efinix_tse.h"
++
++static inline u32 efinix_tse_readl(struct efinix_tse_priv *priv, u32 reg)
++{
++	return readl(priv->regs + reg);
++}
++
++static inline void efinix_tse_writel(struct efinix_tse_priv *priv, u32 reg,
++				     u32 val)
++{
++	writel(val, priv->regs + reg);
++}
++
++static inline u32 efinix_tse_dma_readl(struct efinix_tse_priv *priv, u32 reg,
++				       u32 ch_base)
++{
++	return readl(priv->dma_regs + ch_base + reg);
++}
++
++static inline void efinix_tse_dma_writel(struct efinix_tse_priv *priv, u32 reg,
++					 u32 ch_base, u32 val)
++{
++	writel(val, priv->dma_regs + ch_base + reg);
++}
++
++static void efinix_tse_flush_buf(const void *buf, size_t size)
++{
++	ulong start = (ulong)buf;
++	ulong end = ALIGN(start + size, ARCH_DMA_MINALIGN);
++
++	flush_dcache_range(start, end);
++}
++
++static void efinix_tse_invalidate_buf(const void *buf, size_t size)
++{
++	ulong start = (ulong)buf;
++	ulong end = ALIGN(start + size, ARCH_DMA_MINALIGN);
++
++	invalidate_dcache_range(start, end);
++}
++
++static void efinix_tse_flush_desc(struct efinix_tse_desc *desc)
++{
++	efinix_tse_flush_buf(desc, sizeof(*desc));
++}
++
++static void efinix_tse_invalidate_desc(struct efinix_tse_desc *desc)
++{
++	efinix_tse_invalidate_buf(desc, sizeof(*desc));
++}
++
++static int efinix_tse_wait_mdio_ready(struct efinix_tse_priv *priv)
++{
++	return wait_for_bit_le32(priv->regs + MDIO_REG_STATUS, MDIO_STATUS_BUSY,
++				 false, EFINIX_MDIO_TIMEOUT_MS, false);
++}
++
++static int efinix_tse_mdio_read(struct mii_dev *bus, int addr, int devad,
++				int reg)
++{
++	struct efinix_tse_priv *priv = bus->priv;
++	int ret;
++
++	if (devad != MDIO_DEVAD_NONE)
++		return -EOPNOTSUPP;
++
++	ret = efinix_tse_wait_mdio_ready(priv);
++	if (ret)
++		return ret;
++
++	efinix_tse_writel(priv, MDIO_REG_REG_PHY_ADDR,
++			  (reg & MDIO_REG_ADDR_MASK) |
++			  ((addr << MDIO_PHY_ADDR_SHIFT) &
++			   MDIO_PHY_ADDR_MASK));
++	efinix_tse_writel(priv, MDIO_REG_RD_WR_EN, MDIO_RD_EN);
++
++	ret = efinix_tse_wait_mdio_ready(priv);
++	if (ret)
++		return ret;
++
++	return efinix_tse_readl(priv, MDIO_REG_RD_DATA) & MDIO_READ_DATA_MASK;
++}
++
++static int efinix_tse_mdio_write(struct mii_dev *bus, int addr, int devad,
++				 int reg, u16 val)
++{
++	struct efinix_tse_priv *priv = bus->priv;
++	int ret;
++
++	if (devad != MDIO_DEVAD_NONE)
++		return -EOPNOTSUPP;
++
++	ret = efinix_tse_wait_mdio_ready(priv);
++	if (ret)
++		return ret;
++
++	efinix_tse_writel(priv, MDIO_REG_REG_PHY_ADDR,
++			  (reg & MDIO_REG_ADDR_MASK) |
++			  ((addr << MDIO_PHY_ADDR_SHIFT) &
++			   MDIO_PHY_ADDR_MASK));
++	efinix_tse_writel(priv, MDIO_REG_WR_DATA,
++			  val & MDIO_WRITE_DATA_MASK);
++	efinix_tse_writel(priv, MDIO_REG_RD_WR_EN, MDIO_WR_EN);
++
++	return efinix_tse_wait_mdio_ready(priv);
++}
++
++static phy_interface_t efinix_tse_phy_mode_from_legacy(struct udevice *dev)
++{
++	u32 value = dev_read_u32_default(dev, "efx,phy-type", U32_MAX);
++
++	switch (value) {
++	case TSEMAC_PHY_TYPE_MII:
++		return PHY_INTERFACE_MODE_MII;
++	case TSEMAC_PHY_TYPE_GMII:
++		return PHY_INTERFACE_MODE_GMII;
++	case TSEMAC_PHY_TYPE_RGMII_1_3:
++	case TSEMAC_PHY_TYPE_RGMII_2_0:
++		return PHY_INTERFACE_MODE_RGMII_ID;
++	case TSEMAC_PHY_TYPE_SGMII:
++		return PHY_INTERFACE_MODE_SGMII;
++	case TSEMAC_PHY_TYPE_1000BASE_X:
++		return PHY_INTERFACE_MODE_NONE;
++	default:
++		return PHY_INTERFACE_MODE_NONE;
++	}
++}
++
++static int efinix_tse_of_to_plat(struct udevice *dev)
++{
++	struct eth_pdata *pdata = dev_get_plat(dev);
++	const char *phy_mode;
++
++	pdata->iobase = dev_read_addr(dev);
++
++	phy_mode = dev_read_string(dev, "phy-mode");
++	if (phy_mode)
++		pdata->phy_interface = phy_get_interface_by_name(phy_mode);
++	else
++		pdata->phy_interface = efinix_tse_phy_mode_from_legacy(dev);
++
++	if (pdata->phy_interface == PHY_INTERFACE_MODE_NONE) {
++		dev_err(dev, "missing or invalid phy-mode\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int efinix_tse_get_dma_regs(struct udevice *dev,
++				   struct efinix_tse_priv *priv)
++{
++	struct ofnode_phandle_args args;
++	fdt_addr_t addr;
++	fdt_size_t size;
++
++	if (!dev_read_phandle_with_args(dev, "axistream-connected", NULL, 0, 0,
++					&args)) {
++		addr = ofnode_get_addr_size_index(args.node, 0, &size);
++		if (addr == FDT_ADDR_T_NONE)
++			return -EINVAL;
++
++		priv->dma_regs = map_physmem(addr, size, MAP_NOCACHE);
++		return priv->dma_regs ? 0 : -ENOMEM;
++	}
++
++	priv->dma_regs = dev_remap_addr_index(dev, 1);
++	return priv->dma_regs ? 0 : -EINVAL;
++}
++
++static int efinix_tse_hw_reset(struct efinix_tse_priv *priv)
++{
++	efinix_tse_writel(priv, ETHERNET_CTRL_PHY_RST, 1);
++	efinix_tse_writel(priv, ETHERNET_CTRL_MAC_RST, 1);
++	mdelay(EFINIX_RESET_DELAY_MS);
++
++	efinix_tse_writel(priv, ETHERNET_CTRL_MAC_RST, 0);
++	mdelay(EFINIX_RESET_DELAY_MS);
++
++	efinix_tse_writel(priv, ETHERNET_CTRL_PHY_RST, 0);
++	mdelay(EFINIX_RESET_DELAY_MS);
++
++	efinix_tse_writel(priv, ETHERNET_CTRL_DMA_RX_RESET, 1);
++	efinix_tse_writel(priv, ETHERNET_CTRL_DMA_TX_RESET, 1);
++	efinix_tse_writel(priv, ETHERNET_CTRL_HW_RX_CHECKSUM_EN, 0);
++	efinix_tse_writel(priv, ETHERNET_CTRL_HW_TX_CHECKSUM_EN, 0);
++
++	return 0;
++}
++
++/* Reset MAC and DMA only, leaving the PHY undisturbed. */
++static int efinix_tse_mac_reset(struct efinix_tse_priv *priv)
++{
++	efinix_tse_writel(priv, ETHERNET_CTRL_MAC_RST, 1);
++	mdelay(EFINIX_RESET_DELAY_MS);
++
++	efinix_tse_writel(priv, ETHERNET_CTRL_MAC_RST, 0);
++	mdelay(EFINIX_RESET_DELAY_MS);
++
++	efinix_tse_writel(priv, ETHERNET_CTRL_DMA_RX_RESET, 1);
++	efinix_tse_writel(priv, ETHERNET_CTRL_DMA_TX_RESET, 1);
++	efinix_tse_writel(priv, ETHERNET_CTRL_HW_RX_CHECKSUM_EN, 0);
++	efinix_tse_writel(priv, ETHERNET_CTRL_HW_TX_CHECKSUM_EN, 0);
++
++	return 0;
++}
++
++static void efinix_tse_set_macaddr(struct udevice *dev)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++	struct eth_pdata *pdata = dev_get_plat(dev);
++	const u8 *addr = pdata->enetaddr;
++	u32 mac_lo;
++	u32 mac_hi;
++
++	mac_lo = addr[0] | (addr[1] << 8) | (addr[2] << 16) | (addr[3] << 24);
++	mac_hi = addr[4] | (addr[5] << 8);
++
++	efinix_tse_writel(priv, TSEMAC_MAC_ADDR_LO, mac_lo);
++	efinix_tse_writel(priv, TSEMAC_MAC_ADDR_HI, mac_hi);
++	efinix_tse_writel(priv, TSEMAC_MAC_ADDR_MASK_LO, 0xffffffff);
++	efinix_tse_writel(priv, TSEMAC_MAC_ADDR_MASK_HI, 0x0000ffff);
++}
++
++static int efinix_tse_write_hwaddr(struct udevice *dev)
++{
++	efinix_tse_set_macaddr(dev);
++	return 0;
++}
++
++static void efinix_tse_adjust_link(struct udevice *dev)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++	u32 cmd;
++
++	if (!priv->phydev || !priv->phydev->link)
++		return;
++
++	cmd = efinix_tse_readl(priv, TSEMAC_COMMAND_CONFIG);
++	cmd &= ~ETH_SPEED_MASK;
++
++	switch (priv->phydev->speed) {
++	case SPEED_1000:
++		cmd |= ETH_SPEED_MASK_1000;
++		break;
++	case SPEED_100:
++		cmd |= ETH_SPEED_MASK_100;
++		break;
++	case SPEED_10:
++	default:
++		cmd |= ETH_SPEED_MASK_10;
++		break;
++	}
++
++	if (!priv->phydev->duplex)
++		dev_warn(dev, "half duplex not supported, forcing full duplex\n");
++
++	efinix_tse_writel(priv, TSEMAC_COMMAND_CONFIG, cmd);
++}
++
++static void efinix_tse_dump_state(struct udevice *dev, const char *tag)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++	struct efinix_tse_desc *txd = priv->tx_descs;
++	struct efinix_tse_desc *rxd = priv->rx_descs ?
++		&priv->rx_descs[priv->rx_head % EFINIX_RX_DESC_COUNT] : NULL;
++
++	debug("%s %s: cmd=%08x txok=%u rxok=%u crc=%u inerr=%u outerr=%u txdma=%08x rxdma=%08x",
++	      dev->name, tag,
++	      efinix_tse_readl(priv, TSEMAC_COMMAND_CONFIG),
++	      efinix_tse_readl(priv, TSEMAC_A_FRAMES_TRANSMITTED_OK),
++	      efinix_tse_readl(priv, TSEMAC_A_FRAMES_RECEIVED_OK),
++	      efinix_tse_readl(priv, TSEMAC_CRC_ERRORS),
++	      efinix_tse_readl(priv, TSEMAC_IF_IN_ERRORS),
++	      efinix_tse_readl(priv, TSEMAC_IF_OUT_ERRORS),
++	      efinix_tse_dma_readl(priv, DMA_CH_STATUS, DMASG_TX_BASE),
++	      efinix_tse_dma_readl(priv, DMA_CH_STATUS, DMASG_RX_BASE));
++
++	if (txd)
++		debug(" txd={st=%08x ctl=%08x}", txd[0].status, txd[0].control);
++	if (rxd)
++		debug(" rxd[%d]={st=%08x ctl=%08x}",
++		      priv->rx_head % EFINIX_RX_DESC_COUNT,
++		      rxd->status, rxd->control);
++	debug("\n");
++}
++
++static int efinix_tse_phy_apply_fixups(struct udevice *dev)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++	int ret, reg;
++
++	if (!priv->phydev)
++		return 0;
++
++	if ((priv->phydev->phy_id & RTL8211_PHY_ID_MASK) !=
++	    (RTL8211F_PHY_ID & RTL8211_PHY_ID_MASK))
++		return 0;
++
++	/*
++	 * Match the Linux driver for RTL8211F PHY.
++	 * These page/register writes are board-specific PHY tuning that the
++	 * generic U-Boot PHY driver does not apply.
++	 */
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x1f, 0x0a43);
++	if (ret)
++		return ret;
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x1b, 0x8011);
++	if (ret)
++		return ret;
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x1c, 0xd73f);
++	if (ret)
++		return ret;
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x1f, 0x0d04);
++	if (ret)
++		return ret;
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x10, 0xe251);
++	if (ret)
++		return ret;
++
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x1f, 0x0a42);
++	if (ret)
++		return ret;
++
++	/*
++	 * Force 1000BASE-T master mode.
++	 * Without this, the link can come up but behave unreliably under load.
++	 */
++	reg = phy_read(priv->phydev, MDIO_DEVAD_NONE, MII_CTRL1000);
++	if (reg < 0)
++		return reg;
++	reg |= CTL1000_ENABLE_MASTER | CTL1000_AS_MASTER;
++	return phy_write(priv->phydev, MDIO_DEVAD_NONE, MII_CTRL1000, reg);
++}
++
++static void efinix_tse_dma_stop_channel(struct efinix_tse_priv *priv, u32 base)
++{
++	efinix_tse_dma_writel(priv, DMA_CH_INTERRUPT_ENABLE, base, 0);
++	efinix_tse_dma_writel(priv, DMA_CH_STATUS, base, DMA_CH_STATUS_STOP);
++	wait_for_bit_le32(priv->dma_regs + base + DMA_CH_STATUS,
++			  DMA_CH_STATUS_BUSY, false,
++			  EFINIX_DMA_TIMEOUT_MS, false);
++}
++
++static void efinix_tse_dma_stop(struct efinix_tse_priv *priv)
++{
++	efinix_tse_dma_stop_channel(priv, DMASG_RX_BASE);
++	efinix_tse_dma_stop_channel(priv, DMASG_TX_BASE);
++}
++
++
++static void efinix_tse_init_tx_ring(struct efinix_tse_priv *priv)
++{
++	int i;
++
++	memset(priv->tx_descs, 0,
++	       sizeof(*priv->tx_descs) * EFINIX_TX_DESC_COUNT);
++
++	for (i = 0; i < EFINIX_TX_DESC_COUNT; i++) {
++		priv->tx_descs[i].next = priv->tx_descs_dma +
++			sizeof(*priv->tx_descs) *
++			((i + 1) % EFINIX_TX_DESC_COUNT);
++		priv->tx_descs[i].status = DMASG_DESC_STATUS_COMPLETED;
++	}
++
++	efinix_tse_flush_buf(priv->tx_descs,
++			     sizeof(*priv->tx_descs) * EFINIX_TX_DESC_COUNT);
++}
++
++static void efinix_tse_rearm_rx_desc(struct efinix_tse_priv *priv, int idx)
++{
++	struct efinix_tse_desc *desc = &priv->rx_descs[idx];
++	dma_addr_t dma;
++
++	dma = dma_map_single(net_rx_packets[idx], priv->rx_buf_size,
++			     DMA_FROM_DEVICE);
++
++	desc->to = dma;
++	desc->control = (priv->rx_buf_size - 1) & DMASG_DESC_CTL_BYTES;
++	desc->status = 0;
++	wmb();
++	efinix_tse_flush_desc(desc);
++}
++
++static void efinix_tse_init_rx_ring(struct efinix_tse_priv *priv)
++{
++	int i;
++
++	memset(priv->rx_descs, 0,
++	       sizeof(*priv->rx_descs) * EFINIX_RX_DESC_COUNT);
++
++	for (i = 0; i < EFINIX_RX_DESC_COUNT; i++) {
++		priv->rx_descs[i].next = priv->rx_descs_dma +
++			sizeof(*priv->rx_descs) *
++			((i + 1) % EFINIX_RX_DESC_COUNT);
++		efinix_tse_rearm_rx_desc(priv, i);
++	}
++
++	priv->active_rx = -1;
++	priv->rx_head = 0;
++}
++
++static void efinix_tse_dma_start(struct efinix_tse_priv *priv)
++{
++	efinix_tse_dma_writel(priv, DMA_CH_STATUS, DMASG_TX_BASE,
++			      DMA_CH_STATUS_STOP);
++	efinix_tse_dma_writel(priv, DMA_CH_INTERRUPT_ENABLE, DMASG_TX_BASE, 0);
++	efinix_tse_dma_writel(priv, DMA_CH_INPUT_CONFIG, DMASG_TX_BASE,
++			      DMA_CH_INPUT_CONFIG_MEMORY |
++			      ((EFINIX_DMA_BURST_LEN - 1) &
++			       DMA_CH_BYTE_PER_BURST_MASK));
++	efinix_tse_dma_writel(priv, DMA_CH_OUTPUT_CONFIG, DMASG_TX_BASE, 0);
++	efinix_tse_dma_writel(priv, DMA_CH_PRIORITY, DMASG_TX_BASE, 1);
++
++	efinix_tse_dma_writel(priv, DMA_CH_INTERRUPT_ENABLE, DMASG_RX_BASE, 0);
++	efinix_tse_dma_writel(priv, DMA_CH_INPUT_CONFIG, DMASG_RX_BASE,
++			      DMA_CH_INPUT_CONFIG_COMPLETION_ON_PACKET |
++			      DMA_CH_INPUT_CONFIG_WAIT_ON_PACKET);
++	efinix_tse_dma_writel(priv, DMA_CH_OUTPUT_CONFIG, DMASG_RX_BASE,
++			      DMA_CH_OUTPUT_CONFIG_MEMORY |
++			      ((EFINIX_DMA_BURST_LEN - 1) &
++			       DMA_CH_BYTE_PER_BURST_MASK));
++	efinix_tse_dma_writel(priv, DMA_CH_LINKED_LIST_HEAD, DMASG_RX_BASE,
++			      (u32)priv->rx_descs_dma);
++	efinix_tse_dma_writel(priv, DMA_CH_PRIORITY, DMASG_RX_BASE, 0);
++	efinix_tse_dma_writel(priv, DMA_CH_STATUS, DMASG_RX_BASE,
++			      DMA_CH_STATUS_LINKED_LIST_START);
++}
++
++static int efinix_tse_alloc_rings(struct efinix_tse_priv *priv)
++{
++	priv->tx_descs = dma_alloc_coherent(sizeof(*priv->tx_descs) *
++					    EFINIX_TX_DESC_COUNT,
++					    &priv->tx_descs_dma);
++	if (!priv->tx_descs)
++		return -ENOMEM;
++
++	priv->rx_descs = dma_alloc_coherent(sizeof(*priv->rx_descs) *
++					    EFINIX_RX_DESC_COUNT,
++					    &priv->rx_descs_dma);
++	if (!priv->rx_descs) {
++		dma_free_coherent(priv->tx_descs);
++		priv->tx_descs = NULL;
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++static int efinix_tse_mdio_init(struct udevice *dev)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++	struct mii_dev *bus;
++	unsigned long div;
++	int ret;
++
++	bus = mdio_alloc();
++	if (!bus)
++		return -ENOMEM;
++
++	div = DIV_ROUND_UP(priv->axi_clk_rate, EFINIX_MAX_MDIO_FREQ * 2);
++	if (div)
++		div--;
++
++	efinix_tse_writel(priv, MDIO_REG_DIVIDER_PRE, div & MDIO_DIVIDER_MASK);
++	ret = efinix_tse_wait_mdio_ready(priv);
++	if (ret) {
++		mdio_free(bus);
++		return ret;
++	}
++
++	bus->read = efinix_tse_mdio_read;
++	bus->write = efinix_tse_mdio_write;
++	snprintf(bus->name, sizeof(bus->name), "%s", dev->name);
++	bus->priv = priv;
++
++	ret = mdio_register_seq(bus, dev_seq(dev));
++	if (ret) {
++		mdio_free(bus);
++		return ret;
++	}
++
++	priv->bus = bus;
++	return 0;
++}
++
++static int efinix_tse_phy_init(struct udevice *dev)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++	struct eth_pdata *pdata = dev_get_plat(dev);
++
++	priv->phydev = phy_connect(priv->bus, priv->phyaddr, dev,
++				   pdata->phy_interface);
++	if (!priv->phydev)
++		return -ENODEV;
++
++	priv->phydev->supported &= PHY_GBIT_FEATURES;
++	priv->phydev->advertising = priv->phydev->supported;
++
++	return phy_config(priv->phydev);
++}
++
++static int efinix_tse_start(struct udevice *dev)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++	u32 cmd;
++	int ret;
++
++	/* Only reset MAC/DMA — the PHY is kept alive across start/stop. */
++	ret = efinix_tse_mac_reset(priv);
++	if (ret)
++		return ret;
++
++	cmd = efinix_tse_readl(priv, TSEMAC_COMMAND_CONFIG);
++	cmd &= ~(ETHERNET_CMD_TX_ENA | ETHERNET_CMD_RX_ENA |
++		 ETHERNET_CMD_CRC_FWD);
++	cmd |= ETHERNET_CMD_PAUSE_IGNORE | ETHERNET_CMD_PROMIS_EN;
++	efinix_tse_writel(priv, TSEMAC_COMMAND_CONFIG, cmd);
++
++	efinix_tse_set_macaddr(dev);
++	efinix_tse_writel(priv, TSEMAC_FRM_LENGTH, priv->rx_buf_size);
++
++	efinix_tse_init_tx_ring(priv);
++	efinix_tse_init_rx_ring(priv);
++	efinix_tse_dma_start(priv);
++
++	efinix_tse_writel(priv, ETHERNET_CTRL_DMA_RX_RESET, 0);
++	efinix_tse_writel(priv, ETHERNET_CTRL_DMA_TX_RESET, 0);
++
++	/* Run auto-negotiation only on the first start or after link loss. */
++	if (!priv->phydev->link) {
++		ret = phy_startup(priv->phydev);
++		if (ret) {
++			dev_err(dev, "PHY startup failed: %d\n", ret);
++			return ret;
++		}
++
++		if (!priv->phydev->link) {
++			dev_err(dev, "no PHY link\n");
++			return -ENOLINK;
++		}
++
++		dev_info(dev, "link up, %d Mbps, %s duplex\n",
++			 priv->phydev->speed,
++			 priv->phydev->duplex ? "full" : "half");
++	}
++
++	/* MAC was reset so always re-program the speed/duplex registers. */
++	efinix_tse_adjust_link(dev);
++
++	cmd = efinix_tse_readl(priv, TSEMAC_COMMAND_CONFIG);
++	cmd |= ETHERNET_CMD_TX_ENA | ETHERNET_CMD_RX_ENA;
++	efinix_tse_writel(priv, TSEMAC_COMMAND_CONFIG, cmd);
++
++	return 0;
++}
++
++static int efinix_tse_send(struct udevice *dev, void *packet, int length)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++	struct efinix_tse_desc *desc = &priv->tx_descs[0];
++	dma_addr_t dma;
++	unsigned long start;
++	u32 status;
++
++	if (length <= 0)
++		return -EINVAL;
++
++	dma = dma_map_single(packet, length, DMA_TO_DEVICE);
++
++	desc->from = dma;
++	desc->control = ((length - 1) & DMASG_DESC_CTL_BYTES) |
++			DMASG_DESC_CTL_END_OF_PACKET;
++	desc->status = 0;
++	priv->tx_descs[1].control = 0;
++	priv->tx_descs[1].status = DMASG_DESC_STATUS_COMPLETED;
++	wmb();
++	efinix_tse_flush_buf(priv->tx_descs,
++			     sizeof(*priv->tx_descs) * EFINIX_TX_DESC_COUNT);
++
++	efinix_tse_dma_writel(priv, DMA_CH_LINKED_LIST_HEAD, DMASG_TX_BASE,
++			      (u32)priv->tx_descs_dma);
++	efinix_tse_dma_writel(priv, DMA_CH_STATUS, DMASG_TX_BASE,
++			      DMA_CH_STATUS_LINKED_LIST_START);
++
++	start = get_timer(0);
++	while (1) {
++		efinix_tse_invalidate_desc(desc);
++		status = desc->status;
++		if (status & DMASG_DESC_STATUS_COMPLETED)
++			break;
++		if (get_timer(start) > EFINIX_DMA_TIMEOUT_MS) {
++			dma_unmap_single(dma, length, DMA_TO_DEVICE);
++			dev_err(dev, "TX DMA timed out\n");
++			return -ETIMEDOUT;
++		}
++	}
++
++	dma_unmap_single(dma, length, DMA_TO_DEVICE);
++
++	desc->control = 0;
++	desc->status = DMASG_DESC_STATUS_COMPLETED;
++	efinix_tse_flush_desc(desc);
++
++	return 0;
++}
++
++static int efinix_tse_recv(struct udevice *dev, int flags, uchar **packetp)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++	struct efinix_tse_desc *desc;
++	u32 status;
++	u32 length;
++	int idx;
++
++	if (priv->active_rx >= 0)
++		return -EAGAIN;
++
++	idx = priv->rx_head;
++	desc = &priv->rx_descs[idx];
++	efinix_tse_invalidate_desc(desc);
++	status = desc->status;
++	length = status & DMASG_DESC_STATUS_BYTES;
++
++	/*
++	 * Mirror the Linux driver's recovery for the occasional case where the
++	 * hardware leaves the current slot empty while the next slot has work.
++	 */
++	if (!length) {
++		idx = (idx + 1) % EFINIX_RX_DESC_COUNT;
++		desc = &priv->rx_descs[idx];
++		efinix_tse_invalidate_desc(desc);
++		status = desc->status;
++		length = status & DMASG_DESC_STATUS_BYTES;
++	}
++
++	if (!(status & DMASG_DESC_STATUS_COMPLETED))
++		return -EAGAIN;
++
++	if (!length || length > priv->rx_buf_size) {
++		efinix_tse_rearm_rx_desc(priv, idx);
++		priv->rx_head = (idx + 1) % EFINIX_RX_DESC_COUNT;
++		return -EAGAIN;
++	}
++
++	dma_unmap_single((dma_addr_t)desc->to, priv->rx_buf_size,
++			 DMA_FROM_DEVICE);
++	efinix_tse_invalidate_buf(net_rx_packets[idx], length);
++	*packetp = net_rx_packets[idx];
++	priv->active_rx = idx;
++	priv->rx_head = (idx + 1) % EFINIX_RX_DESC_COUNT;
++
++	return length;
++}
++
++static int efinix_tse_free_pkt(struct udevice *dev, uchar *packet, int length)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++
++	if (priv->active_rx < 0)
++		return 0;
++
++	efinix_tse_rearm_rx_desc(priv, priv->active_rx);
++
++	if (!(efinix_tse_dma_readl(priv, DMA_CH_STATUS, DMASG_RX_BASE) &
++	      DMA_CH_STATUS_BUSY)) {
++		efinix_tse_dma_writel(priv, DMA_CH_STATUS, DMASG_RX_BASE,
++				      DMA_CH_STATUS_LINKED_LIST_START);
++	}
++
++	priv->active_rx = -1;
++	return 0;
++}
++
++static void efinix_tse_stop(struct udevice *dev)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++	u32 cmd;
++
++	efinix_tse_dump_state(dev, "stop");
++
++	cmd = efinix_tse_readl(priv, TSEMAC_COMMAND_CONFIG);
++	cmd &= ~(ETHERNET_CMD_TX_ENA | ETHERNET_CMD_RX_ENA);
++	efinix_tse_writel(priv, TSEMAC_COMMAND_CONFIG, cmd);
++
++	efinix_tse_dma_stop(priv);
++	efinix_tse_writel(priv, ETHERNET_CTRL_DMA_RX_RESET, 1);
++	efinix_tse_writel(priv, ETHERNET_CTRL_DMA_TX_RESET, 1);
++
++	priv->active_rx = -1;
++	priv->rx_head = 0;
++}
++
++static int efinix_tse_probe(struct udevice *dev)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++	struct ofnode_phandle_args phandle_args;
++	unsigned long rate;
++	int ret;
++
++	priv->regs = dev_remap_addr(dev);
++	if (!priv->regs)
++		return -EINVAL;
++
++	ret = efinix_tse_get_dma_regs(dev, priv);
++	if (ret)
++		return ret;
++
++	ret = clk_get_by_index(dev, 0, &priv->axi_clk);
++	if (!ret) {
++		ret = clk_enable(&priv->axi_clk);
++		if (ret && ret != -ENOSYS)
++			return ret;
++		priv->clk_valid = true;
++	}
++
++	rate = dev_read_u32_default(dev, "clock-frequency",
++				    EFINIX_DEFAULT_HOST_CLOCK);
++	if (priv->clk_valid) {
++		unsigned long clk_rate = clk_get_rate(&priv->axi_clk);
++
++		if (clk_rate)
++			rate = clk_rate;
++	}
++	priv->axi_clk_rate = rate;
++
++	priv->rx_buf_size = dev_read_u32_default(dev, "efx,rxmem",
++						 PKTSIZE_ALIGN);
++	if (!priv->rx_buf_size || priv->rx_buf_size > PKTSIZE_ALIGN)
++		priv->rx_buf_size = PKTSIZE_ALIGN;
++
++	priv->phyaddr = -1;
++	if (!dev_read_phandle_with_args(dev, "phy-handle", NULL, 0, 0,
++					&phandle_args))
++		priv->phyaddr = ofnode_read_u32_default(phandle_args.node,
++							"reg", -1);
++
++	ret = efinix_tse_alloc_rings(priv);
++	if (ret)
++		return ret;
++
++	/* Full HW reset (including PHY) once at probe time. */
++	ret = efinix_tse_hw_reset(priv);
++	if (ret)
++		goto err_rings;
++
++	ret = efinix_tse_mdio_init(dev);
++	if (ret)
++		goto err_rings;
++
++	ret = efinix_tse_phy_init(dev);
++	if (ret)
++		goto err_mdio;
++
++	ret = efinix_tse_phy_apply_fixups(dev);
++	if (ret) {
++		dev_warn(dev, "PHY fixups failed: %d\n", ret);
++		goto err_mdio;
++	}
++
++	priv->active_rx = -1;
++	priv->rx_head = 0;
++	return 0;
++
++err_mdio:
++	mdio_unregister(priv->bus);
++	mdio_free(priv->bus);
++	priv->bus = NULL;
++err_rings:
++	if (priv->rx_descs)
++		dma_free_coherent(priv->rx_descs);
++	if (priv->tx_descs)
++		dma_free_coherent(priv->tx_descs);
++	priv->rx_descs = NULL;
++	priv->tx_descs = NULL;
++	return ret;
++}
++
++static int efinix_tse_remove(struct udevice *dev)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++
++	if (priv->phydev)
++		free(priv->phydev);
++
++	if (priv->bus) {
++		mdio_unregister(priv->bus);
++		mdio_free(priv->bus);
++	}
++
++	if (priv->rx_descs)
++		dma_free_coherent(priv->rx_descs);
++	if (priv->tx_descs)
++		dma_free_coherent(priv->tx_descs);
++
++	if (priv->clk_valid)
++		clk_disable(&priv->axi_clk);
++
++	return 0;
++}
++
++static const struct eth_ops efinix_tse_ops = {
++	.start		= efinix_tse_start,
++	.send		= efinix_tse_send,
++	.recv		= efinix_tse_recv,
++	.free_pkt	= efinix_tse_free_pkt,
++	.stop		= efinix_tse_stop,
++	.write_hwaddr	= efinix_tse_write_hwaddr,
++};
++
++static const struct udevice_id efinix_tse_ids[] = {
++	{ .compatible = "efinix,tsemac-0.01.a" },
++	{ }
++};
++
++U_BOOT_DRIVER(efinix_tse) = {
++	.name		= EFINIX_TSE_NAME,
++	.id		= UCLASS_ETH,
++	.of_match	= efinix_tse_ids,
++	.of_to_plat	= efinix_tse_of_to_plat,
++	.probe		= efinix_tse_probe,
++	.remove		= efinix_tse_remove,
++	.ops		= &efinix_tse_ops,
++	.priv_auto	= sizeof(struct efinix_tse_priv),
++	.plat_auto	= sizeof(struct eth_pdata),
++};
+diff --git a/drivers/net/efinix_tse.h b/drivers/net/efinix_tse.h
+new file mode 100644
+index 0000000..3c1c135
+--- /dev/null
++++ b/drivers/net/efinix_tse.h
+@@ -0,0 +1,142 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Efinix Triple-Speed Ethernet MAC driver
++ *
++ * Copyright (C) 2026 Efinix, Inc.
++ * Author: Teoh Choon Zone <czteoh@efinixinc.com>
++ *
++ */
++
++#ifndef EFINIX_TSE_H
++#define EFINIX_TSE_H
++
++#include <linux/bitops.h>
++
++#define EFINIX_TSE_NAME				"efinix_tse"
++
++#define EFINIX_DEFAULT_HOST_CLOCK		100000000
++#define EFINIX_MAX_MDIO_FREQ			2500000
++#define EFINIX_MDIO_TIMEOUT_MS			20
++#define EFINIX_DMA_TIMEOUT_MS			3000
++#define EFINIX_RESET_DELAY_MS			100
++#define EFINIX_DMA_BURST_LEN			64
++#define EFINIX_TX_DESC_COUNT			2
++#define EFINIX_RX_DESC_COUNT			PKTBUFSRX
++
++/* MAC command register bits */
++#define ETHERNET_CMD_TX_ENA			BIT(0)
++#define ETHERNET_CMD_RX_ENA			BIT(1)
++#define ETHERNET_CMD_PROMIS_EN			BIT(4)
++#define ETHERNET_CMD_CRC_FWD			BIT(6)
++#define ETHERNET_CMD_PAUSE_IGNORE		BIT(8)
++
++/* Speed configuration */
++#define ETH_SPEED_MASK				0x00070000
++#define ETH_SPEED_MASK_10			0x00010000
++#define ETH_SPEED_MASK_100			0x00020000
++#define ETH_SPEED_MASK_1000			0x00040000
++
++/* MAC configuration registers */
++#define TSEMAC_COMMAND_CONFIG			0x0008
++#define TSEMAC_MAC_ADDR_LO			0x000c
++#define TSEMAC_MAC_ADDR_HI			0x0010
++#define TSEMAC_FRM_LENGTH			0x0014
++#define TSEMAC_A_FRAMES_TRANSMITTED_OK		0x0068
++#define TSEMAC_A_FRAMES_RECEIVED_OK		0x006c
++#define TSEMAC_CRC_ERRORS			0x0070
++#define TSEMAC_IF_IN_ERRORS			0x0088
++#define TSEMAC_IF_OUT_ERRORS			0x008c
++#define TSEMAC_MAC_ADDR_MASK_LO			0x0144
++#define TSEMAC_MAC_ADDR_MASK_HI			0x0148
++
++/* MDIO registers */
++#define MDIO_REG_DIVIDER_PRE			0x0100
++#define MDIO_REG_RD_WR_EN			0x0104
++#define MDIO_REG_REG_PHY_ADDR			0x0108
++#define MDIO_REG_WR_DATA			0x010c
++#define MDIO_REG_RD_DATA			0x0110
++#define MDIO_REG_STATUS				0x0114
++
++#define MDIO_DIVIDER_MASK			0x000000ff
++#define MDIO_RD_EN				BIT(0)
++#define MDIO_WR_EN				BIT(1)
++#define MDIO_REG_ADDR_MASK			0x0000001f
++#define MDIO_PHY_ADDR_SHIFT			8
++#define MDIO_PHY_ADDR_MASK			0x00001f00
++#define MDIO_READ_DATA_MASK			0x0000ffff
++#define MDIO_WRITE_DATA_MASK			0x0000ffff
++#define MDIO_STATUS_BUSY			BIT(1)
++
++/* Ethernet control registers */
++#define ETHERNET_CTRL_MAC_RST			0x0200
++#define ETHERNET_CTRL_PHY_RST			0x0204
++#define ETHERNET_CTRL_DMA_RX_RESET		0x0208
++#define ETHERNET_CTRL_DMA_TX_RESET		0x020c
++#define ETHERNET_CTRL_HW_RX_CHECKSUM_EN		0x0210
++#define ETHERNET_CTRL_HW_TX_CHECKSUM_EN		0x0214
++
++/* DMA channel base offsets */
++#define DMASG_RX_BASE				0x0000
++#define DMASG_TX_BASE				0x0080
++
++/* DMA channel registers */
++#define DMA_CH_INPUT_CONFIG			0x000c
++#define DMA_CH_OUTPUT_CONFIG			0x001c
++#define DMA_CH_OUTPUT_CONFIG_MEMORY		BIT(12)
++#define DMA_CH_INPUT_CONFIG_MEMORY		BIT(12)
++#define DMA_CH_INPUT_CONFIG_COMPLETION_ON_PACKET	BIT(13)
++#define DMA_CH_INPUT_CONFIG_WAIT_ON_PACKET	BIT(14)
++#define DMA_CH_STATUS				0x002c
++#define DMA_CH_STATUS_BUSY			BIT(0)
++#define DMA_CH_STATUS_STOP			BIT(2)
++#define DMA_CH_STATUS_LINKED_LIST_START		BIT(4)
++#define DMA_CH_PRIORITY				0x0044
++#define DMA_CH_INTERRUPT_ENABLE			0x0050
++#define DMA_CH_LINKED_LIST_HEAD			0x0070
++#define DMA_CH_BYTE_PER_BURST_MASK		0x0fff
++
++/* DMA descriptor fields */
++#define DMASG_DESC_CTL_BYTES			0x07ffffff
++#define DMASG_DESC_CTL_END_OF_PACKET		BIT(30)
++#define DMASG_DESC_STATUS_BYTES			0x07ffffff
++#define DMASG_DESC_STATUS_COMPLETED		BIT(31)
++
++/* PHY interface types */
++#define TSEMAC_PHY_TYPE_MII			0
++#define TSEMAC_PHY_TYPE_GMII			1
++#define TSEMAC_PHY_TYPE_RGMII_1_3		2
++#define TSEMAC_PHY_TYPE_RGMII_2_0		3
++#define TSEMAC_PHY_TYPE_SGMII			4
++#define TSEMAC_PHY_TYPE_1000BASE_X		5
++
++/* RTL8211F PHY identification */
++#define RTL8211F_PHY_ID				0x001cc916
++#define RTL8211_PHY_ID_MASK			0x00ffffff
++
++struct efinix_tse_desc {
++	u32 status;
++	u32 control;
++	u64 from;
++	u64 to;
++	u64 next;
++} __aligned(64);
++
++struct efinix_tse_priv {
++	void __iomem *regs;
++	void __iomem *dma_regs;
++	struct clk axi_clk;
++	struct mii_dev *bus;
++	struct phy_device *phydev;
++	struct efinix_tse_desc *tx_descs;
++	struct efinix_tse_desc *rx_descs;
++	unsigned long tx_descs_dma;
++	unsigned long rx_descs_dma;
++	unsigned long axi_clk_rate;
++	u32 rx_buf_size;
++	int phyaddr;
++	int active_rx;
++	int rx_head;
++	bool clk_valid;
++};
++
++#endif /* EFINIX_TSE_H */
+-- 
+2.43.0
+
