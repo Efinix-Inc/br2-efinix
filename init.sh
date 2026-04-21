@@ -620,16 +620,33 @@ function prepare_buildroot_env()
 
 function get_cpu_count()
 {
-	# count number of cpu core
-	cpu_count=1
-	for i in {4..1}; do
-		num=$(( $i-1))
-		substr="SYSTEM_PLIC_SYSTEM_CORES_${num}_EXTERNAL_INTERRUPT"
-		if [[ $(cat $SOC_H | grep $substr) ]]; then
-			cpu_count=$i
-			break
-		fi
-	done
+        # count number of cpu core
+        cpu_count=1
+
+        if [[ "$MACHINE_ARCH" == "32" ]]; then
+        # existing logic for 32-bit systems
+            for i in {4..1}; do
+                num=$(( $i-1))
+                substr="SYSTEM_PLIC_SYSTEM_CORES_${num}_EXTERNAL_INTERRUPT"
+                if [[ $(cat $SOC_H | grep $substr) ]]; then
+                    cpu_count=$i
+                    break
+                fi
+            done
+        else
+         # 64-bit systems
+
+          # extract SYSTEM_NUMBER_OF_HARTS value
+          harts=$(grep -E "^#define[[:space:]]+SYSTEM_NUMBER_OF_HARTS[[:space:]]+" "$SOC_H" \
+                    | awk '{print $NF}')
+
+          # validate and assign
+          if [[ "$harts" =~ ^[0-9]+$ ]]; then
+              cpu_count=$harts
+          else
+              cpu_count=1
+          fi
+        fi
 }
 
 function get_column()
