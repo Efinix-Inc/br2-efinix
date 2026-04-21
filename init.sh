@@ -471,7 +471,7 @@ function generate_device_tree() {
 
 		# Type specific configs
 		if [[ "$type" == "linux" ]]; then
-			add_cfg_if_exists cmd "$generic_dir/reserved_memory_kernel_6_6.json"
+			add_cfg_if_exists cmd "$config_dir/$MACHINE_ARCH/reserved_memory.json"
 		fi
 
 		# Features configs
