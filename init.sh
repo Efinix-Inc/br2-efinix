@@ -431,6 +431,8 @@ function generate_device_tree() {
 				# spi-nor is for Linux only
 				if [[ "$type" == "linux" ]]; then
 					add_board_cfg cmd "$generic_dir/spi-nor.json" "$override_dir" "$override_board_dir" "spi-nor.json"
+				elif [[ "$type" == "uboot" ]]; then
+					add_board_cfg cmd "$generic_dir/spi-flash.json" "$override_dir" "$override_board_dir" "spi-flash.json"
 				fi
 				;;
 			gpio)
