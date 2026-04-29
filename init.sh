@@ -364,7 +364,13 @@ function check_soc_configuration()
 	fi
 	# ISA EXTRA configuration for ZBA, ZBB, ZBC and ZICBOM --END
 
+	performance_count=$(awk '/SYSTEM_NUMBER_OF_PERFORMANCE_COUNTER/ {print $3; exit}' "$SOC_H")
+	if [ -n "$performance_count" ] && [ "$performance_count" -ne 0 ]; then
+		sed -i 's/CONFIG_RISCV_PMU=n/CONFIG_RISCV_PMU=y/g' \
+			"$BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config"
+	fi
 
+	self_check "Performance counter support ..." "$performance_count"
 	# change the size of DDR to 1024MB due to limitation of physical DDR.
 	ddr_size=$(grep SYSTEM_DDR_BMB_SIZE $SOC_H | awk '{print $3}')
 	phy_ddr_size=0x40000000
