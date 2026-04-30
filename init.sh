@@ -402,7 +402,7 @@ function generate_device_tree() {
 			-m "$MACHINE_ARCH"
 			-c "$config_dir/drivers.json"
 			-c "$config_dir/peripherals.json"
-			-c "$DT_DIR/config/boards/$BOARD/memory.json"
+			-c "$DT_DIR/config/boards/$BOARD/$MACHINE_ARCH/memory.json"
 		)
 
 		# Type specific configs
