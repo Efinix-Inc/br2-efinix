@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-2-Clause
+
+config PLATFORM_TI180J484
+	bool
+	select IPI_MSWI
+	select SERIAL_SPINAL
+	select IRQCHIP_PLIC
+	select SERIAL_UART8250
+	select TIMER_MTIMER
+	default y
