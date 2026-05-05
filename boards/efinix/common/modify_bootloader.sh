@@ -248,5 +248,6 @@ cd $BOOTLOADER_DIR && \
 	fi
 cd - > /dev/null
 
+rm -rf $EFINITY_PROJECT_DIR/linux_bootloader
 cp -rf $BOOTLOADER_DIR/build $EFINITY_PROJECT_DIR/linux_bootloader
 echo INFO: The bootloader is in $EFINITY_PROJECT_DIR/linux_bootloader/bootloader.hex
