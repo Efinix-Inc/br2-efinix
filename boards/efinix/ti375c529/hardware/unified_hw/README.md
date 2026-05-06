@@ -42,7 +42,7 @@ X11 graphics and desktop environment are supported by enabling Linux framebuffer
 
 ## Additional modification for the unified hardware design
 
-This section is optional, but recommended for running the [evsoc_camera](../../../../../package/evsoc_camera/README.md) demo. The display resolution need to set to 720p. Alternatively, you may use prebuild bitstream with 720p by unzip the [unified_hw.zip](unified_hw.zip) file.
+This section is optional, but recommended for running the [evsoc_camera](../../../../../package/evsoc_camera/README.md) demo. The display resolution need to set to 720p. Alternatively, you may use prebuild bitstream with 720p by unzip the [unified_hw.zip](unified_hw.zip) file. Please take note to update the DTS framebuffer size accordingly.
 
 > Please note that the evsoc app and drivers will not work if X11 graphics is turning on.
 
@@ -61,6 +61,35 @@ This section is optional, but recommended for running the [evsoc_camera](../../.
    ```
 
 4. Compile the project.
+
+### DTS settings
+1080p setting:
+```
+&framebuffer0 {
+        dmas = <&dma1 1>;
+        dma-names = "display";
+        width = <1920>;
+        height = <1080>;
+        stride = <7680>;
+        format = "a8b8g8r8";
+        memory-region = <&framebuffer>;
+        status = "okay";
+};
+```
+
+720p setting:
+```
+&framebuffer0 {
+        dmas = <&dma1 1>;
+        dma-names = "display";
+        width = <1280>;
+        height = <720>;
+        stride = <5120>;
+        format = "a8b8g8r8";
+        memory-region = <&framebuffer>;
+        status = "okay";
+};
+```
 
 ## Address Mapping
 
