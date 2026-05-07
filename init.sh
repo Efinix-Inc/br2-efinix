@@ -717,9 +717,11 @@ function add_packages()
 		grep -q EVSOC ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
 		cat ${BR2_DEFCONFIG_DIR}/evsoc_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
 
-		pr_info "Append ${BR2_DEFCONFIG_DIR}/wifi_fragment"
-		grep -q WIFI ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
-		cat ${BR2_DEFCONFIG_DIR}/wifi_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
+		if [ "${BOARD}" = "ti375c529" ]; then
+			pr_info "Append ${BR2_DEFCONFIG_DIR}/wifi_fragment"
+			grep -q WIFI ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
+			cat ${BR2_DEFCONFIG_DIR}/wifi_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
+		fi
 
 	fi
 
