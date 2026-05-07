@@ -407,7 +407,11 @@ function generate_device_tree() {
 
 		# Type specific configs
 		if [[ "$type" == "linux" ]]; then
-			add_cfg_if_exists cmd "$config_dir/$MACHINE_ARCH/reserved_memory.json"
+			if [ "${BOARD}" = "ti60f225" ]; then
+				add_cfg_if_exists cmd "$DT_DIR/config/boards/ti60f225/32/reserved_memory.json"
+			else
+				add_cfg_if_exists cmd "$config_dir/$MACHINE_ARCH/reserved_memory.json"
+			fi
 		fi
 
 		# Features configs
