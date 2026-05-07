@@ -236,6 +236,13 @@ echo INFO: Disabled Debug Flags
 sed -i 's/DEBUG?=yes/DEBUG?=no/g' $SOC_MK
 sed -i 's/DEBUG_OG?=yes/DEBUG_OG?=no/g' $SOC_MK
 
+echo INFO: Check for board: ${DEVKIT}
+grep -qF "DTi60F225_DEVKIT" $SOC_MK  && sed -i "\|DTi60F225_DEVKIT$|d" $SOC_MK
+if [ "${DEVKIT}" = "Ti60F225_devkit" ]; then
+	echo INFO: Enable Ti60F225 flag
+	grep -qF "DTi60F225_DEVKIT" $SOC_MK || echo "CFLAGS+=-DTi60F225_DEVKIT" >> $SOC_MK
+fi
+
 echo INFO: Compiling Linux Bootloader for Sapphire SoC
 cd $BOOTLOADER_DIR && \
 	BSP_PATH=$EFXSAPPHIRESOC_DIR make clean && \
