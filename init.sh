@@ -496,18 +496,10 @@ function generate_device_tree() {
 	cp $DT_DIR/output/linux/$MACHINE_ARCH/linux.dts $EFINIX_DIR/$BOARD/linux/linux.dts
 }
 
-function prepare_buildroot_env()
+function append_uboot_fragments()
 {
-	# Prepare Buildroot build environment
-	title "Prepare Buildroot Build Environment"
-
 	local defconfig_fragments=""
 	local machine_fragments="$BR2_DEFCONFIG_DIR/riscv${MACHINE_ARCH}_fragment"
-	local uboot_dev_fragment="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/$BOARD/u-boot/uboot_defconfig"
-
-	if [ ! -f "$uboot_dev_fragment" ]; then
-		uboot_dev_fragment=""
-	fi
 
 	# Add storage-specific u-boot fragment to the build configuration
 	local storage_fragment=""
@@ -526,13 +518,38 @@ function prepare_buildroot_env()
 		eth_fragment="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_eth_defconfig"
 	fi
 
-	# Append U-Boot defconfig fragments
-	if grep -q "BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES" "${machine_fragments}"; then
-		# If fragment files line exists, append to it
-		sed -i "/BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES/ s|\"$| $uboot_dev_fragment $eth_fragment $storage_fragment\"|" "${machine_fragments}"
+	local uboot_fragments=(
+		"$eth_fragment"
+		"$storage_fragment"
+	)
+
+	if grep -qE '^[[:space:]]*BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES="' "$machine_fragments"; then
+		for f in "${uboot_fragments[@]}"; do
+			[ -z "$f" ] && continue
+			pr_info "Append uboot fragment: $f"
+			if ! grep -qF "$f" "$machine_fragments"; then
+				append=" $f\""
+				sed -i -E \
+				"/^[[:space:]]*BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES=/ s|\"$|$append|" \
+				"$machine_fragments"
+			fi
+		done
 	else
-		# If no fragment files line exists, add it them
-		echo "BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES=\"\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_base_defconfig $uboot_dev_fragment $eth_fragment $storage_fragment\"" >> "${machine_fragments}"
+		# Create variable if absent
+		local uboot_base_defconfig="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_base_defconfig"
+
+		if [ "${BOARD}" = "ti60f225" ]; then
+			uboot_base_defconfig="\$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/ti60f225/u-boot/uboot_defconfig"
+		fi
+
+		printf 'BR2_TARGET_UBOOT_CONFIG_FRAGMENT_FILES="%s' \
+			"$uboot_base_defconfig" >> "$machine_fragments"
+
+		for f in "${uboot_fragments[@]}"; do
+			printf ' %s' "$f" >> "$machine_fragments"
+		done
+
+		printf '"\n' >> "$machine_fragments"
 	fi
 
 	# Merge Buildroot defconfig
@@ -554,7 +571,14 @@ function prepare_buildroot_env()
 	unset CONFIG_
 	BR2_DEFCONFIG="efinix_${BOARD}_${MACHINE_ARCH}_defconfig"
 	mv .config $BR2_DEFCONFIG_DIR/$BR2_DEFCONFIG
+}
 
+function prepare_buildroot_env()
+{
+        # Prepare Buildroot build environment
+        title "Prepare Buildroot Build Environment"
+
+	append_uboot_fragments
 	mkdir $BUILD_DIR
 	cd $BUILD_DIR && \
 	make O=$PWD BR2_EXTERNAL=$BR2_EXTERNAL_DIR -C $BUILDROOT_DIR $BR2_DEFCONFIG
