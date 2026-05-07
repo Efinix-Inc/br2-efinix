@@ -11,7 +11,7 @@ BR2_TARGET_OPENSBI_PLAT="ti60f225"
 BR2_TARGET_OPENSBI_PLAT_PATH="$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/ti60f225/opensbi"
 
 # U-Boot
-BR2_TARGET_UBOOT_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/u-boot/uboot_base_defconfig"
+BR2_TARGET_UBOOT_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/ti60f225/u-boot/uboot_defconfig"
 BR2_TARGET_UBOOT_CUSTOM_DTS_PATH="$(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/ti60f225/u-boot/uboot.dts $(BR2_EXTERNAL_EFINIX_PATH)/boards/efinix/common/dts/sapphire.dtsi"
 
 # Kernel
