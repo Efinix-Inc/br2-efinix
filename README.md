@@ -106,28 +106,16 @@ Preconfigure Efinity project with Linux also provided in the repository for quic
 - **T120F324**
   
   - [boards/efinix/t120f324/hardware/singlecore](boards/efinix/t120f324/hardware/singlecore/)
-  
-  - [boards/efinix/t120f324/hardware/multicores](boards/efinix/t120f324/hardware/multicores/)
 
 - **Ti60F225**
-  
-  - [boards/efinix/ti60f225/hardware/singlecore](boards/efinix/ti60f225/hardware/singlecore/)
-  
-  - [boards/efinix/ti60f225/hardware/multicores](boards/efinix/ti60f225/hardware/multicores/)
   
   - [boards/efinix/ti60f225/hardware/ethernet](boards/efinix/ti60f225/hardware/ethernet/)
 
 - **Ti180J484**
   
-  - [boards/efinix/ti180j484/hardware/singlecore](boards/efinix/ti180j484/hardware/singlecore/)
-  
-  - [boards/efinix/ti180j484/hardware/multicores](boards/efinix/ti180j484/hardware/multicores/)
-  
   - [boards/efinix/ti180j484/hardware/unified_hw](boards/efinix/ti180j484/hardware/unified_hw/)
 
 - **Ti375C529**
-  
-  - [boards/efinix/ti375c529/hardware/soc](boards/efinix/ti375c529/hardware/soc/)
   
   - [boards/efinix/ti375c529/hardware/unified_hw](boards/efinix/ti375c529/hardware/unified_hw)
 
