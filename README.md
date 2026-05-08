@@ -37,15 +37,13 @@ The Sapphire SoC is based on the VexRiscv core created by Charles Papon. The Vex
 
 Some libraries and tools are needed to be installed for building Linux.
 
-Tested on Ubuntu 18.04 LTS
+Tested on Ubuntu 24.04 LTS
 
 ```
 sudo apt-get update && sudo apt-get upgrade -y
 sudo apt-get install -y sed make binutils build-essential bash patch gzip \
 bzip2 perl tar cpio unzip rsync file bc wget autoconf automake libtool \
-mtools jq minicom python3-pip flex bison
-
-pip3 install jinja2
+mtools jq minicom python3-pip flex bison python3-jinja2 dosfstools
 ```
 
 ### Buildroot Dependencies
@@ -58,12 +56,12 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 
 ### Efinity software version version
 
-- [Efinity](https://www.efinixinc.com/support/efinity.php) 2023.2 with patch 5 and above
+- [Efinity](https://www.efinixinc.com/support/efinity.php) 2025.2 with patch 4 and above
 - Follow the official [documentation](https://www.efinixinc.com/docs/efinity-installation-v2.6.pdf) on installation process.
 
 ### Efinity RISC-V Embedded Software IDE
 
-- [v2023.1](https://www.efinixinc.com/support/efinity.php) and above
+- [v2025.2](https://www.efinixinc.com/support/efinity.php) and above
 
 - Follow the official [documentation](https://www.efinixinc.com/docs/efinity-riscv-ide-2022.2.3.readme.txt) on installation process
 
@@ -201,6 +199,10 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
 ## Known Issues
 
 See [known issues](docs/known_issues.md) document.
+
+## Notice
+
+If you use br2-efinix prior to version 2021.05.12, the project might not able to boot up the Linux kernel due to change in bootloader, OpenSBI and U-Boot starting address. You need to recompile the whole project and update the FPGA bootloader accordingly. Refer to [modify bootloader](docs/setup/modify_fpga_bootloader.md) document to update the newer bootloader. Please disregard this notice if you are using Ti60F225 devkit.
 
 ## What's Next?
 
