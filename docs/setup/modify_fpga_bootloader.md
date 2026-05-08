@@ -18,10 +18,19 @@ Make sure to install [Efinity RISC-V Embedded Software IDE](https://www.efinixin
 
 The table below shows the SPI flash address and corresponding RAM address for each firmware. The bootloader program will load these firmware to designated address during the bootstraping process.
 
+For Ti60F225 Devkit,
+
 | Firmware | SPI Flash Address | RAM Address |
 | -------- | ----------------- | ----------- |
 | OpenSBI  | 0x00600000        | 0x01000000  |
 | U-Boot   | 0x00680000        | 0x01040000  |
+
+Other boards,
+
+| Firmware | SPI Flash Address | RAM Address |
+| -------- | ----------------- | ----------- |
+| OpenSBI  | 0x00600000        | 0x02000000  |
+| U-Boot   | 0x00680000        | 0x02040000  |
 
 ## Part 1: Modified Bootloader Program
 
@@ -89,24 +98,30 @@ To modify the bootloader and compile using this script
    CFLAGS += -DSMP
    ```
 
-3. Launch Efinity RISC-V Embedded Software IDE from terminal to compile the bootloader program.
+3. If the target board is Ti60F225, then append the Ti60F225 flag in `$EFINITY_PROJECT/ip/<sapphiresoc>/Ti60F225_devkit/embedded_sw/bsp/efinix/EfxSapphireSoc/include/soc.mk`.
+   
+   ```makefile
+   CFLAGS += -DTi60F225_DEVKIT
+   ```
+
+4. Launch Efinity RISC-V Embedded Software IDE from terminal to compile the bootloader program.
    
    ```bash
-   cd /home/user/efinity/efinity-riscv-ide-2022.2.3
+   cd /home/user/efinity/efinity-riscv-ide-2025.2
    ./efinity-riscv-ide
    ```
 
-4. At the Efinity RISC-V IDE Launcher, click `Browse` button. Select the folder, `$EFINITY_PROJECT/ip/EfxSapphireHpSoc_slb/Ti375C529_devkit/embedded_sw/efx_hard_soc` as the workspace.
+5. At the Efinity RISC-V IDE Launcher, click `Browse` button. Select the folder, `$EFINITY_PROJECT/ip/EfxSapphireHpSoc_slb/Ti375C529_devkit/embedded_sw/efx_hard_soc` as the workspace.
    
    > The workspace must be placed in this directory in order for the Efinity RISC-V IDE toolchain to use the correct bsp files.
 
-5. Click on `File` -> `Import` -> `Efinix Projects`->`Efinix Makefile Project` then click `Next`.
+6. Click on `File` -> `Import` -> `Efinix Projects`->`Efinix Makefile Project` then click `Next`.
 
-6. Put the `BSP Location`. The location could be `$EFINITY_PROJECT/ip/EfxSapphireHpSoc_slb/Ti375C529_devkit/embedded_sw/efx_hard_soc/bsp` then click `Next`.
+7. Put the `BSP Location`. The location could be `$EFINITY_PROJECT/ip/EfxSapphireHpSoc_slb/Ti375C529_devkit/embedded_sw/efx_hard_soc/bsp` then click `Next`.
 
-7. Select `bootloader` then click `Finish`.
+8. Select `bootloader` then click `Finish`.
 
-8. Right click on the `bootloader` on the `Project Explorer` and select `Build Project`.
+9. Right click on the `bootloader` on the `Project Explorer` and select `Build Project`.
 
 ## Part 2: Compile Efinity Project
 
