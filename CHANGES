@@ -1,3 +1,17 @@
+br2-efinix 2021.05.12,
+
+	Add Linux SDIO controller driver
+	Add packages to support IFX Wifi
+	Enable WiFi solution for unified hw design on ti375c529 only
+	Add U-Boot ethernet driver
+	Change starting address for opensbi & u-boot for all supported board except Ti60F225 devkit
+	Enable spi flash node for u-boot device tree
+
+	Issue resolved
+	Update watchdog max timeout and pretimeout
+	Fix multiple bytes read for I2C controller driver
+	Fix modify_bootloader.sh script when copying compiled binary
+
 br2-efinix 2021.05.11,
 
 	Enable watchdog & EMMC drivers for U-Boot & Linux
