@@ -1,4 +1,4 @@
-From dcc250d469aa6005050b39c7cf3315870838babb Mon Sep 17 00:00:00 2001
+From 529b14c9f102242cb5f529726ddf30e453bf05d8 Mon Sep 17 00:00:00 2001
 From: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 Date: Tue, 10 Oct 2023 14:56:37 +0800
 Subject: [PATCH] mmc: add efinix sdhci driver
@@ -7,8 +7,8 @@ Signed-off-by: Mohamad Noor Alim Hussin <mnalim@efinixinc.com>
 ---
  drivers/mmc/host/Kconfig     |   8 +
  drivers/mmc/host/Makefile    |   1 +
- drivers/mmc/host/sdhci-efx.c | 337 +++++++++++++++++++++++++++++++++++
- 3 files changed, 346 insertions(+)
+ drivers/mmc/host/sdhci-efx.c | 338 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 347 insertions(+)
  create mode 100644 drivers/mmc/host/sdhci-efx.c
 
 diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
@@ -43,10 +43,10 @@ index 451c25fc2c69..c6a7ed2abcf6 100644
  	CFLAGS-cb710-mmc	+= -DDEBUG
 diff --git a/drivers/mmc/host/sdhci-efx.c b/drivers/mmc/host/sdhci-efx.c
 new file mode 100644
-index 000000000000..0c983473f505
+index 000000000000..2bcbce1f5361
 --- /dev/null
 +++ b/drivers/mmc/host/sdhci-efx.c
-@@ -0,0 +1,337 @@
+@@ -0,0 +1,338 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Support for SDHIC on Efinix Inc SoC
@@ -301,7 +301,8 @@ index 000000000000..0c983473f505
 +			| SDHCI_QUIRK_NO_HISPD_BIT
 +			| SDHCI_QUIRK_32BIT_ADMA_SIZE
 +			| SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC
-+                        | SDHCI_QUIRK_NO_LED,
++                        | SDHCI_QUIRK_NO_LED
++			| SDHCI_QUIRK_NO_BUSY_IRQ,
 +        .quirks2 = SDHCI_QUIRK2_NO_1_8_V
 +                        | SDHCI_QUIRK2_BROKEN_HS200
 +                        | SDHCI_QUIRK2_BROKEN_DDR50
