@@ -1,0 +1,52 @@
+From 0a2fe77826d5f48086c53b9ecf61cd8117218f0d Mon Sep 17 00:00:00 2001
+From: Swee Aun Khor <sakhor@efinixinc.com>
+Date: Fri, 29 May 2026 10:25:01 +0800
+Subject: [PATCH] spi-nor: add DT override to disable automatic 4-byte
+ addressing
+
+Some SPI NOR flashes larger than 16MiB require 4-byte addressing.
+However, on certain platforms, enabling 4-byte addressing causes
+issues after soft reset, where the flash may remain in 4-byte mode
+and become inaccessible.
+
+Introduce a device-tree property "disable-auto-4byte-addressing"
+to allow not to overwrite addressing mode to 4-byte addressing mode
+even when flash size exceeds 16MiB. When this property is present,
+the automatic transition to 4-byte addressing is skipped.
+
+Signed-off-by: Swee Aun Khor <sakhor@efinixinc.com>
+---
+ drivers/mtd/spi/spi-nor-core.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/mtd/spi/spi-nor-core.c b/drivers/mtd/spi/spi-nor-core.c
+index 6f352c5c..350fe2bd 100644
+--- a/drivers/mtd/spi/spi-nor-core.c
++++ b/drivers/mtd/spi/spi-nor-core.c
+@@ -4578,11 +4578,18 @@ int spi_nor_scan(struct spi_nor *nor)
+ 		shift = 1;
+ 	if (nor->addr_width == 3 && (mtd->size >> shift) > SZ_16M) {
+ #ifndef CONFIG_SPI_FLASH_BAR
+-		/* enable 4-byte addressing if the device exceeds 16MiB */
+-		nor->addr_width = 4;
+-		if (JEDEC_MFR(info) == SNOR_MFR_SPANSION ||
+-		    info->flags & SPI_NOR_4B_OPCODES)
+-			spi_nor_set_4byte_opcodes(nor, info);
++
++		/*
++		 * Not to overwrite to 4-byte addressing mode even flash size
++		 * exceeds 16MiB. Otherwise, it cause problem on soft reset.
++		 */
++		if (!dev_read_bool(nor->dev, "disable-auto-4byte-addressing")) {
++			/* enable 4-byte addressing if the device exceeds 16MiB */
++			nor->addr_width = 4;
++			if (JEDEC_MFR(info) == SNOR_MFR_SPANSION ||
++			info->flags & SPI_NOR_4B_OPCODES)
++				spi_nor_set_4byte_opcodes(nor, info);
++		}
+ #else
+ 	/* Configure the BAR - discover bank cmds and read current bank */
+ 	nor->addr_width = 3;
+-- 
+2.43.0
+
