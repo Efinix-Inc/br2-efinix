@@ -2,20 +2,52 @@
 
 #include "bsp.h"
 #include "io.h"
-#include "spiFlash.h"
-#include "riscv.h"
 #include "start.h"
 
+#if __riscv_xlen == 64 //RV64
+
+#include "spiFlash/spiFlash.h"
+
+#define OPENSBI_MEMORY  0x802000000
+#define OPENSBI_FLASH   0x00600000
+#define OPENSBI_SIZE    0x040000
+
+#define UBOOT_MEMORY    0x802040000
+#define UBOOT_SBI_FLASH 0x00680000
+#define UBOOT_SIZE      0x0C0000
+
+#define SPI             (spi_hwreg_t* )SYSTEM_SPI_0_IO_CTRL
+
+spiFlash_instance_t Flash = {
+    .cs = 0,
+    .inst = &(spi_instance_t){
+        .hwreg      = SPI,
+        .cpol       = LOW,
+        .cpha       = DATA_SAMPLED_RISE_EDGE,
+        .mode       = FULL_DUPLEX_SINGLE_LINE
+    },
+};
+
+#else // RV32
+
+#include "spiFlash.h"
+
 #define SPI SYSTEM_SPI_0_IO_CTRL
-#define SPI_CS 0
+#define SPI_CS                  0
 
-#define OPENSBI_MEMORY    0x02000000
-#define OPENSBI_FLASH     0x00600000
-#define OPENSBI_SIZE      0x040000
+#ifdef Ti60F225_DEVKIT
+#define OPENSBI_MEMORY          0x01000000
+#define UBOOT_MEMORY            0x01040000
+#else
+#define OPENSBI_MEMORY          0x02000000
+#define UBOOT_MEMORY            0x02040000
+#endif
 
-#define UBOOT_MEMORY      0x02040000
-#define UBOOT_SBI_FLASH   0x00680000
-#define UBOOT_SIZE        0x200000
+#define OPENSBI_FLASH           0x00600000
+#define OPENSBI_SIZE            0x040000
+
+#define UBOOT_SBI_FLASH         0x00680000
+#define UBOOT_SIZE              0x0C0000
 
 #define UART_0_SAMPLE_PER_BAUD  8
 #define UART_0_BAUD_RATE        115200
@@ -30,24 +62,27 @@ void configure_uart()
     uart_applyConfig(BSP_UART_TERMINAL, &uart0);
 }
 
+#endif // __riscv_xlen
 
-void bspMain()
-{
-    configure_uart();
+void bspMain() {
+    bsp_printf_s("Built on " __DATE__ " at " __TIME__ "\r\n");
 
-#ifdef __riscv_xlen
-#if __riscv_xlen == 64
+#if __riscv_xlen == 64 // RV64
     bsp_printf_s("RISC-V: 64 bit\r\n");
-#elif __riscv_xlen == 32
-    bsp_printf_s("RISC-V: 32 bit\r\n");
-#endif
-#endif
 
-    bsp_printf_s("Compiled: ");
-    bsp_printf_s(__DATE__);
-    bsp_printf_s(" ");
-    bsp_printf_s(__TIME__);
-    bsp_printf_s("\r\n");
+    // Initialize the flash and read JEDEC ID to verify communication with flash and apply flash specific configuration
+    spiFlash_probe(&Flash);
+    bsp_printf_s("OpenSBI copy\r\n");
+    spiFlash_f2m_single(&Flash, OPENSBI_FLASH, OPENSBI_MEMORY, OPENSBI_SIZE);
+    bsp_printf_s("U-Boot copy\r\n");
+    spiFlash_f2m_single(&Flash, UBOOT_SBI_FLASH, UBOOT_MEMORY, UBOOT_SIZE);
+    bsp_printf_s("Payload boot\r\n");
+    void (*userMain)(u64, u64, u64) = (void (*)(u64, u64, u64))OPENSBI_MEMORY;
+
+#else // RV32
+
+    configure_uart();
+    bsp_printf_s("RISC-V: 32 bit\r\n");
 
     spiFlash_init(SPI, SPI_CS);
     spiFlash_wake(SPI, SPI_CS);
@@ -57,15 +92,13 @@ void bspMain()
     spiFlash_f2m(SPI, SPI_CS, UBOOT_SBI_FLASH, UBOOT_MEMORY, UBOOT_SIZE);
 
     bsp_printf_s("Payload boot\r\n");
-
-#if __riscv_xlen == 64
-    void (*userMain)(u64, u64, u64) = (void (*)(u64, u64, u64))OPENSBI_MEMORY;
-#elif __riscv_xlen == 32
     void (*userMain)(u32, u32, u32) = (void (*)(u32, u32, u32))OPENSBI_MEMORY;
-#endif
+
+#endif // __riscv_xlen
 
 #ifdef SMP
     smp_unlock(userMain);
 #endif
+    bsp_printf_s("Starting OpenSBI\r\n");
     userMain(0, 0, 0);
 }
