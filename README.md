@@ -137,7 +137,7 @@ Follow these documents to generate the custom soc.
 
 ## Software: Build OpenSBI, U-Boot and Linux
 
-Please note that you need to generate the SoC first before proceed with this section. Follow these steps to build Linux image, OpenSBI and U-boot for Ti375C529 development kit using precompile bitstream of Efinity project at [boards/efinix/ti375c529/hardware/soc/soc.zip](boards/efinix/ti375c529/hardware/soc/soc.zip).
+Please note that you need to generate the SoC first before proceed with this section. Follow these steps to build Linux image, OpenSBI and U-boot for Ti375C529 development kit using precompiled bitstream of Efinity project at [boards/efinix/ti375c529/hardware/unified_hw/unified_hw.zip](boards/efinix/ti375c529/hardware/unified_hw/unified_hw.zip).
 
 To build Linux image on other supported devices see [Build Linux Image](docs/buildroot/build_linux_image.md) document.
 
@@ -159,7 +159,7 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
    
    ```bash
    source init.sh ti375c529 \
-   boards/efinix/ti375c529/hardware/soc/soc.h -e
+   boards/efinix/ti375c529/hardware/unified_hw/soc.h -u
    ```
 
 4. Build the Linux.
