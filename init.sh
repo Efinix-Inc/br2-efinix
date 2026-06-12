@@ -127,9 +127,6 @@ function usage()
 	echo "Demo Ti180J484 with unified hardware design"
 	echo "$ source init.sh ti180j484 $(pwd)/boards/efinix/ti180j484/hardware/unified_hw/soc.h -u"
 	echo
-	echo "Demo Ti375C529 soc example design"
-	echo "$ source init.sh ti375c529 $(pwd)/boards/efinix/ti375c529/hardware/soc/soc.h -e"
-	echo
 	echo "Demo Ti375C529 with unified hardware design"
 	echo "$ source init.sh ti375c529 $(pwd)/boards/efinix/ti375c529/hardware/unified_hw/soc.h -u"
 	echo
@@ -137,7 +134,7 @@ function usage()
 	echo "$ source init.sh ti375c529 $(pwd)/boards/efinix/ti375c529/hardware/unified_hw/soc.h -u -x"
 	echo
 	echo "Demo with eMMC u-boot configuration"
-	echo "$ source init.sh ti375c529 $(pwd)/boards/efinix/ti375c529/hardware/soc/soc.h -w"
+	echo "$ source init.sh ti375c529 $(pwd)/boards/efinix/ti375c529/hardware/unified_hw/soc.h -w"
 }
 
 function sanity_check()
