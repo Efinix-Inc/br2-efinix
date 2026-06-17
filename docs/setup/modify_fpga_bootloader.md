@@ -92,7 +92,7 @@ To modify the bootloader and compile using this script
 3. Launch Efinity RISC-V Embedded Software IDE from terminal to compile the bootloader program.
    
    ```bash
-   cd /home/user/efinity/efinity-riscv-ide-2022.2.3
+   cd /home/user/efinity/efinity-riscv-ide-2026.1.0.7
    ./efinity-riscv-ide
    ```
 
@@ -126,7 +126,7 @@ To modify the bootloader and compile using this script
      
      - Enable `Custom On-Chip RAM Application`.
      
-     - Give the full path to the `bootloader.hex` at `User Application Path`.
+     - Give the full path to the `bootloader.hex` at `User Application Path`. Please note that, for `RV64`, you need to give full path to the `bootloader.bin` file.
    
    - Click `Generate` button to regenerate the SoC configuration with modified bootloader.
    
