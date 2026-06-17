@@ -54,25 +54,7 @@ Use the `minicom` to access the UART terminal.
 sudo minicom -D /dev/ttyUSB0
 ```
 
-### Ti60F225 Development board
-
-In a terminal, type the command
-
-```bash
-ls /dev/ttyUSB*
-```
-
-The terminal displays a list of attached devices.
-
-```bash
-/dev/ttyUSB0 /dev/ttyUSB1 /dev/ttyUSB2 /dev/ttyUSB3
-```
-
-The UART is `/dev/ttyUSB2`. Use the `minicom` to access the UART terminal.
-
-```bash
-sudo minicom -D /dev/ttyUSB2
-```
+# 
 
 ### Ti180J484 Development board
 

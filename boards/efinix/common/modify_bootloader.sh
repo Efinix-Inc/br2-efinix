@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# $1 = development board i.e. t120f324, ti60f225
+# $1 = development board i.e. t120f324
 # $2 = path to Efinity project
 # $3 = path to RISC-V SDK
 
@@ -46,7 +46,7 @@ function usage()
 	echo
 	echo "usage: $0 Devkit Project IDE [ -e][-d]"
 	echo "Positional arguments:"
-	echo "	Devkit		Supported devkits are t120f324, ti60f225, ti180j484, ti375c529"
+	echo "	Devkit		Supported devkits are t120f324, ti180j484, ti375c529"
 	echo "	Project		Full path of Efinity project directory. For example, $HOME/soc"
 	echo "	IDE		RISCV IDE installation directory. For example,"
 	echo "			$HOME/efinity/efinity-riscv-ide-2022.2.3"

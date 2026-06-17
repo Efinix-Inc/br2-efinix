@@ -8,7 +8,7 @@ This guide show on how to setup the development board with UART and MicroSD card
   
   - Trion T120 BGA324 Development kit
   
-  - Titanium Ti60F225 Development kit
+  - 
 
 - MicroSD card 1GB
 
@@ -55,20 +55,6 @@ Connect the MIPI and LVDS Expansion daughter card to the board at P2 header.
    - J5 set to 1.8 (pin 5 and 6)
    
    - J6 set to 1.2V (pin 3 and 4)
-
-## Setup Ti60F225
-
-The Titanium Ti60 F225 Development Board has a USB-to-UART converter connected to the Ti60's GPIOL_01 and GPIOL_02 pins.
-
-1. Connect a USB cable type C to Ti60F225 development board and to your computer.
-
-2. Insert micro SD card into the SD card slot.
-
-3. Set the jumper settings as follows
-   
-   - J5, J6, J7 set to 3.3V (connect pin 1 and 2)
-   
-   - J8, J9, J10, J11 set to 1.8V (connect pin 1 and 2)
 
 ## Setup Ti180J484
 

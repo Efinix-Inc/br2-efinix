@@ -44,7 +44,6 @@ sudo apt-get update && sudo apt-get upgrade -y
 sudo apt-get install -y sed make binutils build-essential bash patch gzip \
 bzip2 perl tar cpio unzip rsync file bc wget autoconf automake libtool \
 mtools jq minicom python3-pip libgnutls28-dev python3-jinja2
-
 ```
 
 ### Buildroot Dependencies
@@ -129,10 +128,6 @@ Preconfigure Efinity project with Linux also provided in the repository for quic
   
   - [boards/efinix/t120f324/hardware/singlecore](boards/efinix/t120f324/hardware/singlecore/)
 
-- **Ti60F225**
-  
-  - [boards/efinix/ti60f225/hardware/ethernet](boards/efinix/ti60f225/hardware/ethernet/)
-
 - **Ti180J484**
   
   - [boards/efinix/ti180j484/hardware/unified_hw](boards/efinix/ti180j484/hardware/unified_hw/)
@@ -155,7 +150,7 @@ Follow these documents to generate the custom soc.
   
   - [generate Efinix Sapphire High Performance SoC](docs/hw/generate_sapphirehpsoc.md)
 
-- For Sapphire SoC on T120F324, Ti60F225 and Ti180J484
+- For Sapphire SoC on T120F324 and Ti180J484
   
   - [generate Efinix Sapphire RISC-V SoC](docs/hw/generate_sapphire_soc_for_linux.md)
 

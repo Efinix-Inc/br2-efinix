@@ -86,7 +86,7 @@ function usage()
 	echo "Usage: init.sh [board] [path/to/soc.h] [-c][-d][-m][-r][-a][-e][-u][-s][-x][-w]"
 	echo
 	echo "Positional arguments:"
-	echo "	board			Development kit name such as t120f324, ti60f225, ti180j484, ti375c529"
+	echo "	board			Development kit name such as t120f324, ti180j484, ti375c529"
 	echo "	soc			Path to 'soc.h'. This file is located in Efinity project directory."
 	echo "				For example,"
 	echo "				my_project/embedded_sw/SapphireCore/bsp/efinix/EfxSapphireSoc/include/soc.h"
@@ -97,7 +97,7 @@ function usage()
 	echo "	-c			Reset the repo to the original state"
 	echo "	-d			Rename default build directory name"
 	echo "				By default is <board>_build"
-	echo "				Example, if board is ti60f225 then, the name of build directory is 'ti60f225_build'."
+	echo "				Example, if board is ti180j484 then, the name of build directory is 'ti180j484_build'."
 	echo "	-m			Machine architecture type either 32 or 64 bits. Default is 32."
 	echo "	-r			Reconfigure the Buildroot configuration. This option will not regenerate device tree."
 	echo "	-a			Reconfigure the Buildroot configuration and regenerate Linux device tree."
@@ -114,9 +114,6 @@ function usage()
 	echo
 	echo "Example usage,"
 	echo "$	source init.sh t120f324 ~/efinity/2022.1/project/soc/ip/soc1/T120F324_devkit/embedded_sw/soc1/bsp/efinix/EfxSapphireSoc/include/soc.h"
-	echo
-	echo "Demo Ti60F225 with ethernet example design"
-	echo "$ source init.sh ti60f225 $(pwd)/boards/efinix/ti60f225/hardware/ethernet/soc.h -e"
 	echo
 	echo "Demo Ti180J484 with singlecore example design"
 	echo "$ source init.sh ti180j484 $(pwd)/boards/efinix/ti180j484/hardware/singlecore/soc.h"
@@ -918,10 +915,6 @@ fi
 sanity_check || return 1
 
 if [ $EXAMPLE_DESIGN ]; then
-	if [ "$BOARD" = "ti60f225" ]; then
-		EXTRA_HW_FEATURES+="ethernet,"
-	fi
-
 	if [ "$BOARD" = "ti375n1156" ] || [ "$BOARD" = "ti375c529" ]; then
 		EXTRA_HW_FEATURES+="sdhc,ethernet,"
 	fi

@@ -2,7 +2,7 @@
 
 The default configuration of Sapphire SoC on IP Manager would not able to boot Linux. In this tutorial we are going to generate a custom Sapphire SoC which can boot Linux on Trion T120F324 development board.
 
-These steps also applicable for Ti60F225 and Ti180J484 with different pinout assignment for SPI 1. Please refer to table below on pinout assignment.
+These steps also applicable for Ti180J484 with different pinout assignment for SPI 1. Please refer to table below on pinout assignment.
 
 ## Prerequsite
 
@@ -59,7 +59,6 @@ Follow the official [document](https://www.efinixinc.com/support/docsdl.php?s=ef
      | Devkit    | External Memory Address Size |
      | --------- | ---------------------------- |
      | T120F324  | 256 MB                       |
-     | Ti60F225  | 32 MB                        |
      | Ti180J484 | 256 MB                       |
    
    - At On-Chip RAM Size. set to `8KB`.
@@ -85,7 +84,6 @@ Table below shows the best known configuration for assigning the pinout for SPI 
 | Board     | Instance Name                                                                                                                                                  | Pin                                                                                              | Mode                                                            | I/O standard | Clock Signal                      |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ------------ | --------------------------------- |
 | T120F324  | system_spi_1_io_data_0<br/>system_spi_1_io_data_1<br/>system_spi_1_io_sclk_write<br/>system_spi_1_io_ss<br/><br/>system_uart_0_io_rxd<br/>system_uart_0_io_txd | GPIOT_RXP21<br/>GPIOT_RXP22<br/>GPIOT_RXP23<br/>GPIOT_RXP20<br/><br/>GPIOT_RXP07<br/>GPIOT_RXN07 | inout<br/>inout<br/>output<br/>output<br/><br/>input<br/>output | 3.3 V LVCMOS | *io_peripheralClk or io_systemClk |
-| Ti60F225  | system_spi_1_io_data_0<br/>system_spi_1_io_data_1<br/>system_spi_1_io_sclk_write<br/>system_spi_1_io_ss                                                        | GPIOR_16<br/>GPIOR_18<br/>GPIOR_15<br/>GPIOR_13                                                  | inout<br/>inout<br/>output<br/>output                           | 3.3 V LVCMOS | *io_peripheralClk or io_systemClk |
 | Ti180J484 | system_spi_1_io_data_0<br/>system_spi_1_io_data_1<br/>system_spi_1_io_sclk_write<br/>system_spi_1_io_ss                                                        | GPIOR_60<br/>GPIOR_61<br/>GPIOR_62<br/>GPIOR_59                                                  | inout<br/>inout<br/>output<br/>output                           | 1.8V LVCMOS  | *io_peripheralClk or io_systemClk |
 
 > `Note:` * if peripheral clock is enable then use `io_peripheralClk` as clock signal. Else use `io_systemClk`.

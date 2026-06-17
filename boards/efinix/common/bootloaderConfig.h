@@ -35,13 +35,8 @@ spiFlash_instance_t Flash = {
 #define SPI SYSTEM_SPI_0_IO_CTRL
 #define SPI_CS                  0
 
-#ifdef Ti60F225_DEVKIT
-#define OPENSBI_MEMORY          0x01000000
-#define UBOOT_MEMORY            0x01040000
-#else
 #define OPENSBI_MEMORY          0x02000000
 #define UBOOT_MEMORY            0x02040000
-#endif
 
 #define OPENSBI_FLASH           0x00600000
 #define OPENSBI_SIZE            0x040000

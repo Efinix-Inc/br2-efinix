@@ -40,7 +40,7 @@ This script used to modify and compile the first stage bootloader program for bo
 
 usage: ./modify_bootloader.sh Devkit Project IDE [ -e][-d]
 Positional arguments:
-    Devkit         Supported devkits are t120f324, ti60f225, ti180j484, ti375c529
+    Devkit         Supported devkits are t120f324, ti180j484, ti375c529
     Project        Efinity project directory. For example, /home/mnalim/soc
     IDE            RISCV IDE installation directory. For example,
                    /home/mnalim/efinity/efinity-riscv-ide-2022.2.3
