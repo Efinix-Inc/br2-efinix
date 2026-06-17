@@ -37,15 +37,14 @@ The Sapphire SoC is based on the VexRiscv core created by Charles Papon. The Vex
 
 Some libraries and tools are needed to be installed for building Linux.
 
-Tested on Ubuntu 18.04 LTS
+Tested on Ubuntu 24.04 LTS
 
 ```
 sudo apt-get update && sudo apt-get upgrade -y
 sudo apt-get install -y sed make binutils build-essential bash patch gzip \
 bzip2 perl tar cpio unzip rsync file bc wget autoconf automake libtool \
-mtools jq minicom python3-pip libgnutls28-dev
+mtools jq minicom python3-pip libgnutls28-dev python3-jinja2
 
-pip3 install jinja2
 ```
 
 ### Buildroot Dependencies
@@ -54,20 +53,43 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 
 ### Efinix RISC-V Sapphire SoC version
 
-- 2.2 and above
+- 3.3 and above
 
 ### Efinity software version version
 
-- [Efinity](https://www.efinixinc.com/support/efinity.php) 2023.2 with patch 5 and above
+- [Efinity](https://www.efinixinc.com/support/efinity.php) 2026.1 and above
 - Follow the official [documentation](https://www.efinixinc.com/docs/efinity-installation-v2.6.pdf) on installation process.
 
 ### Efinity RISC-V Embedded Software IDE
 
-- [v2023.1](https://www.efinixinc.com/support/efinity.php) and above
+- [v2026.1](https://www.efinixinc.com/support/efinity.php) and above
 
-- Follow the official [documentation](https://www.efinixinc.com/docs/efinity-riscv-ide-2022.2.3.readme.txt) on installation process
+- Follow the official [documentation](https://www.efinixinc.com/docs/efinity-riscv-ide-2026.1.0.7.readme.txt) on installation process
 
 - Learn more at the [official website](https://www.efinixinc.com/products-efinity-riscv-ide.html)
+
+### Supported RISC-V Architecture
+
+- This repo provide BSP for Efinix RISC-V SoC
+
+  - Sapphire SoC RV32 (soft core)
+
+  - High Performance SoC RV32 (hard core)
+
+  - Sapphire SoC RV64 (soft core)
+
+- List of Supported Linux and U-Boot Drivers
+
+  - See the list of supported drivers [document](docs/list_of_supported_drivers.md)
+
+### Supported Boards
+
+| Development board                                                                | RV32 | RV64 |
+| -------------------------------------------------------------------------------- | ---- | ---- |
+| [Ti375C529](https://www.efinixinc.com/products-devkits-titaniumti375c529.html)   | Y    | Y    |
+| [Ti375N1156](https://www.efinixinc.com/products-devkits-titaniumti375n1156.html) | Y    | N    |
+| [Ti180J484](https://www.efinixinc.com/products-devkits-titaniumti180j484.html)   | Y    | N    |
+| [T120F324](https://www.efinixinc.com/products-devkits-triont120bga324.html)      | Y    | N    |
 
 ### Hardware Requirements
 
@@ -218,16 +240,6 @@ See [known issues](docs/known_issues.md) document.
 2. [RISCV Sapphire SoC datasheet](https://www.efinixinc.com/support/docsdl.php?s=ef&pn=SAPPHIREDS)  
 3. [Sapphire SoC Device Tree Generator](https://github.com/Efinix-Inc/sapphire-soc-dt-generator)
 4. [Others documentation](https://github.com/Efinix-Inc/br2-efinix/tree/main/docs)
-
-## Supported Board
-
-Currently supported development board
-
-1. [Trion T120F324 ](https://www.efinixinc.com/products-devkits-triont120bga324.html)
-2. [Titanium Ti60F225 ](https://www.efinixinc.com/products-devkits-titaniumti60f225.html)
-3. [Titanium Ti180J484](https://www.efinixinc.com/products-devkits-titaniumti180j484.html)
-4. [Titanium Ti375C529](https://www.efinixinc.com/products-devkits-titaniumti375c529.html)
-5. [Titanium Ti375N1156](https://www.efinixinc.com/products-devkits-titaniumti375n1156.html)
 
 ## License
 
