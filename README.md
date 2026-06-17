@@ -108,7 +108,7 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 
 ### Hardware Setup
 
-For hardware setup please refer to [setup development board](docs/setup_development_board.md) document.
+For hardware setup please refer to [setup development board](docs/setup/setup_development_board.md) document.
 
 ## Development Flow
 
