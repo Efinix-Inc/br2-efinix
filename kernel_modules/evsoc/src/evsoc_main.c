@@ -147,7 +147,7 @@ static int evsoc_init(void)
         pr_info("Failed to get allocation for evsoc device!\n");
         return -EBUSY;
     }
-    evsoc_dev.driver_class = class_create(THIS_MODULE, CLASS_NAME);
+    evsoc_dev.driver_class = class_create(CLASS_NAME);
     if (evsoc_dev.driver_class == NULL)
     {
         pr_info("Failed to create driver class!\n");

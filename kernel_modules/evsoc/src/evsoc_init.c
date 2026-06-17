@@ -384,15 +384,21 @@ void start_tx(void)
 
 int evsoc_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-   // uint32_t lVirtAdd = 1000;
-   vma->vm_flags |= VM_SHARED;
-   vma->vm_flags |= VM_READ;
+    /* If you’re mapping device memory via PFNs, mark the VMA appropriately */
+    vm_flags_set(vma, VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP);
 
-   if (remap_pfn_range(vma, vma->vm_start, CAPTURE_START_ADDR >> PAGE_SHIFT, vma->vm_end - vma->vm_start, vma->vm_page_prot))
-   {
-      return -EAGAIN;
-   }
-   return 0;
+    /* Optional: make the mapping non-cached for MMIO/device buffers */
+    vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
+    /* Perform the PFN remap */
+    if (remap_pfn_range(vma,
+                        vma->vm_start,
+                        CAPTURE_START_ADDR >> PAGE_SHIFT,
+                        vma->vm_end - vma->vm_start,
+                        vma->vm_page_prot))
+        return -EAGAIN;
+
+    return 0;
 }
 
 volatile int tx_irq_num;
