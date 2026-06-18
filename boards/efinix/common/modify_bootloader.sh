@@ -204,7 +204,32 @@ BOOTLOADER_DIR="$(find "${STANDALONE_DIR}" -type d -name bootloader)"
 BOOTLOADERCONFIG="${BOOTLOADER_DIR}/src/bootloaderConfig.h"
 SOC_H="$(find "${BSP_DIR}" -type f -name soc.h)"
 SOC_MK="$(find "${BSP_DIR}" -type f -name soc.mk)"
-EFXSAPPHIRESOC_DIR="$BSP_DIR/efinix/EfxSapphireSoc"
+
+# Locate the EfxSapphireSoC directory.
+# Exactly one of EfxSapphireSoc or EfxSapphireSocRV64 must exist;
+# fail if none or multiple matches are found.
+matches=()
+while IFS= read -r dir; do
+    matches+=("$dir")
+done < <(
+    find "$BSP_DIR/efinix" -maxdepth 1 -type d \
+        \( -name EfxSapphireSoc -o -name EfxSapphireSocRV64 \)
+)
+case ${#matches[@]} in
+    0)
+        echo "Error: No EfxSapphireSoc directory found" >&2
+        exit 1
+        ;;
+    1)
+        EFXSAPPHIRESOC_DIR="${matches[0]}"
+        ;;
+    *)
+        echo "Warning: Multiple EfxSapphireSoc directories found:" >&2
+        printf '  %s\n' "${matches[@]}" >&2
+        echo "Warning: Using the first match: ${matches[0]}" >&2
+        EFXSAPPHIRESOC_DIR="${matches[0]}"
+        ;;
+esac
 
 if [ $DEBUG ]; then
 	echo
@@ -224,7 +249,10 @@ echo INFO: Update Bootloader Program
 cp $SCRIPT_DIR/bootloaderConfig.h $BOOTLOADERCONFIG
 
 echo INFO: Check for SMP Flag
-if grep -q SYSTEM_PLIC_SYSTEM_CORES_1_EXTERNAL_INTERRUPT $SOC_H; then
+NUM_HARTS=$(awk '/^#define[[:space:]]+SYSTEM_NUMBER_OF_HARTS/ {print $3}' "$SOC_H")
+
+if grep -q SYSTEM_PLIC_SYSTEM_CORES_1_EXTERNAL_INTERRUPT $SOC_H ||
+    [[ -n "$NUM_HARTS" && "$NUM_HARTS" -gt 1 ]]; then
 	echo INFO: Enable SMP Flag
 	sed -i 's/^#CFLAGS+=-DSMP/CFLAGS+=-DSMP/g' $SOC_MK
 else
@@ -250,4 +278,11 @@ cd - > /dev/null
 
 rm -rf $EFINITY_PROJECT_DIR/linux_bootloader
 cp -rf $BOOTLOADER_DIR/build $EFINITY_PROJECT_DIR/linux_bootloader
-echo INFO: The bootloader is in $EFINITY_PROJECT_DIR/linux_bootloader/bootloader.hex
+# BIN file used for RV64 while HEX file used for RV32
+if [[ "$EFXSAPPHIRESOC_DIR" == *RV64* ]]; then
+    BOOTLOADER_FILE="bootloader.bin"
+else
+    BOOTLOADER_FILE="bootloader.hex"
+fi
+
+echo "INFO: The bootloader is in $EFINITY_PROJECT_DIR/linux_bootloader/$BOOTLOADER_FILE"
