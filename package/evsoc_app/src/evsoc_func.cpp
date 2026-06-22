@@ -3,6 +3,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <vector>
+#include <cstdarg>
 #include "evsoc_def.h"
 #include "evsoc_func.h"
 
