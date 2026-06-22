@@ -67,6 +67,28 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 
 - Learn more at the [official website](https://www.efinixinc.com/products-efinity-riscv-ide.html)
 
+### Supported RISC-V Architecture
+
+- This repo provide BSP for Efinix RISC-V SoC
+  
+  - [Sapphire RV32 SoC](https://www.efinixinc.com/products-riscv.html#pills-riscv)
+  
+  - [High-Performance Sapphire RV32 SoC](https://www.efinixinc.com/products-riscv.html#pills-hardened)
+
+- List of Supported Linux and U-Boot Drivers
+  
+  - See the list of supported drivers [document](docs/list_of_supported_drivers.md)
+
+### Supported Boards
+
+| Development board                                                                | RV32 |
+| -------------------------------------------------------------------------------- | ---- |
+| [Ti375C529](https://www.efinixinc.com/products-devkits-titaniumti375c529.html)   | Y    |
+| [Ti375N1156](https://www.efinixinc.com/products-devkits-titaniumti375n1156.html) | Y    |
+| [Ti180J484](https://www.efinixinc.com/products-devkits-titaniumti180j484.html)   | Y    |
+| [Ti60F225](https://www.efinixinc.com/products-devkits-titaniumti60f225.html)     | Y    |
+| [T120F324](https://www.efinixinc.com/products-devkits-triont120bga324.html)      | Y    |
+
 ### Hardware Requirements
 
 - Supported Efinix devkit
@@ -142,7 +164,7 @@ Please note that you need to generate the SoC first before proceed with this sec
 To build Linux image on other supported devices see [Build Linux Image](docs/buildroot/build_linux_image.md) document.
 
 1. Set the username and email address on gitconfig
-
+   
    ```bash
    git config --global user.name "Your Name"
    git config --global user.email "your@email.com"
@@ -220,16 +242,6 @@ If you use br2-efinix prior to version 2021.05.12, the project might not able to
 2. [RISCV Sapphire SoC datasheet](https://www.efinixinc.com/support/docsdl.php?s=ef&pn=SAPPHIREDS)  
 3. [Sapphire SoC Device Tree Generator](https://github.com/Efinix-Inc/sapphire-soc-dt-generator)
 4. [Others documentation](https://github.com/Efinix-Inc/br2-efinix/tree/main/docs)
-
-## Supported Board
-
-Currently supported development board
-
-1. [Trion T120F324 ](https://www.efinixinc.com/products-devkits-triont120bga324.html)
-2. [Titanium Ti60F225 ](https://www.efinixinc.com/products-devkits-titaniumti60f225.html)
-3. [Titanium Ti180J484](https://www.efinixinc.com/products-devkits-titaniumti180j484.html)
-4. [Titanium Ti375C529](https://www.efinixinc.com/products-devkits-titaniumti375c529.html)
-5. [Titanium Ti375N1156](https://www.efinixinc.com/products-devkits-titaniumti375n1156.html)
 
 ## License
 
