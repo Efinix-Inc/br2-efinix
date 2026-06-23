@@ -135,6 +135,7 @@ Preconfigure Efinity project with Linux also provided in the repository for quic
 - **Ti375C529**
   
   - [boards/efinix/ti375c529/hardware/unified_hw](boards/efinix/ti375c529/hardware/unified_hw)
+  - [boards/efinix/ti375c529/hardware/soc_RV64](boards/efinix/ti375c529/hardware/soc_RV64)
 
 - **Ti375N1156**
   
@@ -175,10 +176,16 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
    ```
 
 3. Run `init.sh` script to configure Linux kernel, generate device tree for Linux and U-Boot then, initialize build directory.
-   
+### For RV32
    ```bash
    source init.sh ti375c529 \
    boards/efinix/ti375c529/hardware/unified_hw/soc.h -u
+   ```
+### For RV64
+Precompiled bitstream of Efinity project file is located at [boards/efinix/ti375c529/hardware/soc_RV64/soc_RV64.zip](boards/efinix/ti375c529/hardware/soc_RV64/soc_RV64.zip).
+   ```bash
+   source init.sh ti375c529 \
+   boards/efinix/ti375c529/hardware/soc_RV64/soc.h -m64 -u
    ```
 
 4. Build the Linux.
