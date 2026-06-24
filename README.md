@@ -236,6 +236,14 @@ See [known issues](docs/known_issues.md) document.
 
 4. [Build Linux with X11 graphics](boards/efinix/ti375c529/hardware/unified_hw/README.md)
 
+5. [Write to MTD SPI device in Linux](docs/devices/spi/write_to_mtd_device.md)
+
+6. [Configure watchdog](docs/devices/watchdog/watchdog.md)
+
+7. [Boot Linux using eMMC](docs/devices/emmc/emmc.md)
+
+8. [Linux network boot](docs/devices/ethernet/uboot_ethernet.md)
+
 ## Documentation
 
 1. [Buildroot documentation](https://buildroot.org/docs.html).  
