@@ -74,7 +74,7 @@ function pr_info()
 
 function self_check()
 {
-	if [ $2 -eq 0 ]; then
+	if [[ $2 -eq 0 ]]; then
 		echo -e "Check: $1 ${RED}NO${NC}"
 	else
 		echo -e "Check: $1 ${GREEN}YES${NC}"
@@ -292,7 +292,7 @@ function check_soc_configuration()
 
 	# check for compressed extension from soc.h
 	ext_c=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_C | awk '{print $3}' | head -1)
-	if [ $ext_c == 1 ]; then
+	if [[ $ext_c == 1 ]]; then
 		# enable compressed extension flag in buildroot defconfig
 		pr_info "Enable compressed extension (RVC) in $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG"
 		sed -i 's/BR2_RISCV_ISA_CUSTOM_RVC=n/BR2_RISCV_ISA_CUSTOM_RVC=y/g' $BR2_EXTERNAL_DIR/configs/$BR2_DEFCONFIG
@@ -302,7 +302,7 @@ function check_soc_configuration()
 
 	# ISA EXTRA configuration for ZBA, ZBB, ZBC and ZICBOM
 	ext_zba=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_ZBA | awk '{print $3}' | head -1)
-	if [ $ext_zba == 1 ]; then
+	if [[ $ext_zba == 1 ]]; then
 		# Enable ZBA extension flag in buildroot defconfig
 		pr_info "Enable ZBA extension in linux.config"
 		sed -i 's/CONFIG_RISCV_ISA_ZBA=n/CONFIG_RISCV_ISA_ZBA=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
@@ -310,7 +310,7 @@ function check_soc_configuration()
 	self_check "ZBA extension support ..." "$ext_zba"
 
 	ext_zbb=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_ZBB | awk '{print $3}' | head -1)
-	if [ $ext_zbb == 1 ]; then
+	if [[ $ext_zbb == 1 ]]; then
 		# Enable ZBB extension flag in buildroot defconfig
 		pr_info "Enable ZBB extension in linux.config"
 		sed -i 's/CONFIG_RISCV_ISA_ZBB=n/CONFIG_RISCV_ISA_ZBB=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
@@ -318,7 +318,7 @@ function check_soc_configuration()
 	self_check "ZBB extension support ..." "$ext_zbb"
 
 	ext_zbs=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_ZBS | awk '{print $3}' | head -1)
-	if [ $ext_zbs == 1 ]; then
+	if [[ $ext_zbs == 1 ]]; then
 		# Enable ZBS extension flag in buildroot defconfig
 		pr_info "Enable ZBS extension in linux.config"
 		sed -i 's/CONFIG_RISCV_ISA_ZBS=n/CONFIG_RISCV_ISA_ZBS=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
@@ -326,7 +326,7 @@ function check_soc_configuration()
 	self_check "ZBS extension support ..." "$ext_zbs"
 
 	ext_zicbom=$(cat ${SOC_H} | grep SYSTEM_RISCV_ISA_EXT_ZICBOM | awk '{print $3}' | head -1)
-	if [ $ext_zicbom == 1 ]; then
+	if [[ $ext_zicbom == 1 ]]; then
 		# Enable ZICBOM extension flag in buildroot defconfig
 		pr_info "Enable ZICBOM extension in linux.config"
 		sed -i 's/CONFIG_RISCV_ISA_ZICBOM=n/CONFIG_RISCV_ISA_ZICBOM=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
