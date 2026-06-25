@@ -9,7 +9,7 @@ DESKTOP_ENVIRONMENT_DESCRIPTION = desktop environment configuration files
 DESKTOP_ENVIRONMENT_SITE = $(BR2_EXTERNAL_EFINIX_PATH)/package/desktop_environment/src
 DESKTOP_ENVIRONMENT_SITE_METHOD = local
 DESKTOP_ENVIRONMENT_LICENSE = MIT
-DESKTOP_ENVIRONMENT_DEPENDENCIES = xlib_libX11 openbox polybar picom hsetroot rofi font-awesome
+DESKTOP_ENVIRONMENT_DEPENDENCIES = xlib_libX11 openbox polybar hsetroot rofi font-awesome
 
 define DESKTOP_ENVIRONMENT_SETUP_VC
 	grep tty0 $(TARGET_DIR)/etc/inittab || \
@@ -22,7 +22,6 @@ define DESKTOP_ENVIRONMENT_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 $(@D)/S40startx $(TARGET_DIR)/etc/init.d/S40startx
 	$(INSTALL) -D -m 0755 $(@D)/xinitrc $(TARGET_DIR)/root/.xinitrc
 	$(INSTALL) -D -m 0644 $(@D)/xorg.conf $(TARGET_DIR)/etc/X11
-	$(INSTALL) -D -m 0644 $(@D)/config/picom.conf $(TARGET_DIR)/root/.config/picom.conf
 	$(INSTALL) -D -m 0644 $(@D)/config/polybar/config.ini $(TARGET_DIR)/root/.config/polybar/config.ini
 	$(INSTALL) -D -m 0644 $(@D)/config/polybar/colors.ini $(TARGET_DIR)/root/.config/polybar/colors.ini
 	$(INSTALL) -D -m 0644 $(@D)/config/polybar/modules.ini $(TARGET_DIR)/root/.config/polybar/modules.ini
