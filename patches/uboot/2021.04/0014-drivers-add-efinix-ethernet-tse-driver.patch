@@ -1,14 +1,16 @@
 From ae365b9d28a31c3c4a379edca4605c9ae896499f Mon Sep 17 00:00:00 2001
 From: Teoh Choon Zone <czteoh@efinixinc.com>
-Date: Mon, 30 Mar 2026 20:59:24 +0800
+Date: Wed, 01 Jul 2026 16:21:37 +0800
 Subject: [PATCH] drivers: Add Efinix Ethernet TSE driver
 
 ---
  drivers/net/Kconfig      |   8 +
  drivers/net/Makefile     |   1 +
- drivers/net/efinix_tse.c | 849 +++++++++++++++++++++++++++++++++++++++
- drivers/net/efinix_tse.h | 142 +++++++
- 4 files changed, 1000 insertions(+)
+ drivers/net/efinix_tse.c | 954 +++++++++++++++++++++++++++++++++++++++
+ drivers/net/efinix_tse.h | 143 ++++++
+ include/configs/saxon.h  |   2 +
+ net/net.c                |   2 +-
+ 6 files changed, 1108 insertions(+), 1 deletion(-)
  create mode 100644 drivers/net/efinix_tse.c
  create mode 100644 drivers/net/efinix_tse.h
 
@@ -43,12 +45,38 @@ index a19511a..bd8cf88 100644
  obj-$(CONFIG_DRIVER_AT91EMAC) += at91_emac.o
  obj-$(CONFIG_DRIVER_AX88180) += ax88180.o
  obj-$(CONFIG_BCM_SF2_ETH) += bcm-sf2-eth.o
+diff --git a/include/configs/saxon.h b/include/configs/saxon.h
+index cbb0c3d76d..3333333 100644
+--- a/include/configs/saxon.h
++++ b/include/configs/saxon.h
+@@ -14,6 +14,8 @@
+ #define CONFIG_SYS_LOAD_ADDR CONFIG_SYS_TEXT_BASE
+ #define CONFIG_SYS_INIT_SP_ADDR CONFIG_SYS_LOAD_ADDR
+ #define CONFIG_SYS_MALLOC_LEN SZ_256K
++#define CONFIG_SYS_CACHELINE_SIZE 64
++#define CONFIG_UDP_CHECKSUM
+ #define CONFIG_EXTRA_ENV_SETTINGS "initrd_high=0xffffffff\0" \
+                                   "fdt_high=0xffffffff\0"
+ #ifdef CONFIG_SPL_BUILD
+diff --git a/net/net.c b/net/net.c
+index 1111111..2222222 100644
+--- a/net/net.c
++++ b/net/net.c
+@@ -1293,7 +1293,7 @@
+ 				       ((xsum >> 16) & 0x0000ffff);
+ 			}
+ 			if ((xsum != 0x00000000) && (xsum != 0x0000ffff)) {
+-				printf(" UDP wrong checksum %08lx %08x\n",
++				debug(" UDP wrong checksum %08lx %08x\n",
+ 				       xsum, ntohs(ip->udp_xsum));
+ 				return;
+ 			}
 diff --git a/drivers/net/efinix_tse.c b/drivers/net/efinix_tse.c
 new file mode 100644
-index 0000000..0c29d36
+index 0000000..2222222
 --- /dev/null
 +++ b/drivers/net/efinix_tse.c
-@@ -0,0 +1,849 @@
+@@ -0,0 +1,954 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Efinix Triple-Speed Ethernet MAC driver
@@ -63,16 +91,20 @@ index 0000000..0c29d36
 +#include <cpu_func.h>
 +#include <dm.h>
 +#include <dm/device_compat.h>
++#include <env.h>
 +#include <log.h>
 +#include <malloc.h>
 +#include <miiphy.h>
 +#include <net.h>
 +#include <phy.h>
 +#include <wait_bit.h>
++#include <asm/barrier.h>
 +#include <asm/io.h>
 +#include <linux/dma-mapping.h>
 +
 +#include "efinix_tse.h"
++
++#define EFINIX_TSE_DMA_NON_COHERENT
 +
 +static inline u32 efinix_tse_readl(struct efinix_tse_priv *priv, u32 reg)
 +{
@@ -99,16 +131,16 @@ index 0000000..0c29d36
 +
 +static void efinix_tse_flush_buf(const void *buf, size_t size)
 +{
-+	ulong start = (ulong)buf;
-+	ulong end = ALIGN(start + size, ARCH_DMA_MINALIGN);
++	ulong start = ALIGN_DOWN((ulong)buf, ARCH_DMA_MINALIGN);
++	ulong end = ALIGN((ulong)buf + size, ARCH_DMA_MINALIGN);
 +
 +	flush_dcache_range(start, end);
 +}
 +
 +static void efinix_tse_invalidate_buf(const void *buf, size_t size)
 +{
-+	ulong start = (ulong)buf;
-+	ulong end = ALIGN(start + size, ARCH_DMA_MINALIGN);
++	ulong start = ALIGN_DOWN((ulong)buf, ARCH_DMA_MINALIGN);
++	ulong end = ALIGN((ulong)buf + size, ARCH_DMA_MINALIGN);
 +
 +	invalidate_dcache_range(start, end);
 +}
@@ -121,6 +153,17 @@ index 0000000..0c29d36
 +static void efinix_tse_invalidate_desc(struct efinix_tse_desc *desc)
 +{
 +	efinix_tse_invalidate_buf(desc, sizeof(*desc));
++}
++
++static void efinix_tse_rx_cache_sync(void)
++{
++#ifdef EFINIX_TSE_DMA_NON_COHERENT
++	/*
++	 * For non-coherent Sapphire SoC design:
++	 * invalidate the data cache before consuming DMA-updated descriptors.
++	 */
++	asm volatile(".word(0x500F)" : : : "memory");
++#endif
 +}
 +
 +static int efinix_tse_wait_mdio_ready(struct efinix_tse_priv *priv)
@@ -332,33 +375,6 @@ index 0000000..0c29d36
 +	efinix_tse_writel(priv, TSEMAC_COMMAND_CONFIG, cmd);
 +}
 +
-+static void efinix_tse_dump_state(struct udevice *dev, const char *tag)
-+{
-+	struct efinix_tse_priv *priv = dev_get_priv(dev);
-+	struct efinix_tse_desc *txd = priv->tx_descs;
-+	struct efinix_tse_desc *rxd = priv->rx_descs ?
-+		&priv->rx_descs[priv->rx_head % EFINIX_RX_DESC_COUNT] : NULL;
-+
-+	debug("%s %s: cmd=%08x txok=%u rxok=%u crc=%u inerr=%u outerr=%u txdma=%08x rxdma=%08x",
-+	      dev->name, tag,
-+	      efinix_tse_readl(priv, TSEMAC_COMMAND_CONFIG),
-+	      efinix_tse_readl(priv, TSEMAC_A_FRAMES_TRANSMITTED_OK),
-+	      efinix_tse_readl(priv, TSEMAC_A_FRAMES_RECEIVED_OK),
-+	      efinix_tse_readl(priv, TSEMAC_CRC_ERRORS),
-+	      efinix_tse_readl(priv, TSEMAC_IF_IN_ERRORS),
-+	      efinix_tse_readl(priv, TSEMAC_IF_OUT_ERRORS),
-+	      efinix_tse_dma_readl(priv, DMA_CH_STATUS, DMASG_TX_BASE),
-+	      efinix_tse_dma_readl(priv, DMA_CH_STATUS, DMASG_RX_BASE));
-+
-+	if (txd)
-+		debug(" txd={st=%08x ctl=%08x}", txd[0].status, txd[0].control);
-+	if (rxd)
-+		debug(" rxd[%d]={st=%08x ctl=%08x}",
-+		      priv->rx_head % EFINIX_RX_DESC_COUNT,
-+		      rxd->status, rxd->control);
-+	debug("\n");
-+}
-+
 +static int efinix_tse_phy_apply_fixups(struct udevice *dev)
 +{
 +	struct efinix_tse_priv *priv = dev_get_priv(dev);
@@ -372,11 +388,11 @@ index 0000000..0c29d36
 +		return 0;
 +
 +	/*
-+	 * Match the Linux driver for RTL8211F PHY.
-+	 * These page/register writes are board-specific PHY tuning that the
-+	 * generic U-Boot PHY driver does not apply.
++	 * These page/register writes are board-specific and are not applied by
++	 * the generic U-Boot PHY driver.
 +	 */
-+	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x1f, 0x0a43);
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE,
++			RTL8211F_PAGE_SELECT, 0x0a43);
 +	if (ret)
 +		return ret;
 +	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x1b, 0x8011);
@@ -385,16 +401,30 @@ index 0000000..0c29d36
 +	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x1c, 0xd73f);
 +	if (ret)
 +		return ret;
-+	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x1f, 0x0d04);
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE,
++			RTL8211F_PAGE_SELECT, 0x0d04);
 +	if (ret)
 +		return ret;
-+	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x10, 0xe251);
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x10, 0x820b);
 +	if (ret)
 +		return ret;
 +
-+	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x1f, 0x0a42);
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE,
++			RTL8211F_PAGE_SELECT, 0x0d08);
 +	if (ret)
 +		return ret;
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x15,
++			RTL8211F_RX_DELAY);
++	if (ret)
++		return ret;
++
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE,
++			RTL8211F_PAGE_SELECT, 0);
++	if (ret)
++		return ret;
++
++	if (!(priv->phydev->advertising & PHY_1000BT_FEATURES))
++		return 0;
 +
 +	/*
 +	 * Force 1000BASE-T master mode.
@@ -404,7 +434,62 @@ index 0000000..0c29d36
 +	if (reg < 0)
 +		return reg;
 +	reg |= CTL1000_ENABLE_MASTER | CTL1000_AS_MASTER;
-+	return phy_write(priv->phydev, MDIO_DEVAD_NONE, MII_CTRL1000, reg);
++	ret = phy_write(priv->phydev, MDIO_DEVAD_NONE, MII_CTRL1000, reg);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static ulong efinix_tse_phy_max_speed(struct udevice *dev)
++{
++	ulong max_speed;
++
++	max_speed = env_get_ulong("efinix_tse_max_speed", 10, SPEED_1000);
++	switch (max_speed) {
++	case SPEED_10:
++	case SPEED_100:
++	case SPEED_1000:
++		return max_speed;
++	default:
++		dev_warn(dev, "ignoring invalid efinix_tse_max_speed=%lu\n",
++			 max_speed);
++		return SPEED_1000;
++	}
++}
++
++static int efinix_tse_phy_configure(struct udevice *dev)
++{
++	struct efinix_tse_priv *priv = dev_get_priv(dev);
++	ulong max_speed;
++	int ret;
++
++	max_speed = efinix_tse_phy_max_speed(dev);
++	if (priv->phy_max_speed == max_speed)
++		return 0;
++
++	ret = phy_set_supported(priv->phydev, max_speed);
++	if (ret)
++		return ret;
++
++	priv->phydev->advertising = priv->phydev->supported;
++
++	ret = phy_config(priv->phydev);
++	if (ret)
++		return ret;
++
++	priv->phy_max_speed = max_speed;
++	priv->phydev->link = 0;
++
++	ret = efinix_tse_phy_apply_fixups(dev);
++	if (ret)
++		return ret;
++
++	if (max_speed != SPEED_1000)
++		dev_info(dev, "limiting PHY autonegotiation to %lu Mbps\n",
++			 max_speed);
++
++	return 0;
 +}
 +
 +static void efinix_tse_dma_stop_channel(struct efinix_tse_priv *priv, u32 base)
@@ -449,11 +534,22 @@ index 0000000..0c29d36
 +	dma = dma_map_single(net_rx_packets[idx], priv->rx_buf_size,
 +			     DMA_FROM_DEVICE);
 +
++	priv->rx_dma[idx] = dma;
 +	desc->to = dma;
 +	desc->control = (priv->rx_buf_size - 1) & DMASG_DESC_CTL_BYTES;
 +	desc->status = 0;
 +	wmb();
 +	efinix_tse_flush_desc(desc);
++}
++
++static void efinix_tse_unmap_rx_desc(struct efinix_tse_priv *priv, int idx,
++				     u32 length)
++{
++	dma_unmap_single(priv->rx_dma[idx], priv->rx_buf_size,
++			 DMA_FROM_DEVICE);
++
++	efinix_tse_invalidate_buf(net_rx_packets[idx],
++				  length ? length : priv->rx_buf_size);
 +}
 +
 +static void efinix_tse_init_rx_ring(struct efinix_tse_priv *priv)
@@ -462,6 +558,7 @@ index 0000000..0c29d36
 +
 +	memset(priv->rx_descs, 0,
 +	       sizeof(*priv->rx_descs) * EFINIX_RX_DESC_COUNT);
++	memset(priv->rx_dma, 0, sizeof(priv->rx_dma));
 +
 +	for (i = 0; i < EFINIX_RX_DESC_COUNT; i++) {
 +		priv->rx_descs[i].next = priv->rx_descs_dma +
@@ -472,6 +569,23 @@ index 0000000..0c29d36
 +
 +	priv->active_rx = -1;
 +	priv->rx_head = 0;
++}
++
++static void *efinix_tse_alloc_desc_ring(size_t size, unsigned long *dma)
++{
++	void *ring;
++
++	size = ALIGN(size, EFINIX_DESC_ALIGN);
++	ring = memalign(EFINIX_DESC_ALIGN, size);
++	if (ring)
++		*dma = (unsigned long)ring;
++
++	return ring;
++}
++
++static void efinix_tse_free_desc_ring(void *ring)
++{
++	free(ring);
 +}
 +
 +static void efinix_tse_dma_start(struct efinix_tse_priv *priv)
@@ -503,18 +617,19 @@ index 0000000..0c29d36
 +
 +static int efinix_tse_alloc_rings(struct efinix_tse_priv *priv)
 +{
-+	priv->tx_descs = dma_alloc_coherent(sizeof(*priv->tx_descs) *
-+					    EFINIX_TX_DESC_COUNT,
-+					    &priv->tx_descs_dma);
++	priv->tx_descs = efinix_tse_alloc_desc_ring(sizeof(*priv->tx_descs) *
++						    EFINIX_TX_DESC_COUNT,
++						    &priv->tx_descs_dma);
 +	if (!priv->tx_descs)
 +		return -ENOMEM;
 +
-+	priv->rx_descs = dma_alloc_coherent(sizeof(*priv->rx_descs) *
-+					    EFINIX_RX_DESC_COUNT,
-+					    &priv->rx_descs_dma);
++	priv->rx_descs = efinix_tse_alloc_desc_ring(sizeof(*priv->rx_descs) *
++						    EFINIX_RX_DESC_COUNT,
++						    &priv->rx_descs_dma);
 +	if (!priv->rx_descs) {
-+		dma_free_coherent(priv->tx_descs);
++		efinix_tse_free_desc_ring(priv->tx_descs);
 +		priv->tx_descs = NULL;
++		priv->tx_descs_dma = 0;
 +		return -ENOMEM;
 +	}
 +
@@ -568,10 +683,7 @@ index 0000000..0c29d36
 +	if (!priv->phydev)
 +		return -ENODEV;
 +
-+	priv->phydev->supported &= PHY_GBIT_FEATURES;
-+	priv->phydev->advertising = priv->phydev->supported;
-+
-+	return phy_config(priv->phydev);
++	return efinix_tse_phy_configure(dev);
 +}
 +
 +static int efinix_tse_start(struct udevice *dev)
@@ -594,12 +706,21 @@ index 0000000..0c29d36
 +	efinix_tse_set_macaddr(dev);
 +	efinix_tse_writel(priv, TSEMAC_FRM_LENGTH, priv->rx_buf_size);
 +
++	/*
++	 * Release the DMA resets before programming the DMA channels;
++	 * registers written while the resets are
++	 * held may not take effect.
++	 */
++	efinix_tse_writel(priv, ETHERNET_CTRL_DMA_RX_RESET, 0);
++	efinix_tse_writel(priv, ETHERNET_CTRL_DMA_TX_RESET, 0);
++
 +	efinix_tse_init_tx_ring(priv);
 +	efinix_tse_init_rx_ring(priv);
 +	efinix_tse_dma_start(priv);
 +
-+	efinix_tse_writel(priv, ETHERNET_CTRL_DMA_RX_RESET, 0);
-+	efinix_tse_writel(priv, ETHERNET_CTRL_DMA_TX_RESET, 0);
++	ret = efinix_tse_phy_configure(dev);
++	if (ret)
++		return ret;
 +
 +	/* Run auto-negotiation only on the first start or after link loss. */
 +	if (!priv->phydev->link) {
@@ -622,7 +743,14 @@ index 0000000..0c29d36
 +	/* MAC was reset so always re-program the speed/duplex registers. */
 +	efinix_tse_adjust_link(dev);
 +
++	/*
++	 * Keep CRC_FWD clear. The DMA status length on this MAC is not a
++	 * reliable indication that the forwarded FCS bytes are present in
++	 * memory, so software FCS stripping can drop valid ARP replies. Let
++	 * the MAC filter bad Ethernet FCS and rely on UDP checksums for TFTP.
++	 */
 +	cmd = efinix_tse_readl(priv, TSEMAC_COMMAND_CONFIG);
++	cmd &= ~ETHERNET_CMD_CRC_FWD;
 +	cmd |= ETHERNET_CMD_TX_ENA | ETHERNET_CMD_RX_ENA;
 +	efinix_tse_writel(priv, TSEMAC_COMMAND_CONFIG, cmd);
 +
@@ -679,6 +807,16 @@ index 0000000..0c29d36
 +	return 0;
 +}
 +
++/* Restart the RX linked list if the channel stopped on a completed slot. */
++static void efinix_tse_rx_kick(struct efinix_tse_priv *priv)
++{
++	if (!(efinix_tse_dma_readl(priv, DMA_CH_STATUS, DMASG_RX_BASE) &
++	      DMA_CH_STATUS_BUSY)) {
++		efinix_tse_dma_writel(priv, DMA_CH_STATUS, DMASG_RX_BASE,
++				      DMA_CH_STATUS_LINKED_LIST_START);
++	}
++}
++
 +static int efinix_tse_recv(struct udevice *dev, int flags, uchar **packetp)
 +{
 +	struct efinix_tse_priv *priv = dev_get_priv(dev);
@@ -690,6 +828,9 @@ index 0000000..0c29d36
 +	if (priv->active_rx >= 0)
 +		return -EAGAIN;
 +
++	efinix_tse_rx_cache_sync();
++	rmb();
++
 +	idx = priv->rx_head;
 +	desc = &priv->rx_descs[idx];
 +	efinix_tse_invalidate_desc(desc);
@@ -697,8 +838,8 @@ index 0000000..0c29d36
 +	length = status & DMASG_DESC_STATUS_BYTES;
 +
 +	/*
-+	 * Mirror the Linux driver's recovery for the occasional case where the
-+	 * hardware leaves the current slot empty while the next slot has work.
++	 * Recovery for the occasional case where the hardware leaves the current
++	 * slot empty while the next slot has work.
 +	 */
 +	if (!length) {
 +		idx = (idx + 1) % EFINIX_RX_DESC_COUNT;
@@ -711,15 +852,18 @@ index 0000000..0c29d36
 +	if (!(status & DMASG_DESC_STATUS_COMPLETED))
 +		return -EAGAIN;
 +
++	rmb();
++
 +	if (!length || length > priv->rx_buf_size) {
++		efinix_tse_unmap_rx_desc(priv, idx, 0);
 +		efinix_tse_rearm_rx_desc(priv, idx);
 +		priv->rx_head = (idx + 1) % EFINIX_RX_DESC_COUNT;
++		efinix_tse_rx_kick(priv);
 +		return -EAGAIN;
 +	}
 +
-+	dma_unmap_single((dma_addr_t)desc->to, priv->rx_buf_size,
-+			 DMA_FROM_DEVICE);
-+	efinix_tse_invalidate_buf(net_rx_packets[idx], length);
++	efinix_tse_unmap_rx_desc(priv, idx, length);
++
 +	*packetp = net_rx_packets[idx];
 +	priv->active_rx = idx;
 +	priv->rx_head = (idx + 1) % EFINIX_RX_DESC_COUNT;
@@ -735,12 +879,7 @@ index 0000000..0c29d36
 +		return 0;
 +
 +	efinix_tse_rearm_rx_desc(priv, priv->active_rx);
-+
-+	if (!(efinix_tse_dma_readl(priv, DMA_CH_STATUS, DMASG_RX_BASE) &
-+	      DMA_CH_STATUS_BUSY)) {
-+		efinix_tse_dma_writel(priv, DMA_CH_STATUS, DMASG_RX_BASE,
-+				      DMA_CH_STATUS_LINKED_LIST_START);
-+	}
++	efinix_tse_rx_kick(priv);
 +
 +	priv->active_rx = -1;
 +	return 0;
@@ -750,8 +889,6 @@ index 0000000..0c29d36
 +{
 +	struct efinix_tse_priv *priv = dev_get_priv(dev);
 +	u32 cmd;
-+
-+	efinix_tse_dump_state(dev, "stop");
 +
 +	cmd = efinix_tse_readl(priv, TSEMAC_COMMAND_CONFIG);
 +	cmd &= ~(ETHERNET_CMD_TX_ENA | ETHERNET_CMD_RX_ENA);
@@ -826,12 +963,6 @@ index 0000000..0c29d36
 +	if (ret)
 +		goto err_mdio;
 +
-+	ret = efinix_tse_phy_apply_fixups(dev);
-+	if (ret) {
-+		dev_warn(dev, "PHY fixups failed: %d\n", ret);
-+		goto err_mdio;
-+	}
-+
 +	priv->active_rx = -1;
 +	priv->rx_head = 0;
 +	return 0;
@@ -842,11 +973,13 @@ index 0000000..0c29d36
 +	priv->bus = NULL;
 +err_rings:
 +	if (priv->rx_descs)
-+		dma_free_coherent(priv->rx_descs);
++		efinix_tse_free_desc_ring(priv->rx_descs);
 +	if (priv->tx_descs)
-+		dma_free_coherent(priv->tx_descs);
++		efinix_tse_free_desc_ring(priv->tx_descs);
 +	priv->rx_descs = NULL;
 +	priv->tx_descs = NULL;
++	priv->rx_descs_dma = 0;
++	priv->tx_descs_dma = 0;
 +	return ret;
 +}
 +
@@ -863,9 +996,9 @@ index 0000000..0c29d36
 +	}
 +
 +	if (priv->rx_descs)
-+		dma_free_coherent(priv->rx_descs);
++		efinix_tse_free_desc_ring(priv->rx_descs);
 +	if (priv->tx_descs)
-+		dma_free_coherent(priv->tx_descs);
++		efinix_tse_free_desc_ring(priv->tx_descs);
 +
 +	if (priv->clk_valid)
 +		clk_disable(&priv->axi_clk);
@@ -900,10 +1033,10 @@ index 0000000..0c29d36
 +};
 diff --git a/drivers/net/efinix_tse.h b/drivers/net/efinix_tse.h
 new file mode 100644
-index 0000000..3c1c135
+index 0000000..2222222
 --- /dev/null
 +++ b/drivers/net/efinix_tse.h
-@@ -0,0 +1,142 @@
+@@ -0,0 +1,143 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Efinix Triple-Speed Ethernet MAC driver
@@ -917,6 +1050,7 @@ index 0000000..3c1c135
 +#define EFINIX_TSE_H
 +
 +#include <linux/bitops.h>
++#include <linux/types.h>
 +
 +#define EFINIX_TSE_NAME				"efinix_tse"
 +
@@ -926,6 +1060,7 @@ index 0000000..3c1c135
 +#define EFINIX_DMA_TIMEOUT_MS			3000
 +#define EFINIX_RESET_DELAY_MS			100
 +#define EFINIX_DMA_BURST_LEN			64
++#define EFINIX_DESC_ALIGN			64
 +#define EFINIX_TX_DESC_COUNT			2
 +#define EFINIX_RX_DESC_COUNT			PKTBUFSRX
 +
@@ -947,11 +1082,6 @@ index 0000000..3c1c135
 +#define TSEMAC_MAC_ADDR_LO			0x000c
 +#define TSEMAC_MAC_ADDR_HI			0x0010
 +#define TSEMAC_FRM_LENGTH			0x0014
-+#define TSEMAC_A_FRAMES_TRANSMITTED_OK		0x0068
-+#define TSEMAC_A_FRAMES_RECEIVED_OK		0x006c
-+#define TSEMAC_CRC_ERRORS			0x0070
-+#define TSEMAC_IF_IN_ERRORS			0x0088
-+#define TSEMAC_IF_OUT_ERRORS			0x008c
 +#define TSEMAC_MAC_ADDR_MASK_LO			0x0144
 +#define TSEMAC_MAC_ADDR_MASK_HI			0x0148
 +
@@ -1018,6 +1148,8 @@ index 0000000..3c1c135
 +/* RTL8211F PHY identification */
 +#define RTL8211F_PHY_ID				0x001cc916
 +#define RTL8211_PHY_ID_MASK			0x00ffffff
++#define RTL8211F_PAGE_SELECT			0x1f
++#define RTL8211F_RX_DELAY			BIT(3)
 +
 +struct efinix_tse_desc {
 +	u32 status;
@@ -1025,7 +1157,7 @@ index 0000000..3c1c135
 +	u64 from;
 +	u64 to;
 +	u64 next;
-+} __aligned(64);
++} __aligned(EFINIX_DESC_ALIGN);
 +
 +struct efinix_tse_priv {
 +	void __iomem *regs;
@@ -1037,7 +1169,9 @@ index 0000000..3c1c135
 +	struct efinix_tse_desc *rx_descs;
 +	unsigned long tx_descs_dma;
 +	unsigned long rx_descs_dma;
++	dma_addr_t rx_dma[EFINIX_RX_DESC_COUNT];
 +	unsigned long axi_clk_rate;
++	ulong phy_max_speed;
 +	u32 rx_buf_size;
 +	int phyaddr;
 +	int active_rx;
@@ -1046,6 +1180,3 @@ index 0000000..3c1c135
 +};
 +
 +#endif /* EFINIX_TSE_H */
--- 
-2.43.0
-
