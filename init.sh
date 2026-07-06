@@ -473,7 +473,9 @@ function generate_device_tree() {
 		if [[ "$type" == "linux" ]]; then
 			add_cfg_if_exists cmd "$config_dir/$MACHINE_ARCH/reserved_memory.json"
 		fi
-
+		if [[ "$type" == "linux" && -n "${UNIFIED_HW:-}" ]]; then
+			add_cfg_if_exists cmd "$config_dir/$MACHINE_ARCH/unified_hw/remoteproc.json"
+		fi
 		# Features configs
 		local feature
 		for feature in "${hw_features[@]}"; do
@@ -746,6 +748,9 @@ function set_kernel_config()
 			emmc)
 				br2_linux_kernel_cfg+=" $kernel_frag_dir/emmc.config"
 				;;
+			remoteproc)
+				br2_linux_kernel_cfg+=" $kernel_frag_dir/remoteproc.config"
+                                ;;
 			esac
 		done
 	fi

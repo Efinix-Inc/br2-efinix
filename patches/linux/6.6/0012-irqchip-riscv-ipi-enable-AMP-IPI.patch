@@ -1,0 +1,63 @@
+From 7b90d47be82b8091610a058cf1f9c52578af2187 Mon Sep 17 00:00:00 2001
+From: Sia Jee Heng <jhsia@efinixinc.com>
+Date: Tue, 23 Jun 2026 21:43:35 +0800
+Subject: [PATCH] irqchip: riscv ipi: enable AMP IPI
+
+Signed-off-by: Sia Jee Heng <jhsia@efinixinc.com>
+---
+ drivers/irqchip/irq-riscv-intc.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/drivers/irqchip/irq-riscv-intc.c b/drivers/irqchip/irq-riscv-intc.c
+index 627beae9..1e1d0196 100644
+--- a/drivers/irqchip/irq-riscv-intc.c
++++ b/drivers/irqchip/irq-riscv-intc.c
+@@ -19,15 +19,45 @@
+ #include <linux/smp.h>
+ #include <linux/soc/andes/irq.h>
+ 
++#include <asm/csr.h>
++
+ static struct irq_domain *intc_domain;
+ static unsigned int riscv_intc_nr_irqs __ro_after_init = BITS_PER_LONG;
+ static unsigned int riscv_intc_custom_base __ro_after_init = BITS_PER_LONG;
+ static unsigned int riscv_intc_custom_nr_irqs __ro_after_init;
+ 
++static void (*riscv_amp_ipi_hook)(void *cookie);
++static void *riscv_amp_ipi_cookie;
++
++void riscv_amp_set_ipi_hook(void (*fn)(void *cookie), void *cookie)
++{
++	WRITE_ONCE(riscv_amp_ipi_cookie, cookie);
++	smp_wmb();
++	WRITE_ONCE(riscv_amp_ipi_hook, fn);
++}
++EXPORT_SYMBOL_GPL(riscv_amp_set_ipi_hook);
++
++static __always_inline void riscv_amp_ipi_notify(void)
++{
++	void (*fn)(void *cookie) = READ_ONCE(riscv_amp_ipi_hook);
++
++	if (fn) {
++		smp_rmb();
++		fn(READ_ONCE(riscv_amp_ipi_cookie));
++	}
++}
++
+ static asmlinkage void riscv_intc_irq(struct pt_regs *regs)
+ {
+ 	unsigned long cause = regs->cause & ~CAUSE_IRQ_FLAG;
+ 
++	/*
++	 * A baremetal AMP remote rings hart 0's SSIP as an rpmsg doorbell.
++	 * Observe it here, then fall through to normal IPI dispatch.
++	 */
++	if (cause == RV_IRQ_SOFT)
++		riscv_amp_ipi_notify();
++
+ 	if (generic_handle_domain_irq(intc_domain, cause))
+ 		pr_warn_ratelimited("Failed to handle interrupt (cause: %ld)\n", cause);
+ }
+-- 
+2.43.0
+

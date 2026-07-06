@@ -1,0 +1,6 @@
+config BR2_PACKAGE_EFINIX_TI375_REMOTEPROC
+            bool "Efinix TI375 RemoteProc kernel module"
+            depends on BR2_LINUX_KERNEL
+            default n
+            help
+              Efinix TI375 RISC-V AMP RemoteProc platform driver.

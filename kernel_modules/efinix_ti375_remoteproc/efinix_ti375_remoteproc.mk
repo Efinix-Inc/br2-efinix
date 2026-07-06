@@ -1,0 +1,29 @@
+##############################################
+#
+# Efinix TI375 RemoteProc
+#
+##############################################
+EFINIX_TI375_REMOTEPROC_VERSION = 1.0
+EFINIX_TI375_REMOTEPROC_SITE = $(BR2_EXTERNAL_EFINIX_PATH)/kernel_modules/efinix_ti375_remoteproc/src
+EFINIX_TI375_REMOTEPROC_SITE_METHOD = local
+
+define EFINIX_TI375_REMOTEPROC_BUILD_CMDS
+	$(MAKE) $(LINUX_MAKE_FLAGS) -C $(LINUX_DIR) M=$(@D) modules
+endef
+
+define EFINIX_TI375_REMOTEPROC_INSTALL_TARGET_CMDS
+	$(MAKE) $(LINUX_MAKE_FLAGS) -C $(LINUX_DIR) M=$(@D) modules_install
+endef
+
+define EFINIX_TI375_REMOTEPROC_LINUX_CONFIG_FIXUPS
+	$(call KCONFIG_ENABLE_OPT,CONFIG_REMOTEPROC)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_REMOTEPROC_CDEV)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_VIRTIO)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_RPMSG_VIRTIO)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_RPMSG_CHAR)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_RPMSG_CTRL)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_MODULE_UNLOAD)
+endef
+
+$(eval $(kernel-module))
+$(eval $(generic-package))

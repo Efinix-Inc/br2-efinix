@@ -1,0 +1,2 @@
+ccflags-y += -I$(srctree)/drivers/remoteproc -I$(objtree)/drivers/remoteproc
+obj-m += efinix_ti375_remoteproc.o

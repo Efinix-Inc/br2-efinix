@@ -1,0 +1,5 @@
+config BR2_PACKAGE_OPENAMP_APP
+	bool "OpenAMP rpmsg demo app"
+	depends on BR2_PACKAGE_EFINIX_TI375_REMOTEPROC
+	help
+	  User-space rpmsg-char client for the Efinix AMP demo.
