@@ -1,3 +1,24 @@
+br2-efinix 2025.02.7.1,
+
+	Introduce new Linux kernel 6.6 support for both RV32 and RV64
+	Upgrade U-Boot support v2025.01
+	Upgrade OpenSBI support v1.6
+	Upgrade GCC 14.3
+	Upgrade sapphire-soc-dt-generator v3.3
+	Add Linux support for RV64
+	Add RV64 SoC example design for Ti375C529 devkit
+	Support EfxSapphireSoC RV64 bootloader generation
+	Add U-boot ethernet driver to support Ti375C529 and Ti180J484 devkit
+	Enable Linux network boot via NFS
+	Drop Linux support for Ti60F225 devkit
+
+	Issues resolved
+	Fix SD host unable to write on Linux
+	Fix ethernet by supporting triple speed on Ti375N1156 example design
+	Fix Linux reboot on RV64
+	Fix EvSoC driver API breaks
+	Add spi-nor patch for disable-auto-4byte-addressing
+
 br2-efinix 2021.05.11,
 
 	Enable watchdog & EMMC drivers for U-Boot & Linux
