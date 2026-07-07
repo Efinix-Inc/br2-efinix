@@ -71,11 +71,11 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 
 - This repo provide BSP for Efinix RISC-V SoC
   
-  - Sapphire SoC RV32 (soft core)
+  - [Sapphire RV32 SoC](https://www.efinixinc.com/products-riscv.html#pills-riscv)
   
-  - High Performance SoC RV32 (hard core)
+  - [High-Performance Sapphire RV32 SoC](https://www.efinixinc.com/products-riscv.html#pills-hardened)
   
-  - Sapphire SoC RV64 (soft core)
+  - [Sapphire RV64 SoC](https://www.efinixinc.com/products-riscv.html#pills-riscv64))
 
 - List of Supported Linux and U-Boot Drivers
   
@@ -89,6 +89,19 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 | [Ti375N1156](https://www.efinixinc.com/products-devkits-titaniumti375n1156.html) | Y    | N    |
 | [Ti180J484](https://www.efinixinc.com/products-devkits-titaniumti180j484.html)   | Y    | N    |
 | [T120F324](https://www.efinixinc.com/products-devkits-triont120bga324.html)      | Y    | N    |
+
+### Board Support Package (BSP)
+
+BSP supported on this branch (2025.02).
+
+| BSP          | Version   |
+| ------------ | --------- |
+| Buildroot    | 2025.02.7 |
+| Linux Kernel | 6.6       |
+| U-Boot       | 2025.01   |
+| OpenSBI      | 1.6       |
+
+> Checkout branch 2021.05 for older release. Please note that branch 2021.05 would be EOL by end of 2026.
 
 ### Hardware Requirements
 
