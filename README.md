@@ -70,15 +70,15 @@ This repo require specific version of Buildroot to work with. See the [VERSION](
 ### Supported RISC-V Architecture
 
 - This repo provide BSP for Efinix RISC-V SoC
-
+  
   - Sapphire SoC RV32 (soft core)
-
+  
   - High Performance SoC RV32 (hard core)
-
+  
   - Sapphire SoC RV64 (soft core)
 
 - List of Supported Linux and U-Boot Drivers
-
+  
   - See the list of supported drivers [document](docs/list_of_supported_drivers.md)
 
 ### Supported Boards
@@ -162,7 +162,7 @@ Please note that you need to generate the SoC first before proceed with this sec
 To build Linux image on other supported devices see [Build Linux Image](docs/buildroot/build_linux_image.md) document.
 
 1. Set the username and email address on gitconfig
-
+   
    ```bash
    git config --global user.name "Your Name"
    git config --global user.email "your@email.com"
@@ -176,13 +176,18 @@ To build Linux image on other supported devices see [Build Linux Image](docs/bui
    ```
 
 3. Run `init.sh` script to configure Linux kernel, generate device tree for Linux and U-Boot then, initialize build directory.
-### For RV32
+   
+   ### For RV32
+   
    ```bash
    source init.sh ti375c529 \
    boards/efinix/ti375c529/hardware/unified_hw/soc.h -u
    ```
-### For RV64
-Precompiled bitstream of Efinity project file is located at [boards/efinix/ti375c529/hardware/soc_RV64/soc_RV64.zip](boards/efinix/ti375c529/hardware/soc_RV64/soc_RV64.zip).
+   
+   ### For RV64
+   
+   Precompiled bitstream of Efinity project file is located at [boards/efinix/ti375c529/hardware/soc_RV64/soc_RV64.zip](boards/efinix/ti375c529/hardware/soc_RV64/soc_RV64.zip).
+   
    ```bash
    source init.sh ti375c529 \
    boards/efinix/ti375c529/hardware/soc_RV64/soc.h -m64 -u
