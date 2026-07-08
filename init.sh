@@ -15,6 +15,7 @@ unset EXTRA_HW_FEATURES
 unset X11_GRAPHICS
 unset MACHINE_ARCH
 unset USE_EMMC_BOOT
+unset OPENAMP_BUILD
 unset KERNEL_SELECTION
 
 BOARD=$1
@@ -83,7 +84,7 @@ function self_check()
 
 function usage()
 {
-	echo "Usage: init.sh [board] [path/to/soc.h] [-c][-d][-m][-r][-a][-e][-u][-s][-x][-w]"
+	echo "Usage: init.sh [board] [path/to/soc.h] [-c][-d][-m][-r][-a][-e][-u][-s][-x][-w][-o]"
 	echo
 	echo "Positional arguments:"
 	echo "	board			Development kit name such as t120f324, ti180j484, ti375c529"
@@ -108,6 +109,7 @@ function usage()
 	echo "	-x			Enable X11 graphics for unified hardware design. This enable framebuffer, DMA and USB drivers."
 	echo "				Not compatible with camera (evsoc driver). This optional argument requires -u to be set first."
 	echo "	-w			Use eMMC u-boot configuration for eMMC storage support"
+	echo "	-o			Enable Efinix remoteproc + OpenAMP Application (requires -u)."
 	echo "	-k			Kernel version selection. Default is 1"
 	echo "				1 - 6.6.x (default)"
 	echo "				2 - 5.10.x"
@@ -473,7 +475,7 @@ function generate_device_tree() {
 		if [[ "$type" == "linux" ]]; then
 			add_cfg_if_exists cmd "$config_dir/$MACHINE_ARCH/reserved_memory.json"
 		fi
-		if [[ "$type" == "linux" && -n "${UNIFIED_HW:-}" ]]; then
+		if [[ "$type" == "linux" && -n "${UNIFIED_HW:-}" ]] && contains_feature "remoteproc"; then
 			add_cfg_if_exists cmd "$config_dir/$MACHINE_ARCH/unified_hw/remoteproc.json"
 		fi
 		# Features configs
@@ -776,6 +778,12 @@ function add_packages()
 		cat ${BR2_DEFCONFIG_DIR}/evsoc_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
 	fi
 
+	if [ $OPENAMP_BUILD ]; then
+		pr_info "Append ${BR2_DEFCONFIG_DIR}/openamp_fragment"
+		grep -q BR2_PACKAGE_EFINIX_TI375_REMOTEPROC ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
+		cat ${BR2_DEFCONFIG_DIR}/openamp_Fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
+	fi
+
         if [ $X11_GRAPHICS ]; then
 		pr_info "Append ${BR2_DEFCONFIG_DIR}/x11_fragment"
                 grep -q BR2_PACKAGE_DESKTOP_ENVIRONMENT ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
@@ -798,7 +806,7 @@ function parser()
 		shift
 	done
 
-	while getopts ":d:s:m:k:raehuxcw" o; do
+	while getopts ":d:s:m:k:raehuxcwo" o; do
 		case "${o}" in
 			:)
 				pr_err "Option -$OPTARG requires an argument"
@@ -859,6 +867,9 @@ function parser()
 			w)
 				USE_EMMC_BOOT=1
 				;;
+			o)
+				OPENAMP_BUILD=1
+				;;
 			k)
 				KERNEL_SELECTION="${OPTARG}"
 				if [ "$KERNEL_SELECTION" != "1" ] && [ "$KERNEL_SELECTION" ! = "2" ]; then
@@ -880,6 +891,14 @@ function parser()
 }
 
 parser "$@"
+
+if [ $OPENAMP_BUILD ] && [ "$UNIFIED_HW" != "1" ]; then
+	pr_err "-o option requires -u to be set."
+	return 1
+fi
+if [ $OPENAMP_BUILD ]; then
+	EXTRA_HW_FEATURES+="remoteproc,"
+fi
 
 if [[ -z $BOARD ]]; then
 	pr_err "Board is not defined"
