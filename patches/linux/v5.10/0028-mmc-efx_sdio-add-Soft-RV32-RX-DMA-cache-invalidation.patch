@@ -1,0 +1,110 @@
+From ad598257d54bfd9fd25a0b05bdb2375ab71339c9 Mon Sep 17 00:00:00 2001
+From: Swee Aun Khor <sakhor@efinixinc.com>
+Date: Fri, 10 Jul 2026 16:05:47 +0800
+Subject: [PATCH] mmc: efx_sdio: add Soft RV32 RX DMA cache invalidation
+ support
+
+Add a new `CONFIG_EFX_SOFT_RV32` Kconfig option to identify the Efinix Soft RV32,
+which does not support RX DMA cache coherency.
+
+When preparing an RX DMA transfer, invalidate the data cache before DMA starts to
+prevent stale cache lines from being returned after the transfer completes. The
+cache invalidation is enabled only when `CONFIG_EFX_SOFT_RV32` is selected and is
+implemented using the Soft RV32 cache invalidate instruction.
+
+Also defer clearing `host->data` until after the MMC request has completed, ensuring
+the data structure remains available throughout request completion.
+
+Signed-off-by: Swee Aun Khor <sakhor@efinixinc.com>
+---
+ arch/riscv/Kconfig.socs          |  7 +++++++
+ drivers/mmc/host/efx_sdio.h      | 10 +++++++++-
+ drivers/mmc/host/efx_sdio_core.c |  5 +++--
+ drivers/mmc/host/efx_sdio_dma.c  |  6 ++++++
+ 4 files changed, 25 insertions(+), 3 deletions(-)
+
+diff --git a/arch/riscv/Kconfig.socs b/arch/riscv/Kconfig.socs
+index 8a55f6156..6961b3a01 100644
+--- a/arch/riscv/Kconfig.socs
++++ b/arch/riscv/Kconfig.socs
+@@ -48,4 +48,11 @@ config SOC_KENDRYTE_K210_DTB_BUILTIN
+ 	  This option should be selected if no bootloader is being used.
+ 	  If unsure, say Y.
+ 
++config EFX_SOFT_RV32
++        bool "Efinix Soft RV32 SoC"
++        default n
++        help
++          Identify the Efinix Soft RV32 core.
++          This core does not support RX DMA cache coherency.
++
+ endmenu
+diff --git a/drivers/mmc/host/efx_sdio.h b/drivers/mmc/host/efx_sdio.h
+index c6b41abfc..55ea36f07 100644
+--- a/drivers/mmc/host/efx_sdio.h
++++ b/drivers/mmc/host/efx_sdio.h
+@@ -310,6 +310,14 @@ struct efx_sdio_host {
+ #define efx_sdio_dbg_cmd(host, fmt, ...) \
+ 	dev_dbg(&(host)->pdev->dev, fmt, ##__VA_ARGS__)
+ 
++#if defined(CONFIG_EFX_SOFT_RV32)
++//Invalidate the whole data cache
++#define data_cache_invalidate_all() asm(".word(0x500F)");
++
++#else
++#define data_cache_invalidate_all()
++#endif /* CONFIG_EFX_SOFT_RV32 */
++
+ /* Platform driver function prototypes */
+ int efx_sdio_probe(struct platform_device *pdev);
+ int efx_sdio_remove(struct platform_device *pdev);
+@@ -383,4 +391,4 @@ static inline void efx_sdio_sys_writel(struct efx_sdio_host *host, u32 val,
+     writel(val, host->sys_ioaddr + reg);
+ }
+ 
+-#endif /* __EFX_SDIO_H__ */
+\ No newline at end of file
++#endif /* __EFX_SDIO_H__ */
+diff --git a/drivers/mmc/host/efx_sdio_core.c b/drivers/mmc/host/efx_sdio_core.c
+index b1bcad432..51d98b3bd 100644
+--- a/drivers/mmc/host/efx_sdio_core.c
++++ b/drivers/mmc/host/efx_sdio_core.c
+@@ -336,8 +336,7 @@ void efx_sdio_finish_data(struct efx_sdio_host *host)
+ 		         data->error);
+ 	}
+ 
+-	/* Clear data pointer */
+-	host->data = NULL;
++	/* Clear transfer information */
+ 	host->bytes_to_transfer = 0;
+ 	host->blocks_done = 0;
+ 	host->sg_offset = 0;
+@@ -346,6 +345,8 @@ void efx_sdio_finish_data(struct efx_sdio_host *host)
+ 	if (host->mrq) {
+ 	    efx_sdio_finish_request(host, host->mrq);
+     }
++        /* Clear data pointer */
++        host->data = NULL;
+ }
+ 
+ void efx_sdio_finish_command(struct efx_sdio_host *host)
+diff --git a/drivers/mmc/host/efx_sdio_dma.c b/drivers/mmc/host/efx_sdio_dma.c
+index ab7162d36..1061c0926 100644
+--- a/drivers/mmc/host/efx_sdio_dma.c
++++ b/drivers/mmc/host/efx_sdio_dma.c
+@@ -194,6 +194,12 @@ void efx_sdio_prepare_dma(struct efx_sdio_host *host, struct mmc_data *data)
+ 	return;
+ 	}
+ 
++        /* Cache invalidation only happened for softcore RV32
++           else function do nothing
++        */
++        if (data->flags & MMC_DATA_READ)
++            data_cache_invalidate_all();
++
+ 	data->sg_len = ret;
+ 	/* Setup ADMA descriptor table */
+ 	ret = efx_sdio_adma_table_pre(host, data);
+-- 
+2.43.0
+

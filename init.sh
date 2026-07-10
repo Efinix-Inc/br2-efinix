@@ -9,6 +9,7 @@ unset RECONFIGURE_ALL
 unset OPT_DIR
 unset EXAMPLE_DESIGN
 unset HARDEN_SOC
+unset SOFT_RV32_SOC
 unset UNIFIED_HW
 unset HW_FEATURES
 unset EXTRA_HW_FEATURES
@@ -167,9 +168,20 @@ function sanity_check()
 		fi
 	fi
 
-	if [ "$(grep SYSTEM_HARD_RISCV_QC32 $SOC_H | awk '{print $3}')" == "1" ]; then
-		HARDEN_SOC=1
-	fi
+        # Identify hard soc and soft RV32 soc
+        # soft RV32 soc does not support cache coherency
+        HARDEN_SOC=0
+        SOFT_RV32_SOC=0
+
+        if [ "$(grep SYSTEM_HARD_RISCV_QC32 "$SOC_H" | awk '{print $3}')" = "1" ]; then
+            HARDEN_SOC=1
+        fi
+
+        if [ "$HARDEN_SOC" = "0" ] && \
+        [ "$(grep SYSTEM_SOFT_RISCV_RV64 "$SOC_H" | awk '{print $3}')" != "1" ]; then
+            SOFT_RV32_SOC=1
+        fi
+
 }
 
 function check_soc_configuration()
@@ -297,6 +309,13 @@ function check_soc_configuration()
 		sed -i 's/CONFIG_RISCV_ISA_C=n/CONFIG_RISCV_ISA_C=y/g' $BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config
 	fi
 	self_check "Compressed extension support ..." "$ext_c"
+
+        self_check "Hardened SoC" "$HARDEN_SOC"
+        self_check "Soft RV32 SoC" "$SOFT_RV32_SOC"
+        # Non coherent config for soft RV32
+        if [ "$SOFT_RV32_SOC" = "1" ]; then
+            echo "CONFIG_EFX_SOFT_RV32=y" >> "$BR2_EXTERNAL_DIR/boards/efinix/$BOARD/linux/linux.config"
+        fi
 
 	# change the size of DDR to 1024MB due to limitation of physical DDR.
 	ddr_size=$(grep SYSTEM_DDR_BMB_SIZE $SOC_H | awk '{print $3}')
