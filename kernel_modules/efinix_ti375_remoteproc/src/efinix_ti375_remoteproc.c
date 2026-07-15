@@ -100,7 +100,7 @@ static int efinix_rproc_hart_start(unsigned long hartid, unsigned long start_add
 			 hartid);
 		return 0;
 	}
-	trace_printk("jsia \n");
+
 	r = sbi_ecall(SBI_EXT_HSM, SBI_EXT_HSM_HART_START,
 		      hartid, start_addr, 0 /* opaque */, 0, 0, 0);
 	if (r.error) {
@@ -115,7 +115,7 @@ static void efinix_rproc_send_ipi(unsigned long hartid)
 {
 	unsigned long hart_mask = 1UL << (hartid % BITS_PER_LONG);
 	unsigned long hart_mask_base = hartid - (hartid % BITS_PER_LONG);
-	trace_printk("jsia \n");
+
 	sbi_ecall(SBI_EXT_IPI, SBI_EXT_IPI_SEND_IPI,
 		  hart_mask, hart_mask_base, 0, 0, 0, 0);
 }
@@ -123,7 +123,7 @@ static void efinix_rproc_send_ipi(unsigned long hartid)
 static void efinix_rproc_notify_work_fn(struct work_struct *w)
 {
 	struct efinix_rproc *priv = container_of(w, struct efinix_rproc, notify_work);
-	trace_printk("jsia \n");
+
 	rproc_vq_interrupt(priv->rproc, 0);
 	rproc_vq_interrupt(priv->rproc, 1);
 }
@@ -140,7 +140,6 @@ static void efinix_rproc_ipi_doorbell(void *cookie)
 	if (now != READ_ONCE(priv->last_r2l_seen)) {
 		WRITE_ONCE(priv->last_r2l_seen, now);
 		atomic_inc(&priv->ipi_doorbells);
-		trace_printk("jsia \n");
 		schedule_work(&priv->notify_work);
 	}
 }
@@ -430,7 +429,7 @@ static int efinix_rproc_probe(struct platform_device *pdev)
 	struct device_node *np = dev->of_node;
 	struct efinix_rproc *priv;
 	struct rproc *rproc;
-	const char *fw_name = "openampRemote.elf";
+	const char *fw_name = "openampEcho.elf";
 	int ret;
 
 	rproc = rproc_alloc(dev, dev_name(dev), &efinix_rproc_ops,
