@@ -781,7 +781,7 @@ function add_packages()
 	if [ $OPENAMP_BUILD ]; then
 		pr_info "Append ${BR2_DEFCONFIG_DIR}/openamp_fragment"
 		grep -q BR2_PACKAGE_EFINIX_TI375_REMOTEPROC ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG} || \
-		cat ${BR2_DEFCONFIG_DIR}/openamp_Fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
+		cat ${BR2_DEFCONFIG_DIR}/openamp_fragment >> ${BR2_DEFCONFIG_DIR}/${BR2_DEFCONFIG}
 	fi
 
         if [ $X11_GRAPHICS ]; then
