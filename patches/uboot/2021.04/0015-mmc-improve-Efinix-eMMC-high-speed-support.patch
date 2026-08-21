@@ -1,0 +1,805 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Teoh Choon Zone <czteoh@efinixinc.com>
+Date: Thu, 13 Aug 2026 12:00:00 +0800
+Subject: [PATCH] mmc: improve Efinix eMMC high-speed support
+
+Add HS200/HS400 tuning, DDR bus-mode handling, controller recovery,
+bounded PIO waits, and stricter transfer validation.
+
+Signed-off-by: Teoh Choon Zone <czteoh@efinixinc.com>
+---
+ drivers/mmc/Kconfig    |   1 +
+ drivers/mmc/efx_emmc.c | 486 ++++++++++++++++++++++++++++++-----------
+ 2 files changed, 342 insertions(+), 145 deletions(-)
+
+diff --git a/drivers/mmc/Kconfig b/drivers/mmc/Kconfig
+index 25442ffdb4a4..bfcbbd31d68e 100644
+--- a/drivers/mmc/Kconfig
++++ b/drivers/mmc/Kconfig
+@@ -484,6 +484,7 @@
+ config MMC_EFX_EMMC
+ 	bool "Efinix eMMC host controller"
+ 	depends on DM_MMC && BLK && OF_CONTROL
++	select MMC_HS400_SUPPORT
+ 	help
+ 	  This enables support for the Efinix eMMC Host Controller.
+ 	  The controller supports eMMC 5.1 specification with HS200 and HS400 modes.
+diff --git a/drivers/mmc/efx_emmc.c b/drivers/mmc/efx_emmc.c
+index 98385f0d13f4..c336920906c1 100644
+--- a/drivers/mmc/efx_emmc.c
++++ b/drivers/mmc/efx_emmc.c
+@@ -2,7 +2,7 @@
+ /*
+  * Efinix eMMC Host Controller Driver for U-Boot
+  *
+- * Copyright (C) 2025 Efinix, Inc.
++ * Copyright (C) 2026 Efinix, Inc.
+  * Author: Teoh Choon Zone <czteoh@efinixinc.com>
+  *
+  * Based on the Linux driver and U-Boot MMC framework
+@@ -85,12 +85,12 @@
+ #define EFX_EMMC_READ_XFER_ACTIVE       BIT(9)
+ #define EFX_EMMC_WRITE_XFER_ACTIVE      BIT(8)
+ #define EFX_EMMC_DAT_LINE_ACTIVE        BIT(2)
+-#define EFX_EMMC_CMD_INHIBIT_DAT        BIT(1)
+ #define EFX_EMMC_CMD_INHIBIT_CMD        BIT(0)
+ 
+ /* Host Control Register (0x128) */
+ #define EFX_EMMC_DATA_WIDTH_SHIFT       1
+ #define EFX_EMMC_DATA_WIDTH_MASK        (0x3 << 1)
++#define EFX_EMMC_DDR_MODE               BIT(3)
+ #define EFX_EMMC_DATA_WIDTH_1BIT        0
+ #define EFX_EMMC_DATA_WIDTH_4BIT        1
+ #define EFX_EMMC_DATA_WIDTH_8BIT        2
+@@ -109,18 +109,18 @@
+ #define EFX_EMMC_INT_CMD_COMPLETE       BIT(0)
+ 
+ #define EFX_EMMC_INT_ERROR_MASK         (EFX_EMMC_INT_DATA_TIMEOUT_ERR | \
+-                                         EFX_EMMC_INT_DATA_CRC_ERR | \
+-                                         EFX_EMMC_INT_DATA_END_BIT_ERR | \
+-                                         EFX_EMMC_INT_CMD_INDEX_ERR | \
+-                                         EFX_EMMC_INT_CMD_END_BIT_ERR | \
+-                                         EFX_EMMC_INT_CMD_CRC_ERR | \
+-                                         EFX_EMMC_INT_CMD_TIMEOUT_ERR)
++					 EFX_EMMC_INT_DATA_CRC_ERR | \
++					 EFX_EMMC_INT_DATA_END_BIT_ERR | \
++					 EFX_EMMC_INT_CMD_INDEX_ERR | \
++					 EFX_EMMC_INT_CMD_END_BIT_ERR | \
++					 EFX_EMMC_INT_CMD_CRC_ERR | \
++					 EFX_EMMC_INT_CMD_TIMEOUT_ERR)
+ 
+ #define EFX_EMMC_INT_ALL_MASK           (EFX_EMMC_INT_ERROR_MASK | \
+-                                         EFX_EMMC_INT_BUFFER_READ_RDY | \
+-                                         EFX_EMMC_INT_BUFFER_WRITE_RDY | \
+-                                         EFX_EMMC_INT_XFER_COMPLETE | \
+-                                         EFX_EMMC_INT_CMD_COMPLETE)
++					 EFX_EMMC_INT_BUFFER_READ_RDY | \
++					 EFX_EMMC_INT_BUFFER_WRITE_RDY | \
++					 EFX_EMMC_INT_XFER_COMPLETE | \
++					 EFX_EMMC_INT_CMD_COMPLETE)
+ 
+ /* System Reset Register bits */
+ #define EFX_SYS_RESET_EMMC_DEV          BIT(1)
+@@ -133,8 +133,14 @@
+ 
+ /* Driver constants */
+ #define EFX_EMMC_MIN_FREQ               400000    /* 400 KHz */
++#define EFX_EMMC_HS_MODE_MIN_FREQ       50000000  /* 50 MHz */
+ #define EFX_EMMC_MAX_FREQ               200000000 /* 200 MHz */
+ #define EFX_EMMC_PIO_TIMEOUT_MS         1000
++#define EFX_EMMC_TUNING_PLL_SHIFTS      8
++#define EFX_EMMC_TUNING_SAMPLE_SHIFT    16
++#define EFX_EMMC_TUNING_PLL_SHIFT       6
++#define EFX_EMMC_TUNING_APPLY           BIT(0)
++#define EFX_EMMC_TUNING_SETTLE_US       50000
+ 
+ /* Hardware specific constants from documentation */
+ #define EFX_EMMC_RESET_PULSE_WIDTH      1         /* 1us minimum */
+@@ -151,25 +157,35 @@
+ struct efx_emmc_host {
+ 	void __iomem *ioaddr;
+ 	void __iomem *sys_ioaddr;
+-	
++
+ 	u32 base_clk;
+ 	u32 current_clk;
+ 	u32 max_clk;
+-	
++
+ 	/* Transfer state tracking */
+-	int bytes_to_transfer;
+-	int blocks_done;
++	size_t bytes_to_transfer;
++	unsigned int blocks_done;
+ 	unsigned int sg_offset;
+-	
++
+ 	/* Current command and data */
+ 	struct mmc_cmd *cmd;
+ 	struct mmc_data *data;
+-	
++
+ 	struct udevice *dev;
+ 	struct mmc *mmc;
+ 	struct efx_emmc_plat *plat;
++	bool tuned;
++	bool hs400_tuned;
++	u32 tuning_sample;
++	u32 tuning_pll;
+ };
+ 
++#ifdef MMC_SUPPORTS_TUNING
++static int efx_emmc_execute_tuning(struct udevice *dev, uint opcode);
++static void efx_emmc_set_tuning(struct efx_emmc_host *host, u32 sample,
++				u32 pll_shift);
++#endif
++
+ /* Register access helpers */
+ static inline u32 efx_emmc_readl(struct efx_emmc_host *host, u32 reg)
+ {
+@@ -219,6 +235,19 @@
+ 	udelay(EFX_EMMC_POST_RESET_DELAY);
+ }
+ 
++static void efx_emmc_reset_ip(struct efx_emmc_host *host)
++{
++	u32 reg;
++
++	reg = efx_emmc_sys_readl(host, EFX_SYS_RESET_REG);
++	efx_emmc_sys_writel(host, reg | EFX_SYS_RESET_EMMC_IP,
++			     EFX_SYS_RESET_REG);
++	udelay(EFX_EMMC_RESET_PULSE_WIDTH);
++	efx_emmc_sys_writel(host, reg & ~EFX_SYS_RESET_EMMC_IP,
++			     EFX_SYS_RESET_REG);
++	udelay(EFX_EMMC_RESET_PULSE_WIDTH);
++}
++
+ static void efx_emmc_set_clock(struct efx_emmc_host *host, unsigned int clock)
+ {
+ 	u32 div, reg;
+@@ -274,12 +303,15 @@
+ 	host->current_clk = host->base_clk / div;
+ }
+ 
+-static void efx_emmc_set_bus_width(struct efx_emmc_host *host, int width)
++static void efx_emmc_set_bus_mode(struct efx_emmc_host *host, int width,
++				  bool ddr)
+ {
+ 	u32 reg;
+ 
+ 	reg = efx_emmc_readl(host, EFX_EMMC_HOST_CONTROL);
+-	reg &= ~EFX_EMMC_DATA_WIDTH_MASK;
++	reg &= ~(EFX_EMMC_DATA_WIDTH_MASK | EFX_EMMC_DDR_MODE);
++	if (ddr)
++		reg |= EFX_EMMC_DDR_MODE;
+ 
+ 	switch (width) {
+ 	case 1:
+@@ -299,6 +331,25 @@
+ 
+ }
+ 
++static void efx_emmc_recover(struct efx_emmc_host *host)
++{
++	unsigned int clock = host->current_clk;
++	unsigned int width = host->mmc->bus_width ?: 1;
++
++	efx_emmc_reset_ip(host);
++	efx_emmc_writel(host, 0, EFX_EMMC_INT_SIGNAL_EN);
++	efx_emmc_writel(host, EFX_EMMC_INT_ALL_MASK, EFX_EMMC_INT_STATUS);
++	efx_emmc_set_bus_mode(host, width, host->mmc->ddr_mode);
++	efx_emmc_set_clock(host, clock);
++	efx_emmc_writel(host, EFX_EMMC_INT_ALL_MASK, EFX_EMMC_INT_STATUS_EN);
++
++#ifdef MMC_SUPPORTS_TUNING
++	if (host->tuned)
++		efx_emmc_set_tuning(host, host->tuning_sample,
++				    host->tuning_pll);
++#endif
++}
++
+ static int efx_emmc_wait_cmd_ready(struct efx_emmc_host *host, int timeout_ms)
+ {
+ 	u32 present_state;
+@@ -318,149 +369,189 @@
+ 		return -ETIMEDOUT;
+ 	}
+ 
+-	/* Check for data line inhibit if we have data */
+-	if (host->data) {
+-		ret = readl_poll_timeout(host->ioaddr + EFX_EMMC_PRESENT_STATE,
+-					 present_state,
+-					 !(present_state & EFX_EMMC_CMD_INHIBIT_DAT),
+-					 timeout_us);
+-		if (ret) {
+-			printf("Data line timeout, present_state=0x%08x\n",
+-			      efx_emmc_readl(host, EFX_EMMC_PRESENT_STATE));
+-			return -ETIMEDOUT;
+-		}
+-	}
+-
+ 	return 0;
+ }
+ 
+ static int efx_emmc_wait_interrupt(struct efx_emmc_host *host, u32 mask, int timeout_ms)
+ {
+ 	u32 intstat;
++	u32 wait_mask = mask | EFX_EMMC_INT_ERROR_MASK;
++	bool tuning = host->cmd && mmc_is_tuning_cmd(host->cmd->cmdidx);
+ 	int timeout_us = timeout_ms * 1000;
+ 	int ret;
+ 
+ 	ret = readl_poll_timeout(host->ioaddr + EFX_EMMC_INT_STATUS,
+ 				 intstat,
+-				 (intstat & mask),
++				 (intstat & wait_mask),
+ 				 timeout_us);
+ 
+ 	if (ret) {
+-		printf("Wait interrupt timeout: mask=0x%08x, status=0x%08x\n",
+-		      mask, efx_emmc_readl(host, EFX_EMMC_INT_STATUS));
++		if (!tuning)
++			printf("Wait interrupt timeout: mask=0x%08x, status=0x%08x\n",
++			       mask, efx_emmc_readl(host, EFX_EMMC_INT_STATUS));
+ 		return -ETIMEDOUT;
+ 	}
+ 
+-	/* Clear the interrupt */
+-	efx_emmc_writel(host, intstat & mask, EFX_EMMC_INT_STATUS);
++	/* Clear the completion or error that ended the wait. */
++	efx_emmc_writel(host, intstat & wait_mask, EFX_EMMC_INT_STATUS);
+ 
+-	/* Check for errors */
+ 	if (intstat & EFX_EMMC_INT_ERROR_MASK) {
++		if (!tuning)
++			dev_dbg(host->dev, "interrupt error: cmd=%u status=0x%08x\n",
++				host->cmd ? host->cmd->cmdidx : 0, intstat);
+ 		return -EIO;
+ 	}
+ 
+ 	return 0;
+ }
+ 
+-static void efx_emmc_read_block_pio(struct efx_emmc_host *host)
++static int efx_emmc_wait_buffer_ready(struct efx_emmc_host *host, u32 mask)
++{
++	unsigned long start = get_timer(0);
++	u32 intstat, state;
++
++	do {
++		intstat = efx_emmc_readl(host, EFX_EMMC_INT_STATUS);
++		if (intstat & EFX_EMMC_INT_ERROR_MASK) {
++			efx_emmc_writel(host, intstat & EFX_EMMC_INT_ERROR_MASK,
++					 EFX_EMMC_INT_STATUS);
++			return -EIO;
++		}
++
++		state = efx_emmc_readl(host, EFX_EMMC_PRESENT_STATE);
++		if (state & mask)
++			return 0;
++
++		udelay(1);
++	} while (get_timer(start) < EFX_EMMC_PIO_TIMEOUT_MS);
++
++	return -ETIMEDOUT;
++}
++
++static int efx_emmc_read_block_pio(struct efx_emmc_host *host)
+ {
+ 	struct mmc_data *data = host->data;
+-	u32 *buf = (u32 *)((u8 *)data->dest + (data->blocksize * host->blocks_done));
++	u8 *buf = (u8 *)data->dest +
++		  (size_t)data->blocksize * host->blocks_done;
++	bool aligned = IS_ALIGNED((uintptr_t)buf, sizeof(u32));
+ 	int words = data->blocksize / 4;
+ 	int i;
+-	u32 present_state;
+-	int timeout = 100000; /* Timeout counter */
+-
+-	if (words == 0) {
+-		return;
+-	}
++	int ret;
++	u32 val;
+ 
+ 	for (i = 0; i < words; i++) {
+-		/* Wait for data available with timeout */
+-		timeout = 10000; /* Reduced timeout with delay */
+-		do {
+-			present_state = efx_emmc_readl(host, EFX_EMMC_PRESENT_STATE);
+-			if (!(present_state & EFX_EMMC_BUFFER_READ_EN)) {
+-				udelay(1); /* Small delay to prevent system hang */
+-			}
+-			timeout--;
+-		} while (!(present_state & EFX_EMMC_BUFFER_READ_EN) && timeout > 0);
+-		
+-		if (timeout <= 0) {
+-			printf("PIO read timeout waiting for data word %d/%d, present_state=0x%08x\n", 
+-			       i, words, present_state);
+-			break;
++		if (!(efx_emmc_readl(host, EFX_EMMC_PRESENT_STATE) &
++		      EFX_EMMC_BUFFER_READ_EN)) {
++			ret = efx_emmc_wait_buffer_ready(host,
++						 EFX_EMMC_BUFFER_READ_EN);
++			if (ret)
++				return ret;
+ 		}
+ 
+-		buf[i] = efx_emmc_readl(host, EFX_EMMC_BUFFER_DATA_PORT);
++		val = efx_emmc_readl(host, EFX_EMMC_BUFFER_DATA_PORT);
++		if (aligned)
++			((u32 *)buf)[i] = val;
++		else
++			put_unaligned_le32(val, buf + i * sizeof(u32));
+ 	}
+ 
+ 	host->bytes_to_transfer -= data->blocksize;
+ 	host->blocks_done++;
++
++	return 0;
+ }
+ 
+-static void efx_emmc_write_block_pio(struct efx_emmc_host *host)
++static int efx_emmc_write_block_pio(struct efx_emmc_host *host)
+ {
+ 	struct mmc_data *data = host->data;
+-	u32 *buf = (u32 *)((u8 *)data->src + (data->blocksize * host->blocks_done));
++	const u8 *buf = (const u8 *)data->src +
++			(size_t)data->blocksize * host->blocks_done;
++	bool aligned = IS_ALIGNED((uintptr_t)buf, sizeof(u32));
+ 	int words = data->blocksize / 4;
+ 	int i;
++	int ret;
++	u32 val;
+ 
+ 	for (i = 0; i < words; i++) {
+-		/* Wait for space available */
+-		while (!(efx_emmc_readl(host, EFX_EMMC_PRESENT_STATE) &
+-			 EFX_EMMC_BUFFER_WRITE_EN));
++		if (!(efx_emmc_readl(host, EFX_EMMC_PRESENT_STATE) &
++		      EFX_EMMC_BUFFER_WRITE_EN)) {
++			ret = efx_emmc_wait_buffer_ready(host,
++						 EFX_EMMC_BUFFER_WRITE_EN);
++			if (ret)
++				return ret;
++		}
+ 
+-		efx_emmc_writel(host, buf[i], EFX_EMMC_BUFFER_DATA_PORT);
++		if (aligned)
++			val = READ_ONCE(((const u32 *)buf)[i]);
++		else
++			val = get_unaligned_le32(buf + i * sizeof(u32));
++		efx_emmc_writel(host, val, EFX_EMMC_BUFFER_DATA_PORT);
+ 	}
+ 
+ 	host->bytes_to_transfer -= data->blocksize;
+ 	host->blocks_done++;
++
++	return 0;
+ }
+ 
+-static void efx_emmc_transfer_pio(struct efx_emmc_host *host)
++static int efx_emmc_transfer_pio(struct efx_emmc_host *host)
+ {
+ 	struct mmc_data *data = host->data;
+ 	int blocks_remaining = data->blocks;
++	int ret;
+ 
+ 	while (blocks_remaining > 0 && host->bytes_to_transfer > 0) {
+-		if (data->flags & MMC_DATA_READ) {
+-			efx_emmc_read_block_pio(host);
+-		} else {
+-			efx_emmc_write_block_pio(host);
+-		}
++		if (data->flags & MMC_DATA_READ)
++			ret = efx_emmc_read_block_pio(host);
++		else
++			ret = efx_emmc_write_block_pio(host);
++		if (ret)
++			return ret;
++
+ 		blocks_remaining--;
+ 	}
++
++	return 0;
+ }
+ 
+ static int efx_emmc_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
+-                     struct mmc_data *data)
++			     struct mmc_data *data)
+ {
+-    struct efx_emmc_host *host = dev_get_priv(dev);
+-    u32 command, resp[4];
+-    int ret;
+-
+-    host->cmd = cmd;
+-    host->data = data;
+-
+-    /* Ensure valid block length for CMD16 (SET_BLOCKLEN). For eMMC, 512 is standard. */
+-    if (cmd->cmdidx == MMC_CMD_SET_BLOCKLEN) {
+-        if (cmd->cmdarg == 0 || cmd->cmdarg > MMC_MAX_BLOCK_LEN)
+-            cmd->cmdarg = MMC_MAX_BLOCK_LEN; /* 512 */
+-    }
++	struct efx_emmc_host *host = dev_get_priv(dev);
++	u32 command, resp[4];
++	int ret = 0;
++
++	host->cmd = cmd;
++	host->data = data;
++
++	if (cmd->cmdidx == MMC_CMD_SET_BLOCKLEN &&
++	    (!cmd->cmdarg || cmd->cmdarg > EFX_EMMC_MAX_BLOCK_LENGTH)) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	if (data && (!data->blocks || data->blocks > 0xffff ||
++		     !data->blocksize ||
++		     data->blocksize > EFX_EMMC_MAX_BLOCK_LENGTH ||
++		     data->blocksize % sizeof(u32) ||
++		     (data->flags != MMC_DATA_READ &&
++		      data->flags != MMC_DATA_WRITE))) {
++		ret = -EINVAL;
++		goto out;
++	}
+ 
+ 	/* Handle SD-specific commands that should fail on eMMC */
+ 	/* CMD8 with arg 0x1AA is SD interface check, but CMD8 with arg 0x0 is eMMC EXT_CSD */
+-    if ((cmd->cmdidx == 8 && cmd->cmdarg == 0x000001aa) || 
+-        cmd->cmdidx == 55 || cmd->cmdidx == 41) {
+-        return -ETIMEDOUT; /* Make it look like a timeout to MMC core */
+-    }
++	if ((cmd->cmdidx == 8 && cmd->cmdarg == 0x000001aa) ||
++	    cmd->cmdidx == 55 || cmd->cmdidx == 41) {
++		ret = -ETIMEDOUT;
++		goto out;
++	}
+ 
+ 	/* Wait for command line to be ready */
+ 	ret = efx_emmc_wait_cmd_ready(host, 1000);
+-    if (ret) {
+-        return ret;
+-    }
++	if (ret)
++		goto recover;
+ 
+ 	/* Clear any pending interrupts */
+ 	efx_emmc_writel(host, EFX_EMMC_INT_ALL_MASK, EFX_EMMC_INT_STATUS);
+@@ -493,11 +584,6 @@
+ 	if (data) {
+ 		command |= EFX_EMMC_DATA_PRESENT;
+ 
+-		/* Ensure we have a valid block size */
+-		if (data->blocksize == 0) {
+-            data->blocksize = 512; /* Default eMMC block size */
+-		}
+-		
+ 		/* Set up data transfer */
+ 		efx_emmc_writel(host, (data->blocks << EFX_EMMC_BLOCK_COUNT_SHIFT) |
+ 				(data->blocksize & EFX_EMMC_BLOCK_SIZE_MASK),
+@@ -513,7 +599,8 @@
+ 		}
+ 
+ 		/* Initialize PIO transfer state */
+-		host->bytes_to_transfer = data->blocksize * data->blocks;
++		host->bytes_to_transfer =
++			(size_t)data->blocksize * data->blocks;
+ 		host->blocks_done = 0;
+ 	}
+ 
+@@ -522,9 +609,8 @@
+ 
+ 	/* Wait for command completion */
+ 	ret = efx_emmc_wait_interrupt(host, EFX_EMMC_INT_CMD_COMPLETE, 1000);
+-    if (ret) {
+-        return ret;
+-    }
++	if (ret)
++		goto recover;
+ 
+ 	/* Read response */
+ 	if (cmd->resp_type & MMC_RSP_PRESENT) {
+@@ -554,29 +640,21 @@
+ 
+ 		/* Wait for buffer ready interrupt first (following Linux driver order) */
+ 		ret = efx_emmc_wait_interrupt(host, expected_int, 5000);
+-		if (ret) {
+-			return ret;
+-		}
+-		
+-		efx_emmc_transfer_pio(host);
+-		
+-		/* Wait for transfer activity to complete (following Linux driver approach) */
+-		u32 present_state;
+-		u32 activity_mask = EFX_EMMC_DAT_LINE_ACTIVE |
+-				    EFX_EMMC_READ_XFER_ACTIVE |
+-				    EFX_EMMC_WRITE_XFER_ACTIVE;
+-		int timeout = 100; /* 100ms timeout, 1ms per loop */
+-		do {
+-			present_state = efx_emmc_readl(host, EFX_EMMC_PRESENT_STATE);
+-			if (!(present_state & activity_mask))
+-				break;
+-			udelay(1000); /* 1ms delay */
+-			timeout--;
+-		} while (timeout > 0);
+-		
+-		if (timeout <= 0) {
+-			return -ETIMEDOUT;
+-		}
++		if (ret)
++			goto recover;
++
++		ret = efx_emmc_transfer_pio(host);
++		if (ret)
++			goto recover;
++
++		/* Tuning completes when its fixed pattern has been drained. */
++		if (mmc_is_tuning_cmd(cmd->cmdidx))
++			goto out;
++
++		ret = efx_emmc_wait_interrupt(host,
++					      EFX_EMMC_INT_XFER_COMPLETE, 5000);
++		if (ret)
++			goto recover;
+ 	}
+ 
+ 	/* Add delay after CMD0 (GO_IDLE_STATE) for eMMC initialization */
+@@ -584,35 +662,190 @@
+ 		mdelay(10); /* 10ms delay for eMMC to be ready for next command */
+ 	}
+ 
++	if (cmd->cmdidx == MMC_CMD_SWITCH &&
++	    ((cmd->cmdarg >> 16) & 0xff) == EXT_CSD_BUS_WIDTH) {
++		u8 width = (cmd->cmdarg >> 8) & 0xff;
++
++		host->mmc->ddr_mode = !!(width & EXT_CSD_DDR_FLAG);
++		efx_emmc_set_bus_mode(host, host->mmc->bus_width,
++				       host->mmc->ddr_mode);
++	}
++
++out:
+ 	host->cmd = NULL;
+ 	host->data = NULL;
+ 
+-	return 0;
++	return ret;
++
++recover:
++	efx_emmc_recover(host);
++	goto out;
+ }
+ 
+ static int efx_emmc_set_ios(struct udevice *dev)
+ {
+-    struct efx_emmc_host *host = dev_get_priv(dev);
+-    struct mmc *mmc = mmc_get_mmc_dev(dev);
++	struct efx_emmc_host *host = dev_get_priv(dev);
++	struct mmc *mmc = mmc_get_mmc_dev(dev);
++
++	if (mmc->clock != host->current_clk) {
++		efx_emmc_set_clock(host, mmc->clock);
++		mmc->clock = host->current_clk;
++	}
++
++	if (mmc->bus_width)
++		efx_emmc_set_bus_mode(host, mmc->bus_width, mmc->ddr_mode);
++
++#ifdef MMC_SUPPORTS_TUNING
++	if (host->tuned && mmc->selected_mode != MMC_HS_200 &&
++	    mmc->selected_mode != MMC_HS_400) {
++		efx_emmc_set_tuning(host, 0, 0);
++		host->tuned = false;
++		host->tuning_sample = 0;
++		host->tuning_pll = 0;
++	}
++#endif
++
++#if CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
++	if (mmc->selected_mode != MMC_HS_400) {
++		host->hs400_tuned = false;
++	} else if (!host->hs400_tuned) {
++		/* This controller requires a second scan on the HS400 receive path. */
++		host->hs400_tuned = true;
++		return efx_emmc_execute_tuning(dev,
++				MMC_CMD_SEND_TUNING_BLOCK_HS200);
++	}
++#endif
+ 
+-    if (mmc->clock != host->current_clk) {
+-        efx_emmc_set_clock(host, mmc->clock);
+-    }
+-
+-    if (mmc->bus_width) {
+-        efx_emmc_set_bus_width(host, mmc->bus_width);
+-    }
+-
+-    /* Ensure logical block lengths default to 512 if unset (avoid CMD16 arg=0). */
+-    if (mmc->read_bl_len == 0)
+-        mmc->read_bl_len = MMC_MAX_BLOCK_LEN;
++	/* Ensure logical block lengths default to 512 if unset (avoid CMD16 arg=0). */
++	if (mmc->read_bl_len == 0)
++		mmc->read_bl_len = MMC_MAX_BLOCK_LEN;
+ #if CONFIG_IS_ENABLED(MMC_WRITE)
+-    if (mmc->write_bl_len == 0)
+-        mmc->write_bl_len = MMC_MAX_BLOCK_LEN;
++	if (mmc->write_bl_len == 0)
++		mmc->write_bl_len = MMC_MAX_BLOCK_LEN;
+ #endif
+ 
+-    return 0;
++	return 0;
++}
++
++#ifdef MMC_SUPPORTS_TUNING
++struct efx_emmc_tuning_row {
++	u8 pass;
++	u8 start;
++	u8 len;
++};
++
++static void efx_emmc_set_tuning(struct efx_emmc_host *host, u32 sample,
++				u32 pll_shift)
++{
++	u32 val = sample << EFX_EMMC_TUNING_SAMPLE_SHIFT |
++		  pll_shift << EFX_EMMC_TUNING_PLL_SHIFT;
++
++	efx_emmc_writel(host, val, EFX_EMMC_BASE_REG1);
++	efx_emmc_writel(host, val | EFX_EMMC_TUNING_APPLY, EFX_EMMC_BASE_REG1);
++	efx_emmc_writel(host, val, EFX_EMMC_BASE_REG1);
++	udelay(EFX_EMMC_TUNING_SETTLE_US);
++}
++
++static int efx_emmc_execute_tuning(struct udevice *dev, uint opcode)
++{
++	struct efx_emmc_host *host = dev_get_priv(dev);
++	struct mmc *mmc = mmc_get_mmc_dev(dev);
++	struct efx_emmc_tuning_row *rows;
++	const char *mode;
++	u32 samples, sample, shift;
++	u32 max_len = 0, run = 0, run_start = 0;
++	u32 best_rows = 0, best_row_start = 0, row, pll;
++
++	if (opcode != MMC_CMD_SEND_TUNING_BLOCK_HS200)
++		return -EINVAL;
++	mode = mmc->selected_mode == MMC_HS_400 ? "HS400" :
++	       mmc->hs400_tuning ? "HS400 pre-tune (HS200)" : "HS200";
++
++	samples = efx_emmc_readl(host, EFX_EMMC_BASE_REG0) &
++		  EFX_EMMC_BASE_REG0_CLK_DIV_MASK;
++	if (!samples)
++		return -EINVAL;
++
++	rows = calloc(samples, sizeof(*rows));
++	if (!rows)
++		return -ENOMEM;
++
++	for (sample = 0; sample < samples; sample++) {
++		for (shift = 0; shift < EFX_EMMC_TUNING_PLL_SHIFTS; shift++) {
++			efx_emmc_set_tuning(host, sample, shift);
++			if (!mmc_send_tuning(mmc, opcode, NULL))
++				rows[sample].pass |= BIT(shift);
++		}
++
++		run = 0;
++		for (shift = 0; shift < 2 * EFX_EMMC_TUNING_PLL_SHIFTS;
++		     shift++) {
++			if (rows[sample].pass &
++			    BIT(shift % EFX_EMMC_TUNING_PLL_SHIFTS)) {
++				if (run < EFX_EMMC_TUNING_PLL_SHIFTS)
++					run++;
++				if (run > rows[sample].len) {
++					rows[sample].start = (shift + 1 - run) %
++						EFX_EMMC_TUNING_PLL_SHIFTS;
++					rows[sample].len = run;
++				}
++			} else {
++				run = 0;
++			}
++		}
++		max_len = max(max_len, (u32)rows[sample].len);
++	}
++
++	printf("eMMC %s tuning map (rows=sample_cnt, columns=pll_shift, 1=pass):\n",
++	       mode);
++	printf("           0 1 2 3 4 5 6 7\n");
++	for (sample = 0; sample < samples; sample++) {
++		printf("%9u:", sample);
++		for (shift = 0; shift < EFX_EMMC_TUNING_PLL_SHIFTS; shift++)
++			printf(" %u", !!(rows[sample].pass & BIT(shift)));
++		printf("\n");
++	}
++
++	if (!max_len) {
++		free(rows);
++		dev_err(dev, "no tuning point found\n");
++		return -EIO;
++	}
++
++	run = 0;
++	for (sample = 0; sample <= samples; sample++) {
++		if (sample < samples && rows[sample].len == max_len) {
++			if (!run)
++				run_start = sample;
++			run++;
++		} else {
++			if (run > best_rows) {
++				best_row_start = run_start;
++				best_rows = run;
++			}
++			run = 0;
++		}
++	}
++
++	row = best_row_start + (best_rows - 1) / 2;
++	if (row >= samples) {
++		free(rows);
++		return -ERANGE;
++	}
++	pll = (rows[row].start + (rows[row].len - 1) / 2) %
++	      EFX_EMMC_TUNING_PLL_SHIFTS;
++	free(rows);
++
++	efx_emmc_set_tuning(host, row, pll);
++	host->tuned = true;
++	host->tuning_sample = row;
++	host->tuning_pll = pll;
++	printf("eMMC %s tuning selected: sample_cnt=%u pll_shift=%u\n",
++	       mode, row, pll);
++
++	return 0;
+ }
++#endif
+ 
+ static int efx_emmc_get_cd(struct udevice *dev)
+ {
+@@ -627,6 +860,9 @@
+ static const struct dm_mmc_ops efx_emmc_ops = {
+ 	.send_cmd = efx_emmc_send_cmd,
+ 	.set_ios = efx_emmc_set_ios,
++#ifdef MMC_SUPPORTS_TUNING
++	.execute_tuning = efx_emmc_execute_tuning,
++#endif
+ 	.get_cd = efx_emmc_get_cd,
+ 	.get_wp = efx_emmc_get_wp,
+ };
+@@ -676,14 +912,7 @@
+ 	cfg->f_min = EFX_EMMC_MIN_FREQ;
+ 	cfg->b_max = 65535;
+ 
+-	/* eMMC-specific capabilities - force eMMC only */
+-	cfg->host_caps = MMC_MODE_HS | MMC_MODE_8BIT | MMC_MODE_4BIT |
+-			 MMC_CAP_NONREMOVABLE;
+-
+-	/* Support HS200 if enabled */
+-#if CONFIG_IS_ENABLED(MMC_HS200_SUPPORT)
+-	cfg->host_caps |= MMC_MODE_HS200;
+-#endif
++	cfg->host_caps = 0;
+ 
+ 	/* Voltage support: 1.7-1.95V and 2.7-3.6V */
+ 	cfg->voltages = MMC_VDD_165_195 | MMC_VDD_27_28 | MMC_VDD_28_29 |
+@@ -696,7 +925,7 @@
+ {
+ 	struct efx_emmc_plat *plat = dev_get_plat(dev);
+ 	struct efx_emmc_host *host = dev_get_priv(dev);
+-	struct mmc *mmc = mmc_get_mmc_dev(dev);
++	struct mmc *mmc = &plat->mmc;
+ 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
+ 	fdt_addr_t addr;
+ 	int ret;
+@@ -736,6 +965,13 @@
+ 	}
+ 
+ 	efx_emmc_add_host(host);
++	ret = mmc_of_parse(dev, &plat->cfg);
++	if (ret)
++		return ret;
++
++	if (plat->cfg.f_max < EFX_EMMC_HS_MODE_MIN_FREQ)
++		plat->cfg.host_caps &= ~(MMC_MODE_HS200 | MMC_MODE_HS400 |
++					 MMC_MODE_HS400_ES);
+ 
+ 	return 0;
+ }
+-- 
+2.43.0
