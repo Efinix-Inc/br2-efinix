@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Teoh Choon Zone <czteoh@efinixinc.com>
+Date: Thu, 13 Aug 2026 12:00:00 +0800
+Subject: [PATCH] timer: vexriscv: read 64-bit counter on 32-bit systems
+
+Read mtime as two stable 32-bit halves instead of relying on readq(),
+which is unavailable on 32-bit RISC-V.
+
+Signed-off-by: Teoh Choon Zone <czteoh@efinixinc.com>
+---
+ drivers/timer/vexriscv-timer.c | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/timer/vexriscv-timer.c b/drivers/timer/vexriscv-timer.c
+index 9b1adeb09edf..4812febb1284 100644
+--- a/drivers/timer/vexriscv-timer.c
++++ b/drivers/timer/vexriscv-timer.c
+@@ -14,10 +14,22 @@
+ /* mtime register */
+ #define MTIME_REG(base, offset)		((ulong)(base) + (offset))
+ 
++static u64 notrace vexriscv_timer_read(void __iomem *addr)
++{
++	u32 hi, lo;
++
++	do {
++		hi = readl(addr + 4);
++		lo = readl(addr);
++	} while (hi != readl(addr + 4));
++
++	return (u64)hi << 32 | lo;
++}
++
+ static u64 notrace vexriscv_timer_get_count(struct udevice *dev)
+ {
+-	return readq((void __iomem *)MTIME_REG(dev_get_priv(dev),
+-					       dev_get_driver_data(dev)));
++	return vexriscv_timer_read((void __iomem *)MTIME_REG(dev_get_priv(dev),
++							 dev_get_driver_data(dev)));
+ }
+ 
+ #if CONFIG_IS_ENABLED(RISCV_MMODE) && IS_ENABLED(CONFIG_TIMER_EARLY)
+@@ -35,8 +47,8 @@
+  */
+ u64 notrace timer_early_get_count(void)
+ {
+-	return readq((void __iomem *)MTIME_REG(RISCV_MMODE_TIMERBASE,
+-					       RISCV_MMODE_TIMEROFF));
++	return vexriscv_timer_read((void __iomem *)MTIME_REG(RISCV_MMODE_TIMERBASE,
++							 RISCV_MMODE_TIMEROFF));
+ }
+ #endif
+ 
+-- 
+2.43.0
+
