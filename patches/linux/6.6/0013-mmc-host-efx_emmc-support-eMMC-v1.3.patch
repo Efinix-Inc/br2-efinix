@@ -1,0 +1,738 @@
+From 12e41da3ca4b0d064e6db192c407d803a9ad6875 Mon Sep 17 00:00:00 2001
+From: Swee Aun Khor <sakhor@efinixinc.com>
+Date: Tue, 11 Aug 2026 15:05:41 +0800
+Subject: [PATCH] mmc/host/efx_emmc: support eMMC v1.3
+
+- Add clock shift setting for HS200 and HS400 modes
+- Enhance tuning matching conditions
+- Improve optimal sample selection during tuning
+
+Signed-off-by: Swee Aun Khor <sakhor@efinixinc.com>
+---
+ drivers/mmc/host/efx_emmc.h          |  16 +-
+ drivers/mmc/host/efx_emmc_core.c     |  29 +-
+ drivers/mmc/host/efx_emmc_platform.c |  20 +-
+ drivers/mmc/host/efx_emmc_tuning.c   | 395 ++++++++++++++++++++-------
+ 4 files changed, 352 insertions(+), 108 deletions(-)
+
+diff --git a/drivers/mmc/host/efx_emmc.h b/drivers/mmc/host/efx_emmc.h
+index e7d484639..1f04ed311 100644
+--- a/drivers/mmc/host/efx_emmc.h
++++ b/drivers/mmc/host/efx_emmc.h
+@@ -16,6 +16,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/interrupt.h>
+ #include <linux/dma-mapping.h>
++#include <linux/completion.h>
+ 
+ #ifndef min3
+ #define min3(x, y, z) min(min(x, y), z)
+@@ -60,6 +61,7 @@
+ #define EFX_EMMC_INT_STATUS_EN          0x134
+ #define EFX_EMMC_INT_SIGNAL_EN          0x138
+ #define EFX_EMMC_HOST_CAPABILITIES      0x140
++#define EFX_EMMC_HOST_ADJUSTMENT        0x144
+ #define EFX_EMMC_ADMA_SYS_ADDR_LOW      0x158
+ #define EFX_EMMC_ADMA_SYS_ADDR_HIGH     0x15C
+ 
+@@ -170,7 +172,11 @@
+ #define EFX_EMMC_TUNING_POLL_INTERVAL	200	
+ #define EFX_EMMC_TUNING_BLOCK_SIZE_4BIT	64	
+ #define EFX_EMMC_TUNING_BLOCK_SIZE_8BIT	128	
+-#define EFX_EMMC_MIN_TIMING_MARGIN	1	
++#define EFX_EMMC_MIN_TIMING_MARGIN	1
++#define EMMC_BASE_CLK_CAL_PORT          2
++#define EMMC_BASE_CLK_SHIFT_PORT        3
++#define EMMC_BASE_CLK_SHIFT_90          2
++#define EMMC_BASE_CLK_SHIFT_135         3
+ 
+ struct efx_adma_desc {
+ 	u16 attr;
+@@ -184,6 +190,8 @@ struct efx_emmc_host {
+ 	void __iomem *sys_ioaddr;
+ 	struct clk *clk;
+ 	int irq;
++	bool tuning_first_half_sample;
++	bool tuning_result_selection_edge;
+ 
+ 	struct mmc_request *mrq;
+ 	struct mmc_request *mrq_done;
+@@ -221,6 +229,8 @@ struct efx_emmc_host {
+ 	u32 hs400_default_pll;
+ 	bool tuning_done;
+ 	bool tuning_in_progress;
++	bool tuning_crc_error;
++	struct completion tuning_complete;
+ 	unsigned int prev_timing;
+ 	bool hs400_retune_pending;
+ 	struct delayed_work hs400_retune_work;
+@@ -275,7 +285,9 @@ int efx_emmc_execute_tuning(struct mmc_host *mmc, u32 opcode);
+ int efx_emmc_execute_tuning_command(struct efx_emmc_host *host,
+ 				     int bus_width);
+ void efx_emmc_set_timing_config(struct efx_emmc_host *host,
+-				 u32 sample_count, u32 pll_shift);
++				 u32 sample_count, u32 pll_shift, u32 clk_port);
++void efx_emmc_base_clk_shift(struct efx_emmc_host *host,
++                              u32 pll_shift);
+ int efx_emmc_find_optimal_timing(struct efx_emmc_host *host,
+ 				  u8 result_map[][EFX_EMMC_MAX_PLL_SHIFT],
+ 				  u32 max_sample_count);
+diff --git a/drivers/mmc/host/efx_emmc_core.c b/drivers/mmc/host/efx_emmc_core.c
+index 4c4a975a3..0fbaf5c26 100644
+--- a/drivers/mmc/host/efx_emmc_core.c
++++ b/drivers/mmc/host/efx_emmc_core.c
+@@ -356,12 +356,12 @@ void efx_emmc_finish_command(struct efx_emmc_host *host)
+ 		    case 1: 
+ 		        dev_dbg(&host->pdev->dev,
+ 				"CMD6 mode switch to legacy/HS completed\n");
+-		        efx_emmc_set_timing_config(host, 0, 0);
++		        efx_emmc_set_timing_config(host, 0, 0, EMMC_BASE_CLK_CAL_PORT);
+ 		        break;
+ 		    case 2: 
+ 		        dev_dbg(&host->pdev->dev,
+ 				"CMD6 mode switch to DDR52 completed\n");
+-		        efx_emmc_set_timing_config(host, 2, 2);
++		        efx_emmc_set_timing_config(host, 2, 2, EMMC_BASE_CLK_CAL_PORT);
+ 		        break;
+ 		    case 3: 
+ 		        dev_dbg(&host->pdev->dev,
+@@ -451,7 +451,7 @@ void efx_emmc_send_command(struct efx_emmc_host *host, struct mmc_command *cmd)
+ 		    dev_dbg(&host->pdev->dev,
+ 			    "CMD6 mode switch detected (index=%u, value=%u)\n",
+ 		             index, value);
+-		    efx_emmc_set_timing_config(host, 0, 0);
++		    efx_emmc_set_timing_config(host, 0, 0, EMMC_BASE_CLK_CAL_PORT);
+ 		    msleep(10);
+ 
+ 		    efx_emmc_writel(host, 0xFFFFFFFF, EFX_EMMC_INT_STATUS);
+@@ -678,10 +678,14 @@ void efx_emmc_set_timing(struct efx_emmc_host *host, unsigned int timing)
+ 		if (!test_bit(timing, &host->tuned_timing_modes)) {
+ 		    needs_tuning = true;
+ 		    host->tuning_done = false;
++		    efx_emmc_set_timing_config(host, host->hs200_sample_count,
++                                               host->hs200_pll_shift, EMMC_BASE_CLK_CAL_PORT);
++		    efx_emmc_base_clk_shift(host, EMMC_BASE_CLK_SHIFT_135);
+ 		    dev_dbg(&host->pdev->dev, "HS200 mode - tuning required\n");
+ 		} else {
+ 		    efx_emmc_set_timing_config(host, host->hs200_sample_count,
+-		                               host->hs200_pll_shift);
++		                               host->hs200_pll_shift, EMMC_BASE_CLK_CAL_PORT);
++		    efx_emmc_base_clk_shift(host, EMMC_BASE_CLK_SHIFT_135);
+ 		    dev_dbg(&host->pdev->dev,
+ 		            "HS200 mode - already tuned, restored timing (sample=%u, pll=%u)\n",
+ 		            host->hs200_sample_count, host->hs200_pll_shift);
+@@ -694,7 +698,8 @@ void efx_emmc_set_timing(struct efx_emmc_host *host, unsigned int timing)
+ 		    u32 initial_sample = host->hs400_default_sample;
+ 		    u32 initial_pll = host->hs400_default_pll;
+ 
+-		    efx_emmc_set_timing_config(host, initial_sample, initial_pll);
++		    efx_emmc_set_timing_config(host, initial_sample, initial_pll, EMMC_BASE_CLK_CAL_PORT);
++		    efx_emmc_base_clk_shift(host, EMMC_BASE_CLK_SHIFT_90);
+ 		    needs_tuning = true;
+ 		    host->tuning_done = false;
+ 		    host->hs400_retune_pending = true;
+@@ -709,7 +714,8 @@ void efx_emmc_set_timing(struct efx_emmc_host *host, unsigned int timing)
+ 					  msecs_to_jiffies(10));
+ 		} else {
+ 		    efx_emmc_set_timing_config(host, host->hs400_sample_count,
+-		                               host->hs400_pll_shift);
++		                               host->hs400_pll_shift, EMMC_BASE_CLK_CAL_PORT);
++		    efx_emmc_base_clk_shift(host, EMMC_BASE_CLK_SHIFT_90);
+ 		    dev_info(&host->pdev->dev,
+ 		             "HS400 mode - already tuned, restored timing (sample=%u, pll=%u)\n",
+ 		             host->hs400_sample_count, host->hs400_pll_shift);
+@@ -769,6 +775,13 @@ irqreturn_t efx_emmc_irq(int irq, void *dev_id)
+ 				     "Expected timeout for CMD%d during card detection\n",
+ 		            host->cmd->opcode);
+ 		} else if (host->tuning_in_progress) {
++		    if (intstat & (EFX_EMMC_INT_CMD_CRC_ERR | EFX_EMMC_INT_DATA_CRC_ERR))
++			{
++			    host->tuning_crc_error = true;
++			    dev_dbg(&host->pdev->dev, "CRC error: complete tuning_complete");
++			    complete(&host->tuning_complete);
++			}
++
+ 		    efx_emmc_dbg_irq(host, "Tuning error (expected): 0x%08x\n",
+ 		            (unsigned int)(intstat & EFX_EMMC_INT_ERROR_MASK));
+ 		} else {
+@@ -864,6 +877,10 @@ irqreturn_t efx_emmc_irq(int irq, void *dev_id)
+ 	if (intstat & EFX_EMMC_INT_XFER_COMPLETE) {
+ 		efx_emmc_dbg_irq(host, "Transfer complete interrupt (DMA: %s)\n",
+ 		        host->use_dma ? "enabled" : "disabled");
++		if (host->tuning_in_progress) {
++		    dev_dbg(&host->pdev->dev, "complete tuning_complete");
++		    complete(&host->tuning_complete);
++		}
+ 		efx_emmc_finish_data(host);
+ 	}
+ 
+diff --git a/drivers/mmc/host/efx_emmc_platform.c b/drivers/mmc/host/efx_emmc_platform.c
+index dcfc5222d..8519ce31a 100644
+--- a/drivers/mmc/host/efx_emmc_platform.c
++++ b/drivers/mmc/host/efx_emmc_platform.c
+@@ -145,6 +145,7 @@ int efx_emmc_probe(struct platform_device *pdev)
+ 
+ 	host->tuning_done = false;
+ 	host->tuning_in_progress = false;
++	init_completion(&host->tuning_complete);
+ 	host->hs200_sample_count = 0;
+ 	host->hs200_pll_shift = 0;
+ 	host->hs200_margin = 0;
+@@ -153,11 +154,12 @@ int efx_emmc_probe(struct platform_device *pdev)
+ 	host->hs400_margin = 0;
+ 	host->prev_timing = MMC_TIMING_LEGACY;
+ 	host->hs400_retune_pending = false;
+-	host->tuned_timing_modes = 0; 
++	host->tuned_timing_modes = 0;
++	host->tuning_first_half_sample = false;
++	host->tuning_result_selection_edge = false;
+ 
+ 	INIT_DELAYED_WORK(&host->hs400_retune_work, efx_emmc_hs400_retune_work);
+ 
+-
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	host->ioaddr = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(host->ioaddr)) {
+@@ -184,6 +186,20 @@ int efx_emmc_probe(struct platform_device *pdev)
+ 		 host->hs400_default_sample, host->hs400_default_pll);
+ 	}
+ 
++	// Tuning map result selection
++	// Default is based on center of the map result
++	if (of_property_read_bool(pdev->dev.of_node, "tuning_result_selection_edge")) {
++	    host->tuning_result_selection_edge = true;
++	    dev_info(&pdev->dev, "Tuning result selection edge enabled from DT\n");
++	}
++
++	// Tuning first_half_sample property
++	// Default is using the second half of the sample point
++	if (of_property_read_bool(pdev->dev.of_node, "tuning_first_half_sample")) {
++	    host->tuning_first_half_sample = true;
++	    dev_info(&pdev->dev, "First half sample enabled from DT\n");
++	}
++
+ 	host->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(host->clk)) {
+ 	ret = PTR_ERR(host->clk);
+diff --git a/drivers/mmc/host/efx_emmc_tuning.c b/drivers/mmc/host/efx_emmc_tuning.c
+index f38a77091..a663a1fa2 100644
+--- a/drivers/mmc/host/efx_emmc_tuning.c
++++ b/drivers/mmc/host/efx_emmc_tuning.c
+@@ -33,17 +33,26 @@ static const u32 tuning_block_pattern_4b_mode[] = {
+ };
+ 
+ void efx_emmc_set_timing_config(struct efx_emmc_host *host,
+-				 u32 sample_count, u32 pll_shift)
++				 u32 sample_count, u32 pll_shift, u32 clk_port)
+ {
+-	u32 config_value;
++	u32 config_value  = 0;
++	u32 pll_shift_sel = 0;
+ 
+-	config_value = (sample_count << 16) | (pll_shift << 6);
++	pll_shift_sel = 1 << clk_port;
++	config_value = (sample_count << 16) | (pll_shift << 6) | (pll_shift_sel << 1);
+ 
+ 	efx_emmc_writel(host, config_value | 0x0, EFX_EMMC_BASE_REG1);
+ 	efx_emmc_writel(host, config_value | 0x1, EFX_EMMC_BASE_REG1);
+ 	efx_emmc_writel(host, config_value | 0x0, EFX_EMMC_BASE_REG1);
+ 
+-	udelay(100); 
++	udelay(50000);
++}
++
++void efx_emmc_base_clk_shift(struct efx_emmc_host *host, u32 pll_shift)
++{
++	u32 sample_cnt_value = 0;
++	sample_cnt_value = (efx_emmc_readl(host, EFX_EMMC_BASE_REG1) >> 16 ) & 0xFFFF;
++	efx_emmc_set_timing_config(host, sample_cnt_value, pll_shift, EMMC_BASE_CLK_SHIFT_PORT);
+ }
+ 
+ int efx_emmc_execute_tuning_command(struct efx_emmc_host *host, int bus_width)
+@@ -53,6 +62,7 @@ int efx_emmc_execute_tuning_command(struct efx_emmc_host *host, int bus_width)
+ 	u32 received_data;
+ 	int i, mismatches = 0;
+ 	unsigned long timeout;
++	unsigned long flags;
+ 	u32 tuning_present_state;
+ 
+ 	if (bus_width == 8) {
+@@ -70,6 +80,11 @@ int efx_emmc_execute_tuning_command(struct efx_emmc_host *host, int bus_width)
+ 
+ 	efx_emmc_writel(host, 0xFFFFFFFF, EFX_EMMC_INT_STATUS);
+ 
++	reinit_completion(&host->tuning_complete);
++	spin_lock_irqsave(&host->lock, flags);
++	host->tuning_crc_error = false; // Reset CRC error flag at start of tuning command
++	spin_unlock_irqrestore(&host->lock, flags);
++
+ 	command_config = 0x153A0010;
+ 	efx_emmc_writel(host, command_config, EFX_EMMC_TRANSFER_MODE);
+ 
+@@ -82,11 +97,15 @@ int efx_emmc_execute_tuning_command(struct efx_emmc_host *host, int bus_width)
+ 	}
+ 
+ 	if (time_after(jiffies, timeout)) {
++	    tuning_present_state = efx_emmc_readl(host, EFX_EMMC_PRESENT_STATE);
++            if (tuning_present_state & EFX_EMMC_BUFFER_READ_EN) {
++                break;
++            }
+ 	    dev_dbg(&host->pdev->dev, "Tuning command timeout after 5ms\n");
+ 	    return 0; 
+ 	}
+ 
+-	cpu_relax();
++        udelay(10);
+ 	} while (1);
+ 
+ 	for (i = 0; i < word_count; i++) {
+@@ -99,6 +118,19 @@ int efx_emmc_execute_tuning_command(struct efx_emmc_host *host, int bus_width)
+ 	           i, received_data, reference_pattern[i]);
+ 	}
+ 	}
++	if (!wait_for_completion_timeout(&host->tuning_complete,
++		msecs_to_jiffies(EFX_EMMC_TUNING_TIMEOUT_MS))) {
++		dev_dbg(&host->pdev->dev, "Tuning completion interrupt timeout\n");
++		return 0;
++	}
++
++	if (host->tuning_crc_error) {
++		dev_dbg(&host->pdev->dev,"Tuning command CRC error detected\n");
++		spin_lock_irqsave(&host->lock, flags);
++		host->tuning_crc_error = false; /* Reset CRC error flag after handling */
++		spin_unlock_irqrestore(&host->lock, flags);
++		return 0; /* Failure due to CRC error */
++	}
+ 
+ 	if (mismatches <= 2) {
+ 	return 1; 
+@@ -129,6 +161,41 @@ static int efx_emmc_find_longest_consecutive_ones(u8 *row, int length)
+ 	return max_len;
+ }
+ 
++// A function that finds the first or last occurrence of the longest consecutive 1's based on argument
++static int efx_emmc_find_first_or_last_consecutive_ones(u8 *row, int length, bool find_first)
++{
++    int max_len = 0;
++    int current_len = 0;
++    int max_start = -1;
++    int current_start = -1;
++    int i;
++
++    for (i = 0; i < length; i++) {
++        if (row[i] == 1) {
++            if (current_len == 0) {
++                current_start = i;
++            }
++            current_len++;
++            if (current_len > max_len) {
++                max_len = current_len;
++                max_start = current_start;
++            }
++        } else {
++            current_len = 0;
++        }
++    }
++
++    if (max_start == -1) {
++        return -1;
++    }
++
++    if (find_first) {
++        return max_start;
++    } else {
++        return max_start + max_len - 1;
++    }
++}
++
+ static int efx_emmc_find_center_of_consecutive_ones(u8 *row, int length)
+ {
+ 	int max_len, current_len, max_start, current_start, center, i;
+@@ -153,7 +220,7 @@ static int efx_emmc_find_center_of_consecutive_ones(u8 *row, int length)
+ 	}
+ 	}
+ 
+-	center = max_start + (max_len / 2);
++	center = max_start + ((max_len-1) / 2);
+ 	return center;
+ }
+ 
+@@ -161,108 +228,216 @@ int efx_emmc_find_optimal_timing(struct efx_emmc_host *host,
+ 				  u8 result_map[][EFX_EMMC_MAX_PLL_SHIFT],
+ 				  u32 max_sample_count)
+ {
+-	int max_consecutive_length, row_length, optimal_sample_count,
+-	optimal_pll_shift;
++	int max_consecutive_length, row_length, optimal_sample_count, optimal_pll_shift;
+ 	int *optimal_rows;
+-	int optimal_row_count, center_row, i;
++	int optimal_row_count, center_row, selected_index, original_length, i, j;
+ 	char optimal_row_str[32];
+ 
+-	optimal_rows = kmalloc(max_sample_count * sizeof(int), GFP_KERNEL);
+-	if (!optimal_rows) {
+-	return -ENOMEM;
+-	}
+-
+-	dev_dbg(&host->pdev->dev, "Analyzing timing results\n");
+-	max_consecutive_length = 0;
+-	for (i = 0; i < max_sample_count; i++) {
+-	row_length = efx_emmc_find_longest_consecutive_ones(result_map[i],
+-							     EFX_EMMC_MAX_PLL_SHIFT);
+-	dev_dbg(&host->pdev->dev, "Sample[%u]: consecutive_length=%d\n",
+-			i, row_length);
+-	if (row_length > max_consecutive_length) {
+-	    dev_dbg(&host->pdev->dev,
+-			    "New best: Sample[%u] length=%d\n",
+-			    i, row_length);
+-	    max_consecutive_length = row_length;
+-	}
+-	}
+-	dev_dbg(&host->pdev->dev, "Best consecutive length: %d\n",
+-	     max_consecutive_length);
+-
+-
+-	if (max_consecutive_length < EFX_EMMC_MIN_TIMING_MARGIN) {
+-	dev_warn(&host->pdev->dev,
+-			  "Insufficient timing margin: %d (minimum %d)\n",
+-	        max_consecutive_length, EFX_EMMC_MIN_TIMING_MARGIN);
+-	}
+-
+-	optimal_row_count = 0;
+-	for (i = 0; i < max_sample_count; i++) {
+-	if (efx_emmc_find_longest_consecutive_ones(result_map[i],
+-							     EFX_EMMC_MAX_PLL_SHIFT) ==
+-	    max_consecutive_length) {
+-	    optimal_rows[optimal_row_count++] = i;
+-	}
+-	}
+-
+-	if (optimal_row_count == 0) {
+-	kfree(optimal_rows);
+-	return -ENODEV; 
+-	}
+-
+-	center_row = optimal_row_count / 2;
+-	optimal_sample_count = optimal_rows[center_row];
+-
+-	dev_dbg(&host->pdev->dev,
+-	     "Selected sample_count=%d from %d optimal rows\n",
+-	     optimal_sample_count, optimal_row_count);
+-
+-	optimal_row_str[0] = '\0';
+-	for (i = 0; i < EFX_EMMC_MAX_PLL_SHIFT; i++) {
+-	sprintf(optimal_row_str + strlen(optimal_row_str), "%d",
+-		result_map[optimal_sample_count][i]);
+-	}
+-	dev_dbg(&host->pdev->dev,
+-	     "Analyzing row[%d]: [%s] for center calculation\n",
+-	     optimal_sample_count, optimal_row_str);
+-
+-	optimal_pll_shift =
+-	efx_emmc_find_center_of_consecutive_ones(result_map[optimal_sample_count],
+-						   EFX_EMMC_MAX_PLL_SHIFT);
+-
+-	dev_dbg(&host->pdev->dev,
+-	     "Center PLL calculation result: pll_shift=%d\n",
+-	     optimal_pll_shift);
+-
+-	if (host->mmc->ios.timing == MMC_TIMING_MMC_HS200) {
+-		host->hs200_sample_count = optimal_sample_count;
+-		host->hs200_pll_shift = optimal_pll_shift;
+-		host->hs200_margin = max_consecutive_length;
+-	} else if (host->mmc->ios.timing == MMC_TIMING_MMC_HS400) {
+-		host->hs400_sample_count = optimal_sample_count;
+-		host->hs400_pll_shift = optimal_pll_shift;
+-		host->hs400_margin = max_consecutive_length;
+-	}
+-
+-	dev_dbg(&host->pdev->dev,
+-	     "Optimal timing found: sample_count=%u, pll_shift=%u, margin=%d\n",
+-	     optimal_sample_count, optimal_pll_shift, max_consecutive_length);
+-
+-	kfree(optimal_rows);
+-	return 0;
++    // Max sample count should be less than 8 With system clock is 200Mhz and target SDIO clock is 25Mhz.
++    // Shall perform basic tuning if the max sample count more than 8.
++    if (max_sample_count > 8) {
++
++        optimal_rows = kmalloc(max_sample_count * sizeof(int), GFP_KERNEL);
++        if (!optimal_rows) {
++        return -ENOMEM;
++        }
++
++        dev_dbg(&host->pdev->dev, "Analyzing timing results\n");
++        max_consecutive_length = 0;
++        for (i = 0; i < max_sample_count; i++) {
++        row_length = efx_emmc_find_longest_consecutive_ones(result_map[i],
++                                    EFX_EMMC_MAX_PLL_SHIFT);
++        dev_dbg(&host->pdev->dev, "Sample[%u]: consecutive_length=%d\n",
++                i, row_length);
++        if (row_length > max_consecutive_length) {
++            dev_dbg(&host->pdev->dev,
++                    "New best: Sample[%u] length=%d\n",
++                    i, row_length);
++            max_consecutive_length = row_length;
++        }
++        }
++        dev_dbg(&host->pdev->dev, "Best consecutive length: %d\n",
++            max_consecutive_length);
++
++
++        if (max_consecutive_length < EFX_EMMC_MIN_TIMING_MARGIN) {
++        dev_warn(&host->pdev->dev,
++                "Insufficient timing margin: %d (minimum %d)\n",
++                max_consecutive_length, EFX_EMMC_MIN_TIMING_MARGIN);
++        }
++
++        optimal_row_count = 0;
++        for (i = 0; i < max_sample_count; i++) {
++        if (efx_emmc_find_longest_consecutive_ones(result_map[i],
++                                    EFX_EMMC_MAX_PLL_SHIFT) ==
++            max_consecutive_length) {
++            optimal_rows[optimal_row_count++] = i;
++        }
++        }
++
++        if (optimal_row_count == 0) {
++        kfree(optimal_rows);
++        return -ENODEV;
++        }
++
++        center_row = optimal_row_count / 2;
++        optimal_sample_count = optimal_rows[center_row];
++
++        dev_dbg(&host->pdev->dev,
++            "Selected sample_count=%d from %d optimal rows\n",
++            optimal_sample_count, optimal_row_count);
++
++        optimal_row_str[0] = '\0';
++        for (i = 0; i < EFX_EMMC_MAX_PLL_SHIFT; i++) {
++        sprintf(optimal_row_str + strlen(optimal_row_str), "%d",
++            result_map[optimal_sample_count][i]);
++        }
++        dev_dbg(&host->pdev->dev,
++            "Analyzing row[%d]: [%s] for center calculation\n",
++            optimal_sample_count, optimal_row_str);
++
++        optimal_pll_shift =
++        efx_emmc_find_center_of_consecutive_ones(result_map[optimal_sample_count],
++                            EFX_EMMC_MAX_PLL_SHIFT);
++
++        dev_dbg(&host->pdev->dev,
++            "Center PLL calculation result: pll_shift=%d\n",
++            optimal_pll_shift);
++
++        if (host->mmc->ios.timing == MMC_TIMING_MMC_HS200) {
++            host->hs200_sample_count = optimal_sample_count;
++            host->hs200_pll_shift = optimal_pll_shift;
++            host->hs200_margin = max_consecutive_length;
++        } else if (host->mmc->ios.timing == MMC_TIMING_MMC_HS400) {
++            host->hs400_sample_count = optimal_sample_count;
++            host->hs400_pll_shift = optimal_pll_shift;
++            host->hs400_margin = max_consecutive_length;
++        }
++
++        dev_dbg(&host->pdev->dev,
++            "Optimal timing found: sample_count=%u, pll_shift=%u, margin=%d\n",
++            optimal_sample_count, optimal_pll_shift, max_consecutive_length);
++
++        kfree(optimal_rows);
++    } else {
++
++        u8 *flat_map;
++        int flat_length;
++
++        // Append the same result_map to make it look like 1D for better center calculation
++        // Double the result_map
++        flat_length = max_sample_count * EFX_EMMC_MAX_PLL_SHIFT * 2;
++        flat_map = kmalloc(flat_length, GFP_KERNEL);
++        if (!flat_map) {
++            kfree(optimal_rows);
++            return -ENOMEM;
++        }
++
++        for (i = 0; i < max_sample_count; i++) {
++            for (j = 0; j < EFX_EMMC_MAX_PLL_SHIFT; j++) {
++                flat_map[i * EFX_EMMC_MAX_PLL_SHIFT + j] = result_map[i][j];
++                flat_map[(i + max_sample_count) * EFX_EMMC_MAX_PLL_SHIFT + j] = result_map[i][j];
++            }
++        }
++
++        //Debug: Print the flat map for analysis
++        dev_dbg(&host->pdev->dev, "Flat map:\n");
++        for (i = 0; i < flat_length; i++) {
++            dev_dbg(&host->pdev->dev, "%u ", flat_map[i]);
++        }
++
++        max_consecutive_length = efx_emmc_find_longest_consecutive_ones(flat_map, flat_length);
++        dev_dbg(&host->pdev->dev, "Best consecutive length in flat map: %d\n", max_consecutive_length);
++        if (max_consecutive_length < EFX_EMMC_MIN_TIMING_MARGIN) {
++            dev_warn(&host->pdev->dev,
++                     "Insufficient timing margin in flat map: %d (minimum %d)\n",
++                     max_consecutive_length, EFX_EMMC_MIN_TIMING_MARGIN);
++        }
++
++        // DDR and SDR modes using different selection strategy for better tuning results
++        if (host->mmc->ios.timing == MMC_TIMING_MMC_HS400) {
++            // DDR mode: select center of longest consecutive 1's for better stability as DDR is more sensitive to timing
++            // For DDR mode, find the center of the longest consecutive 1's
++            original_length = max_sample_count * EFX_EMMC_MAX_PLL_SHIFT;
++            selected_index = efx_emmc_find_center_of_consecutive_ones(flat_map, flat_length);
++            if (selected_index < 0) {
++                kfree(flat_map);
++                return -ENODEV;
++            }
++            selected_index = selected_index % original_length; // Map it back to the original range
++
++            // Find sample count range
++            optimal_sample_count = selected_index / EFX_EMMC_MAX_PLL_SHIFT;
++            // Find PLL shift range
++            optimal_pll_shift = selected_index % EFX_EMMC_MAX_PLL_SHIFT;
++
++            dev_info(&host->pdev->dev,
++                     "DDR mode - optimal timing found: sample_count=%u, pll_shift=%u, margin=%d\n",
++                     optimal_sample_count, optimal_pll_shift, max_consecutive_length);
++        } else {
++            /* SDR mode:
++               If tuning_result_selection_edge is false, select the center of the longest consecutive 1's
++               If tuning_result_selection_edge is true, select the first or last occurrence of the longest
++               consecutive 1's based on tuning_first_half_sample.
++               If first_half_sample is true, select the last occurrence
++               If first_half_sample is false, select the first occurrence
++            */
++            original_length = max_sample_count * EFX_EMMC_MAX_PLL_SHIFT;
++
++            // Default is based on center of the map result
++            if (!host->tuning_result_selection_edge) {
++                selected_index = efx_emmc_find_center_of_consecutive_ones(flat_map, flat_length);
++                dev_info(&host->pdev->dev,
++                    "SDR mode - using center of longest consecutive 1's\n");
++            } else {
++	            selected_index = efx_emmc_find_first_or_last_consecutive_ones(
++			            flat_map, flat_length, !host->tuning_first_half_sample);
++                dev_info(&host->pdev->dev,
++                    "SDR mode - using %s occurrence of longest consecutive 1's\n",
++                    host->tuning_first_half_sample ? "last" : "first");
++            }
++	        if (selected_index < 0) {
++	            kfree(flat_map);
++		        return -ENODEV;
++	        }
++
++	        selected_index = selected_index % original_length;
++	        optimal_sample_count = selected_index / EFX_EMMC_MAX_PLL_SHIFT;
++	        optimal_pll_shift = selected_index % EFX_EMMC_MAX_PLL_SHIFT;
++
++	        dev_info(&host->pdev->dev,
++                    "SDR mode - optimal timing found: sample_count=%u, pll_shift=%u, margin=%d\n",
++                    optimal_sample_count, optimal_pll_shift, max_consecutive_length);
++            }
++
++        kfree(flat_map);
++    }
++
++    if (host->mmc->ios.timing == MMC_TIMING_MMC_HS200) {
++        host->hs200_sample_count = optimal_sample_count;
++        host->hs200_pll_shift = optimal_pll_shift;
++        host->hs200_margin = max_consecutive_length;
++    } else if (host->mmc->ios.timing == MMC_TIMING_MMC_HS400) {
++        host->hs400_sample_count = optimal_sample_count;
++        host->hs400_pll_shift = optimal_pll_shift;
++        host->hs400_margin = max_consecutive_length;
++    }
++    return 0;
+ }
+ 
+ int efx_emmc_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ {
+ 	struct efx_emmc_host *host;
+-	u32 max_sample_count, sample_count, pll_shift;
++	u32 max_sample_count, sample_count, pll_shift, host_adjustment;
+ 	int bus_width, success, ret;
+ 	unsigned long flags, timeout;
+ 	u8 (*tuning_result_map)[EFX_EMMC_MAX_PLL_SHIFT];
+ 
+ 	host = mmc_priv(mmc);
+ 
++	spin_lock_irqsave(&host->lock, flags);
+ 	host->tuning_in_progress = true;
++	spin_unlock_irqrestore(&host->lock, flags);
+ 
+ 	dev_info(&host->pdev->dev, "execute_tuning called: timing=%u, clock=%u Hz\n",
+ 	     mmc->ios.timing, mmc->ios.clock);
+@@ -277,7 +452,12 @@ int efx_emmc_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 		u32 pll = (mmc->ios.timing == MMC_TIMING_MMC_HS200) ?
+ 			  host->hs200_pll_shift : host->hs400_pll_shift;
+ 
+-		efx_emmc_set_timing_config(host, sample, pll);
++		efx_emmc_set_timing_config(host, sample, pll, EMMC_BASE_CLK_CAL_PORT);
++
++		if (mmc->ios.timing == MMC_TIMING_MMC_HS200)
++			efx_emmc_base_clk_shift(host, EMMC_BASE_CLK_SHIFT_135);
++		else if (mmc->ios.timing == MMC_TIMING_MMC_HS400)
++			efx_emmc_base_clk_shift(host, EMMC_BASE_CLK_SHIFT_90);
+ 
+ 		dev_info(&host->pdev->dev,
+ 			"Tuning skipped: already successfully tuned for timing=%u (sample=%u, pll=%u)\n",
+@@ -334,10 +514,29 @@ int efx_emmc_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 
+ 	for (pll_shift = 0; pll_shift < EFX_EMMC_MAX_PLL_SHIFT; pll_shift++) {
+ 
+-	    efx_emmc_set_timing_config(host, sample_count, pll_shift);
++	    efx_emmc_set_timing_config(host, sample_count, pll_shift, EMMC_BASE_CLK_CAL_PORT);
+ 
+ 	    success = efx_emmc_execute_tuning_command(host, bus_width);
+ 
++            // For success case, additional checking needed to ensure result is successful for SDR mode
++            // last_half both bit8 and bit9 are 1
++            // first_half both bit8 and bit10 are 0
++            if (success && mmc->ios.timing != MMC_TIMING_MMC_HS400) {
++                host_adjustment = efx_emmc_readl(host, EFX_EMMC_HOST_ADJUSTMENT);
++
++                if (success == 1) {
++                if (host->tuning_first_half_sample) {
++                    if ((host_adjustment & 0x500) != 0x0) {
++                        success = 0; // Mark as failure if bit 8 or bit 10 is set
++                    }
++                } else {
++                    if ((host_adjustment & 0x300) != 0x300) {
++                        success = 0; // Mark as failure if both bit 8 and bit 9 is not set
++                    }
++                }
++                }
++            }
++
+ 	    if (!success) {
+ 	        tuning_result_map[sample_count][pll_shift] = 0;
+ 	        consecutive_passes = 0;
+@@ -393,7 +592,7 @@ int efx_emmc_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 		margin = 0;
+ 	}
+ 
+-	efx_emmc_set_timing_config(host, sample, pll);
++	efx_emmc_set_timing_config(host, sample, pll, EMMC_BASE_CLK_CAL_PORT);
+ 
+ 	if (!test_bit(mmc->ios.timing, &host->tuned_timing_modes)) {
+ 	    dev_info(&host->pdev->dev,
+@@ -412,7 +611,7 @@ int efx_emmc_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 			  "Tuning failed: %d, using fallback configuration\n",
+ 			  ret);
+ 	if (max_sample_count == 1) {
+-	    efx_emmc_set_timing_config(host, 0, 2); 
++	    efx_emmc_set_timing_config(host, 0, 2, EMMC_BASE_CLK_CAL_PORT);
+ 	    if (mmc->ios.timing == MMC_TIMING_MMC_HS200) {
+ 	        host->hs200_sample_count = 0;
+ 	        host->hs200_pll_shift = 2;
+@@ -421,7 +620,7 @@ int efx_emmc_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 	        host->hs400_pll_shift = 2;
+ 	    }
+ 	} else {
+-	    efx_emmc_set_timing_config(host, 1, 1);
++	    efx_emmc_set_timing_config(host, 1, 1, EMMC_BASE_CLK_CAL_PORT);
+ 	    if (mmc->ios.timing == MMC_TIMING_MMC_HS200) {
+ 	        host->hs200_sample_count = 1;
+ 	        host->hs200_pll_shift = 1;
+-- 
+2.43.0
+
