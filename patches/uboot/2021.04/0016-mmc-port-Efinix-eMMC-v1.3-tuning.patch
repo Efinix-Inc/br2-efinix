@@ -1,0 +1,372 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Teoh Choon Zone <czteoh@efinixinc.com>
+Date: Thu, 27 Aug 2026 11:30:00 +0800
+Subject: [PATCH] mmc: port Efinix eMMC v1.3 tuning
+
+Use the v1.3 host-adjustment checks and flattened circular tuning map.
+Program the dedicated receive and transmit PLL outputs, preserve their
+phases across recovery, and allow the SDR selection algorithm and sampling
+window to be selected through device tree string properties.
+
+Signed-off-by: Teoh Choon Zone <czteoh@efinixinc.com>
+---
+ drivers/mmc/efx_emmc.c | 227 ++++++++++++++++++++++++++++-------------
+ 1 file changed, 151 insertions(+), 76 deletions(-)
+
+diff --git a/drivers/mmc/efx_emmc.c b/drivers/mmc/efx_emmc.c
+--- a/drivers/mmc/efx_emmc.c
++++ b/drivers/mmc/efx_emmc.c
+@@ -43,6 +43,7 @@
+ #define EFX_EMMC_INT_STATUS_EN          0x134
+ #define EFX_EMMC_INT_SIGNAL_EN          0x138
+ #define EFX_EMMC_HOST_CAPABILITIES      0x140
++#define EFX_EMMC_HOST_ADJUSTMENT        0x144
+ 
+ /* System Register Offsets */
+ #define EFX_SYS_DATE_REG                0x000
+@@ -95,6 +96,11 @@
+ #define EFX_EMMC_DATA_WIDTH_4BIT        1
+ #define EFX_EMMC_DATA_WIDTH_8BIT        2
+ 
++/* Host Adjustment Register (0x144) */
++#define EFX_EMMC_ADJUST_CMD_DIFF        BIT(8)
++#define EFX_EMMC_ADJUST_DATA_ALL_DIFF   BIT(9)
++#define EFX_EMMC_ADJUST_DATA_ANY_DIFF   BIT(10)
++
+ /* Interrupt Status Register bits */
+ #define EFX_EMMC_INT_DATA_TIMEOUT_ERR   BIT(22)
+ #define EFX_EMMC_INT_DATA_CRC_ERR       BIT(21)
+@@ -137,10 +143,16 @@
+ #define EFX_EMMC_MAX_FREQ               200000000 /* 200 MHz */
+ #define EFX_EMMC_PIO_TIMEOUT_MS         1000
+ #define EFX_EMMC_TUNING_PLL_SHIFTS      8
++#define EFX_EMMC_TUNING_MAX_SAMPLES     64
+ #define EFX_EMMC_TUNING_SAMPLE_SHIFT    16
+ #define EFX_EMMC_TUNING_PLL_SHIFT       6
++#define EFX_EMMC_TUNING_PLL_SEL_SHIFT   1
+ #define EFX_EMMC_TUNING_APPLY           BIT(0)
+ #define EFX_EMMC_TUNING_SETTLE_US       50000
++#define EFX_EMMC_BASE_CLK_CAL_PORT       2
++#define EFX_EMMC_BASE_CLK_SHIFT_PORT     3
++#define EFX_EMMC_HS200_CLK_SHIFT         3 /* 135 degrees */
++#define EFX_EMMC_HS400_CLK_SHIFT         2 /* 90 degrees */
+ 
+ /* Hardware specific constants from documentation */
+ #define EFX_EMMC_RESET_PULSE_WIDTH      1         /* 1us minimum */
+@@ -178,12 +190,17 @@
+ 	bool hs400_tuned;
+ 	u32 tuning_sample;
+ 	u32 tuning_pll;
++	bool tuning_edge;
++	bool sampling_right_half;
++	u32 clock_shift;
+ };
+ 
+ #ifdef MMC_SUPPORTS_TUNING
+ static int efx_emmc_execute_tuning(struct udevice *dev, uint opcode);
+ static void efx_emmc_set_tuning(struct efx_emmc_host *host, u32 sample,
+ 				u32 pll_shift);
++static void efx_emmc_set_clock_shift(struct efx_emmc_host *host,
++				     u32 pll_shift);
+ #endif
+ 
+ /* Register access helpers */
+@@ -197,6 +214,43 @@
+ 	writel(val, host->ioaddr + reg);
+ }
+ 
++#ifdef MMC_SUPPORTS_TUNING
++static void efx_emmc_set_phase(struct efx_emmc_host *host, u32 sample,
++			       u32 pll_shift, u32 clock_port)
++{
++	u32 val = sample << EFX_EMMC_TUNING_SAMPLE_SHIFT |
++		  pll_shift << EFX_EMMC_TUNING_PLL_SHIFT |
++		  BIT(clock_port) << EFX_EMMC_TUNING_PLL_SEL_SHIFT;
++
++	efx_emmc_writel(host, val, EFX_EMMC_BASE_REG1);
++	efx_emmc_writel(host, val | EFX_EMMC_TUNING_APPLY, EFX_EMMC_BASE_REG1);
++	efx_emmc_writel(host, val, EFX_EMMC_BASE_REG1);
++	udelay(EFX_EMMC_TUNING_SETTLE_US);
++}
++
++static void efx_emmc_set_tuning(struct efx_emmc_host *host, u32 sample,
++				u32 pll_shift)
++{
++	efx_emmc_set_phase(host, sample, pll_shift,
++			   EFX_EMMC_BASE_CLK_CAL_PORT);
++}
++
++static void efx_emmc_set_clock_shift(struct efx_emmc_host *host,
++				     u32 pll_shift)
++{
++	u32 sample;
++
++	if (host->clock_shift == pll_shift)
++		return;
++
++	sample = efx_emmc_readl(host, EFX_EMMC_BASE_REG1) >>
++		 EFX_EMMC_TUNING_SAMPLE_SHIFT;
++	efx_emmc_set_phase(host, sample, pll_shift,
++			   EFX_EMMC_BASE_CLK_SHIFT_PORT);
++	host->clock_shift = pll_shift;
++}
++#endif
++
+ static inline u32 efx_emmc_sys_readl(struct efx_emmc_host *host, u32 reg)
+ {
+ 	return readl(host->sys_ioaddr + reg);
+@@ -344,9 +398,11 @@
+ 	efx_emmc_writel(host, EFX_EMMC_INT_ALL_MASK, EFX_EMMC_INT_STATUS_EN);
+ 
+ #ifdef MMC_SUPPORTS_TUNING
+-	if (host->tuned)
+-		efx_emmc_set_tuning(host, host->tuning_sample,
+-				    host->tuning_pll);
++	efx_emmc_set_phase(host,
++			   efx_emmc_readl(host, EFX_EMMC_BASE_REG1) >>
++			   EFX_EMMC_TUNING_SAMPLE_SHIFT,
++			   host->clock_shift, EFX_EMMC_BASE_CLK_SHIFT_PORT);
++	efx_emmc_set_tuning(host, host->tuning_sample, host->tuning_pll);
+ #endif
+ }
+ 
+@@ -696,6 +752,11 @@
+ 		efx_emmc_set_bus_mode(host, mmc->bus_width, mmc->ddr_mode);
+ 
+ #ifdef MMC_SUPPORTS_TUNING
++	if (mmc->selected_mode == MMC_HS_200)
++		efx_emmc_set_clock_shift(host, EFX_EMMC_HS200_CLK_SHIFT);
++	else if (mmc->selected_mode == MMC_HS_400)
++		efx_emmc_set_clock_shift(host, EFX_EMMC_HS400_CLK_SHIFT);
++
+ 	if (host->tuned && mmc->selected_mode != MMC_HS_200 &&
+ 	    mmc->selected_mode != MMC_HS_400) {
+ 		efx_emmc_set_tuning(host, 0, 0);
+@@ -728,33 +789,16 @@
+ }
+ 
+ #ifdef MMC_SUPPORTS_TUNING
+-struct efx_emmc_tuning_row {
+-	u8 pass;
+-	u8 start;
+-	u8 len;
+-};
+-
+-static void efx_emmc_set_tuning(struct efx_emmc_host *host, u32 sample,
+-				u32 pll_shift)
+-{
+-	u32 val = sample << EFX_EMMC_TUNING_SAMPLE_SHIFT |
+-		  pll_shift << EFX_EMMC_TUNING_PLL_SHIFT;
+-
+-	efx_emmc_writel(host, val, EFX_EMMC_BASE_REG1);
+-	efx_emmc_writel(host, val | EFX_EMMC_TUNING_APPLY, EFX_EMMC_BASE_REG1);
+-	efx_emmc_writel(host, val, EFX_EMMC_BASE_REG1);
+-	udelay(EFX_EMMC_TUNING_SETTLE_US);
+-}
+-
+ static int efx_emmc_execute_tuning(struct udevice *dev, uint opcode)
+ {
+ 	struct efx_emmc_host *host = dev_get_priv(dev);
+ 	struct mmc *mmc = mmc_get_mmc_dev(dev);
+-	struct efx_emmc_tuning_row *rows;
++	u8 *map;
+ 	const char *mode;
+-	u32 samples, sample, shift;
+-	u32 max_len = 0, run = 0, run_start = 0;
+-	u32 best_rows = 0, best_row_start = 0, row, pll;
++	const char *selection;
++	u32 samples, points, sample, shift, adjustment;
++	u32 index, run = 0, best_len = 0, best_start = 0, selected;
++	bool pass;
+ 
+ 	if (opcode != MMC_CMD_SEND_TUNING_BLOCK_HS200)
+ 		return -EINVAL;
+@@ -763,37 +807,34 @@
+ 
+ 	samples = efx_emmc_readl(host, EFX_EMMC_BASE_REG0) &
+ 		  EFX_EMMC_BASE_REG0_CLK_DIV_MASK;
+-	if (!samples)
++	if (!samples || samples > EFX_EMMC_TUNING_MAX_SAMPLES)
+ 		return -EINVAL;
++	points = samples * EFX_EMMC_TUNING_PLL_SHIFTS;
+ 
+-	rows = calloc(samples, sizeof(*rows));
+-	if (!rows)
++	map = calloc(points, sizeof(*map));
++	if (!map)
+ 		return -ENOMEM;
+ 
+ 	for (sample = 0; sample < samples; sample++) {
+ 		for (shift = 0; shift < EFX_EMMC_TUNING_PLL_SHIFTS; shift++) {
+ 			efx_emmc_set_tuning(host, sample, shift);
+-			if (!mmc_send_tuning(mmc, opcode, NULL))
+-				rows[sample].pass |= BIT(shift);
+-		}
+-
+-		run = 0;
+-		for (shift = 0; shift < 2 * EFX_EMMC_TUNING_PLL_SHIFTS;
+-		     shift++) {
+-			if (rows[sample].pass &
+-			    BIT(shift % EFX_EMMC_TUNING_PLL_SHIFTS)) {
+-				if (run < EFX_EMMC_TUNING_PLL_SHIFTS)
+-					run++;
+-				if (run > rows[sample].len) {
+-					rows[sample].start = (shift + 1 - run) %
+-						EFX_EMMC_TUNING_PLL_SHIFTS;
+-					rows[sample].len = run;
+-				}
+-			} else {
+-				run = 0;
++			pass = !mmc_send_tuning(mmc, opcode, NULL);
++			if (pass && !mmc->ddr_mode) {
++				adjustment = efx_emmc_readl(host,
++							 EFX_EMMC_HOST_ADJUSTMENT);
++				if (host->sampling_right_half)
++					pass = (adjustment &
++						(EFX_EMMC_ADJUST_CMD_DIFF |
++						 EFX_EMMC_ADJUST_DATA_ALL_DIFF)) ==
++						(EFX_EMMC_ADJUST_CMD_DIFF |
++						 EFX_EMMC_ADJUST_DATA_ALL_DIFF);
++				else
++					pass = !(adjustment &
++						 (EFX_EMMC_ADJUST_CMD_DIFF |
++						  EFX_EMMC_ADJUST_DATA_ANY_DIFF));
+ 			}
++			map[sample * EFX_EMMC_TUNING_PLL_SHIFTS + shift] = pass;
+ 		}
+-		max_len = max(max_len, (u32)rows[sample].len);
+ 	}
+ 
+ 	printf("eMMC %s tuning map (rows=sample_cnt, columns=pll_shift, 1=pass):\n",
+@@ -802,46 +843,55 @@
+ 	for (sample = 0; sample < samples; sample++) {
+ 		printf("%9u:", sample);
+ 		for (shift = 0; shift < EFX_EMMC_TUNING_PLL_SHIFTS; shift++)
+-			printf(" %u", !!(rows[sample].pass & BIT(shift)));
++			printf(" %u", map[sample * EFX_EMMC_TUNING_PLL_SHIFTS +
++					 shift]);
+ 		printf("\n");
+ 	}
+ 
+-	if (!max_len) {
+-		free(rows);
+-		dev_err(dev, "no tuning point found\n");
+-		return -EIO;
+-	}
+-
+-	run = 0;
+-	for (sample = 0; sample <= samples; sample++) {
+-		if (sample < samples && rows[sample].len == max_len) {
+-			if (!run)
+-				run_start = sample;
++	for (index = 0; index < 2 * points; index++) {
++		if (map[index % points]) {
+ 			run++;
+-		} else {
+-			if (run > best_rows) {
+-				best_row_start = run_start;
+-				best_rows = run;
++			if (run > best_len) {
++				best_start = index + 1 - run;
++				best_len = run;
+ 			}
++		} else {
+ 			run = 0;
+ 		}
+ 	}
+ 
+-	row = best_row_start + (best_rows - 1) / 2;
+-	if (row >= samples) {
+-		free(rows);
+-		return -ERANGE;
++	if (!best_len) {
++		free(map);
++		dev_err(dev, "no tuning point found\n");
++		return -EIO;
++	}
++
++	if (host->tuning_edge && !mmc->ddr_mode) {
++		if (host->sampling_right_half) {
++			selected = best_start % points;
++			selection = "first_col (edge algorithm, right_half "
++				    "sampling window)";
++		} else {
++			selected = (best_start + best_len - 1) % points;
++			selection = "last_col (edge algorithm, left_half "
++				    "sampling window)";
++		}
++	} else {
++		selected = (best_start + (best_len - 1) / 2) % points;
++		selection = mmc->ddr_mode ?
++			"center_col (DDR only supports the center algorithm)" :
++			"center_col (center algorithm)";
+ 	}
+-	pll = (rows[row].start + (rows[row].len - 1) / 2) %
+-	      EFX_EMMC_TUNING_PLL_SHIFTS;
+-	free(rows);
++	sample = selected / EFX_EMMC_TUNING_PLL_SHIFTS;
++	shift = selected % EFX_EMMC_TUNING_PLL_SHIFTS;
++	free(map);
+ 
+-	efx_emmc_set_tuning(host, row, pll);
++	efx_emmc_set_tuning(host, sample, shift);
+ 	host->tuned = true;
+-	host->tuning_sample = row;
+-	host->tuning_pll = pll;
+-	printf("eMMC %s tuning selected: sample_cnt=%u pll_shift=%u\n",
+-	       mode, row, pll);
++	host->tuning_sample = sample;
++	host->tuning_pll = shift;
++	printf("eMMC %s tuning selected: %s, sample_cnt=%u pll_shift=%u\n",
++	       mode, selection, sample, shift);
+ 
+ 	return 0;
+ }
+@@ -889,6 +939,12 @@
+ 	/* Clear any pending interrupts */
+ 	efx_emmc_writel(host, EFX_EMMC_INT_ALL_MASK, EFX_EMMC_INT_STATUS);
+ 
++#ifdef MMC_SUPPORTS_TUNING
++	/* v1.3 PLL defaults: receive clock 0 degrees, output clock 90 degrees. */
++	efx_emmc_set_tuning(host, 0, 0);
++	efx_emmc_set_clock_shift(host, EFX_EMMC_HS400_CLK_SHIFT);
++#endif
++
+ 	/* Set initial bus width to 1-bit */
+ 	reg = efx_emmc_readl(host, EFX_EMMC_HOST_CONTROL);
+ 	reg &= ~EFX_EMMC_DATA_WIDTH_MASK;
+@@ -927,6 +983,7 @@
+ 	struct efx_emmc_host *host = dev_get_priv(dev);
+ 	struct mmc *mmc = &plat->mmc;
+ 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
++	const char *property;
+ 	fdt_addr_t addr;
+ 	int ret;
+ 
+@@ -935,6 +992,24 @@
+ 	host->plat = plat;
+ 	upriv->mmc = &plat->mmc;
+ 	plat->cfg.name = dev->name;
++	property = dev_read_string(dev, "efinix,tuning-algo");
++	if (!property || !strcmp(property, "center"))
++		host->tuning_edge = false;
++	else if (!strcmp(property, "edge"))
++		host->tuning_edge = true;
++	else {
++		dev_err(dev, "invalid efinix,tuning-algo '%s'\n", property);
++		return -EINVAL;
++	}
++	property = dev_read_string(dev, "efinix,sampling-window");
++	if (!property || !strcmp(property, "right_half"))
++		host->sampling_right_half = true;
++	else if (!strcmp(property, "left_half"))
++		host->sampling_right_half = false;
++	else {
++		dev_err(dev, "invalid efinix,sampling-window '%s'\n", property);
++		return -EINVAL;
++	}
+ 
+ 	/* Get eMMC controller base address */
+ 	addr = dev_read_addr_index(dev, 0);
+-- 
+2.43.0
