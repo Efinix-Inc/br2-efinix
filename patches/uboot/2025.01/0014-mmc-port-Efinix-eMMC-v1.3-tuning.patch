@@ -368,14 +368,5 @@ diff --git a/drivers/mmc/efx_emmc.c b/drivers/mmc/efx_emmc.c
  
  	/* Get eMMC controller base address */
  	addr = dev_read_addr_index(dev, 0);
-@@ -968,7 +1043,7 @@
- 	ret = mmc_of_parse(dev, &plat->cfg);
- 	if (ret)
- 		return ret;
--	//plat->cfg.host_caps &= ~MMC_MODE_DDR_52MHz;
-+
- 	if (plat->cfg.f_max < EFX_EMMC_HS_MODE_MIN_FREQ)
- 		plat->cfg.host_caps &= ~(MMC_MODE_HS200 | MMC_MODE_HS400 |
- 					 MMC_MODE_HS400_ES);
 -- 
 2.43.0
