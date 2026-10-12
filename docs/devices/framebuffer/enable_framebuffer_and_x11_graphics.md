@@ -32,7 +32,7 @@ Here are the steps to enable framebuffer support.
        compatible = "efx,dma-controller";
        interrupt-parent = <&plic>;
        interrupts = <0 16>;
-       clocks = <&apb_clock 0>;
+       clocks = <&clock 0>;
        clock-frequency = <200000000>;
        status = "disabled";
    };
@@ -67,7 +67,7 @@ Here are the steps to enable framebuffer support.
        height = <1080>;
        stride = <7680>;
        format = "a8b8g8r8";
-       clocks = <&apb_clock 0>;
+       clocks = <&clock 0>;
        status = "okay";
    };
    ```
@@ -100,7 +100,7 @@ Here are the steps to enable framebuffer support.
    };
    ```
 
-3. Add X11 packages. We are using `BR2_PACKAGE_DESKTOP_ENVIRONMENT` package as it already have some X11 configuration, packages and other configuration for desktop environment. Append the line into `br2-efinix/configs/efinix_ti375c529_defconfig`.
+3. Add X11 packages. We are using `BR2_PACKAGE_DESKTOP_ENVIRONMENT` package as it already have some X11 configuration, packages and other configuration for desktop environment. Append the line into `build/.config`.
    
    ```
    BR2_PACKAGE_DESKTOP_ENVIRONMENT=y
