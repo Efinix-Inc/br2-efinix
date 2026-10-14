@@ -43,7 +43,7 @@ Tested on Ubuntu 24.04 LTS
 sudo apt-get update && sudo apt-get upgrade -y
 sudo apt-get install -y sed make binutils build-essential bash patch gzip \
 bzip2 perl tar cpio unzip rsync file bc wget autoconf automake libtool \
-mtools jq minicom python3-pip libgnutls28-dev python3-jinja2
+mtools jq minicom python3-pip libgnutls28-dev python3-jinja2 libssl-dev
 ```
 
 ### Buildroot Dependencies
